@@ -173,20 +173,20 @@ Story: As a developer workflow researcher, I want to run evaluations with single
 Story: As a developer workflow researcher, I want to run evaluations that use Claude Code's plan mode followed by implementation.
 
 ### Plan-Then-Implement Workflow
-- [ ] T400 [US3] Implement PlanThenImplementWorkflow class (src/claude_evaluator/workflows/plan_then_implement.py)
-- [ ] T401 [US3] Phase 1: Execute with permission_mode=plan (src/claude_evaluator/workflows/plan_then_implement.py)
-- [ ] T402 [US3] Phase 2: Switch to permission_mode=acceptEdits (src/claude_evaluator/workflows/plan_then_implement.py)
-- [ ] T403 [US3] Handle session continuation between phases (src/claude_evaluator/workflows/plan_then_implement.py)
-- [ ] T404 [US3] Capture metrics per phase (planning vs implementation) (src/claude_evaluator/workflows/plan_then_implement.py)
+- [X] T400 [US3] Implement PlanThenImplementWorkflow class (src/claude_evaluator/workflows/plan_then_implement.py)
+- [X] T401 [US3] Phase 1: Execute with permission_mode=plan (src/claude_evaluator/workflows/plan_then_implement.py)
+- [X] T402 [US3] Phase 2: Switch to permission_mode=acceptEdits (src/claude_evaluator/workflows/plan_then_implement.py)
+- [X] T403 [US3] Handle session continuation between phases (src/claude_evaluator/workflows/plan_then_implement.py)
+- [X] T404 [US3] Capture metrics per phase (planning vs implementation) (src/claude_evaluator/workflows/plan_then_implement.py)
 
 ### US-003 Tests
-- [ ] T405 [US3] Write unit tests for PlanThenImplementWorkflow (tests/unit/test_workflows.py)
-- [ ] T406 [US3] Verify: Developer agent triggers plan mode (tests/e2e/test_plan_workflow.py)
-- [ ] T407 [US3] Verify: Transition from plan to develop mode (tests/e2e/test_plan_workflow.py)
-- [ ] T408 [US3] Verify: Metrics captured for both phases (tests/e2e/test_plan_workflow.py)
+- [X] T405 [US3] Write unit tests for PlanThenImplementWorkflow (tests/unit/test_workflows.py)
+- [X] T406 [US3] Verify: Developer agent triggers plan mode (tests/e2e/test_plan_workflow.py)
+- [X] T407 [US3] Verify: Transition from plan to develop mode (tests/e2e/test_plan_workflow.py)
+- [X] T408 [US3] Verify: Metrics captured for both phases (tests/e2e/test_plan_workflow.py)
 
 ### Checkpoint
-- [ ] T409 [US3] CHECKPOINT: Verify plan-then-implement workflow with phase metrics
+- [X] T409 [US3] CHECKPOINT: Verify plan-then-implement workflow with phase metrics
 
 ---
 
