@@ -15,7 +15,46 @@ import yaml
 from ..models.enums import PermissionMode
 from .models import EvalDefaults, EvaluationConfig, EvaluationSuite, Phase
 
-__all__ = ["load_suite"]
+__all__ = ["load_suite", "apply_defaults"]
+
+
+def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
+    """Apply suite-level defaults to individual evaluation configurations.
+
+    For each evaluation in the suite, applies default values from the suite's
+    defaults for any fields that the evaluation doesn't explicitly override.
+
+    Args:
+        suite: The evaluation suite to process.
+
+    Returns:
+        EvaluationSuite: The modified suite with defaults applied to all evaluations.
+            Note: This modifies the evaluations in place and returns the same suite object.
+
+    Example:
+        >>> suite = load_suite("evaluations/my-suite.yaml")
+        >>> # Defaults are automatically applied, but can also be called explicitly:
+        >>> suite = apply_defaults(suite)
+    """
+    if suite.defaults is None:
+        return suite
+
+    defaults = suite.defaults
+
+    for evaluation in suite.evaluations:
+        # Apply max_turns default if not overridden
+        if evaluation.max_turns is None and defaults.max_turns is not None:
+            evaluation.max_turns = defaults.max_turns
+
+        # Apply max_budget_usd default if not overridden
+        if evaluation.max_budget_usd is None and defaults.max_budget_usd is not None:
+            evaluation.max_budget_usd = defaults.max_budget_usd
+
+        # Apply timeout_seconds default if not overridden
+        if evaluation.timeout_seconds is None and defaults.timeout_seconds is not None:
+            evaluation.timeout_seconds = defaults.timeout_seconds
+
+    return suite
 
 
 def load_suite(path: Path | str) -> EvaluationSuite:
@@ -57,7 +96,8 @@ def load_suite(path: Path | str) -> EvaluationSuite:
     if not isinstance(data, dict):
         raise ValueError(f"Invalid YAML structure: expected mapping, got {type(data).__name__}")
 
-    return _parse_suite(data, path)
+    suite = _parse_suite(data, path)
+    return apply_defaults(suite)
 
 
 def _parse_suite(data: dict[str, Any], source_path: Path) -> EvaluationSuite:
