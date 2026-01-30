@@ -60,9 +60,11 @@ class DirectWorkflow(BaseWorkflow):
             # Set the phase for metrics tracking
             self.set_phase("implementation")
 
-            # Configure Worker with acceptEdits permission for direct execution
+            # Configure Worker permission - use bypassPermissions for file creation
             worker = evaluation.worker_agent
-            worker.set_permission_mode(PermissionMode.acceptEdits)
+            # Only set acceptEdits if not already bypassPermissions
+            if worker.permission_mode != PermissionMode.bypassPermissions:
+                worker.set_permission_mode(PermissionMode.acceptEdits)
 
             # Execute the task prompt directly
             query_metrics = await worker.execute_query(

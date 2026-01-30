@@ -238,7 +238,7 @@ async def run_evaluation(
         execution_mode=ExecutionMode.sdk,
         project_directory=str(output_dir),
         active_session=False,
-        permission_mode=PermissionMode.plan,
+        permission_mode=PermissionMode.bypassPermissions,
     )
 
     # Create evaluation
@@ -254,6 +254,9 @@ async def run_evaluation(
 
     # Start evaluation
     evaluation.start()
+
+    # Update worker to use evaluation workspace
+    worker.project_directory = str(evaluation.workspace_path)
 
     if verbose:
         print(f"Workspace: {evaluation.workspace_path}")
