@@ -27,25 +27,25 @@
 Project initialization and environment configuration.
 
 ### Directory Structure
-- [ ] T001 [P] Create project directory structure (src/claude_evaluator/)
-- [ ] T002 [P] Create agents directory (src/claude_evaluator/agents/)
-- [ ] T003 [P] Create config directory (src/claude_evaluator/config/)
-- [ ] T004 [P] Create metrics directory (src/claude_evaluator/metrics/)
-- [ ] T005 [P] Create workflows directory (src/claude_evaluator/workflows/)
-- [ ] T006 [P] Create report directory (src/claude_evaluator/report/)
-- [ ] T007 [P] Create tests directory structure (tests/unit/, tests/integration/, tests/e2e/)
-- [ ] T008 [P] Create evals directory for YAML configs (evals/)
-- [ ] T009 [P] Create evaluations output directory (evaluations/)
+- [X] T001 [P] Create project directory structure (src/claude_evaluator/)
+- [X] T002 [P] Create agents directory (src/claude_evaluator/agents/)
+- [X] T003 [P] Create config directory (src/claude_evaluator/config/)
+- [X] T004 [P] Create metrics directory (src/claude_evaluator/metrics/)
+- [X] T005 [P] Create workflows directory (src/claude_evaluator/workflows/)
+- [X] T006 [P] Create report directory (src/claude_evaluator/report/)
+- [X] T007 [P] Create tests directory structure (tests/unit/, tests/integration/, tests/e2e/)
+- [X] T008 [P] Create evals directory for YAML configs (evals/)
+- [X] T009 [P] Create evaluations output directory (evaluations/)
 
 ### Configuration Files
-- [ ] T010 Create pyproject.toml with dependencies and tool config (pyproject.toml)
-- [ ] T011 Create package __init__.py with version (src/claude_evaluator/__init__.py)
-- [ ] T012 [P] Create .gitignore for Python project (.gitignore)
-- [ ] T013 [P] Create pytest configuration (tests/conftest.py)
+- [X] T010 Create pyproject.toml with dependencies and tool config (pyproject.toml)
+- [X] T011 Create package __init__.py with version (src/claude_evaluator/__init__.py)
+- [X] T012 [P] Create .gitignore for Python project (.gitignore)
+- [X] T013 [P] Create pytest configuration (tests/conftest.py)
 
 ### Dependency Installation
-- [ ] T014 Install production dependencies: claude-agent-sdk, pyyaml
-- [ ] T015 Install dev dependencies: pytest, ruff, mypy
+- [X] T014 Install production dependencies: claude-agent-sdk, pyyaml
+- [X] T015 Install dev dependencies: pytest, ruff, mypy
 
 ---
 
@@ -54,41 +54,41 @@ Project initialization and environment configuration.
 Core entities, enums, and shared utilities used across multiple user stories.
 
 ### Core Enums (src/claude_evaluator/models/)
-- [ ] T100 Create models module init (src/claude_evaluator/models/__init__.py)
-- [ ] T101 [P] Define WorkflowType enum (direct, plan_then_implement, multi_command) (src/claude_evaluator/models/enums.py)
-- [ ] T102 [P] Define EvaluationStatus enum (pending, running, completed, failed) (src/claude_evaluator/models/enums.py)
-- [ ] T103 [P] Define ExecutionMode enum (sdk, cli) (src/claude_evaluator/models/enums.py)
-- [ ] T104 [P] Define PermissionMode enum (plan, acceptEdits, bypassPermissions) (src/claude_evaluator/models/enums.py)
-- [ ] T105 [P] Define Outcome enum (success, partial, failure, timeout, budget_exceeded, loop_detected) (src/claude_evaluator/models/enums.py)
-- [ ] T106 [P] Define DeveloperState enum (src/claude_evaluator/models/enums.py)
+- [X] T100 Create models module init (src/claude_evaluator/models/__init__.py)
+- [X] T101 [P] Define WorkflowType enum (direct, plan_then_implement, multi_command) (src/claude_evaluator/models/enums.py)
+- [X] T102 [P] Define EvaluationStatus enum (pending, running, completed, failed) (src/claude_evaluator/models/enums.py)
+- [X] T103 [P] Define ExecutionMode enum (sdk, cli) (src/claude_evaluator/models/enums.py)
+- [X] T104 [P] Define PermissionMode enum (plan, acceptEdits, bypassPermissions) (src/claude_evaluator/models/enums.py)
+- [X] T105 [P] Define Outcome enum (success, partial, failure, timeout, budget_exceeded, loop_detected) (src/claude_evaluator/models/enums.py)
+- [X] T106 [P] Define DeveloperState enum (src/claude_evaluator/models/enums.py)
 
 ### Foundation Entities
-- [ ] T107 Define Decision dataclass (src/claude_evaluator/models/decision.py)
-- [ ] T108 Define ToolInvocation dataclass (src/claude_evaluator/models/tool_invocation.py)
-- [ ] T109 Define QueryMetrics dataclass (src/claude_evaluator/models/query_metrics.py)
-- [ ] T110 Define Metrics dataclass (src/claude_evaluator/models/metrics.py)
-- [ ] T111 Define TimelineEvent dataclass (src/claude_evaluator/models/timeline_event.py)
+- [X] T107 Define Decision dataclass (src/claude_evaluator/models/decision.py)
+- [X] T108 Define ToolInvocation dataclass (src/claude_evaluator/models/tool_invocation.py)
+- [X] T109 Define QueryMetrics dataclass (src/claude_evaluator/models/query_metrics.py)
+- [X] T110 Define Metrics dataclass (src/claude_evaluator/models/metrics.py)
+- [X] T111 Define TimelineEvent dataclass (src/claude_evaluator/models/timeline_event.py)
 
 ### YAML Configuration Entities
-- [ ] T112 Define Phase dataclass (src/claude_evaluator/config/models.py)
-- [ ] T113 Define EvalDefaults dataclass (src/claude_evaluator/config/models.py)
-- [ ] T114 Define EvaluationConfig dataclass (src/claude_evaluator/config/models.py)
-- [ ] T115 Define EvaluationSuite dataclass (src/claude_evaluator/config/models.py)
-- [ ] T116 Define SuiteSummary dataclass (src/claude_evaluator/config/models.py)
-- [ ] T117 Define SuiteRunResult dataclass (src/claude_evaluator/config/models.py)
+- [X] T112 Define Phase dataclass (src/claude_evaluator/config/models.py)
+- [X] T113 Define EvalDefaults dataclass (src/claude_evaluator/config/models.py)
+- [X] T114 Define EvaluationConfig dataclass (src/claude_evaluator/config/models.py)
+- [X] T115 Define EvaluationSuite dataclass (src/claude_evaluator/config/models.py)
+- [X] T116 Define SuiteSummary dataclass (src/claude_evaluator/config/models.py)
+- [X] T117 Define SuiteRunResult dataclass (src/claude_evaluator/config/models.py)
 
 ### Config Loader
-- [ ] T118 Implement YAML suite loader with validation (src/claude_evaluator/config/loader.py)
-- [ ] T119 Add defaults inheritance logic to config loader (src/claude_evaluator/config/loader.py)
-- [ ] T120 Create config module init with exports (src/claude_evaluator/config/__init__.py)
+- [X] T118 Implement YAML suite loader with validation (src/claude_evaluator/config/loader.py)
+- [X] T119 Add defaults inheritance logic to config loader (src/claude_evaluator/config/loader.py)
+- [X] T120 Create config module init with exports (src/claude_evaluator/config/__init__.py)
 
 ### Example YAML Suites
-- [ ] T121 [P] Create example-suite.yaml with documentation (evals/example-suite.yaml)
-- [ ] T122 [P] Create greenfield.yaml with workflow configs (evals/greenfield.yaml)
+- [X] T121 [P] Create example-suite.yaml with documentation (evals/example-suite.yaml)
+- [X] T122 [P] Create greenfield.yaml with workflow configs (evals/greenfield.yaml)
 
 ### Foundation Tests
-- [ ] T123 Write unit tests for config loader (tests/unit/test_config.py)
-- [ ] T124 Write unit tests for enum definitions (tests/unit/test_enums.py)
+- [X] T123 Write unit tests for config loader (tests/unit/test_config.py)
+- [X] T124 Write unit tests for enum definitions (tests/unit/test_enums.py)
 
 ---
 
@@ -97,48 +97,48 @@ Core entities, enums, and shared utilities used across multiple user stories.
 Story: As a developer workflow researcher, I want to run an evaluation that simulates a developer using Claude Code to build a greenfield solution.
 
 ### Agent Entities
-- [ ] T200 [US1] Define DeveloperAgent dataclass with state machine (src/claude_evaluator/agents/developer.py)
-- [ ] T201 [US1] Define WorkerAgent dataclass with SDK integration points (src/claude_evaluator/agents/worker.py)
-- [ ] T202 [US1] Create agents module init (src/claude_evaluator/agents/__init__.py)
+- [X] T200 [US1] Define DeveloperAgent dataclass with state machine (src/claude_evaluator/agents/developer.py)
+- [X] T201 [US1] Define WorkerAgent dataclass with SDK integration points (src/claude_evaluator/agents/worker.py)
+- [X] T202 [US1] Create agents module init (src/claude_evaluator/agents/__init__.py)
 
 ### Evaluation Entity
-- [ ] T203 [US1] Define Evaluation dataclass with all attributes (src/claude_evaluator/evaluation.py)
-- [ ] T204 [US1] Implement Evaluation state transitions (pending→running→completed/failed) (src/claude_evaluator/evaluation.py)
-- [ ] T205 [US1] Add workspace creation using tempfile (src/claude_evaluator/evaluation.py)
-- [ ] T206 [US1] Add workspace cleanup on completion/failure (src/claude_evaluator/evaluation.py)
+- [X] T203 [US1] Define Evaluation dataclass with all attributes (src/claude_evaluator/evaluation.py)
+- [X] T204 [US1] Implement Evaluation state transitions (pending→running→completed/failed) (src/claude_evaluator/evaluation.py)
+- [X] T205 [US1] Add workspace creation using tempfile (src/claude_evaluator/evaluation.py)
+- [X] T206 [US1] Add workspace cleanup on completion/failure (src/claude_evaluator/evaluation.py)
 
 ### Worker Agent Implementation
-- [ ] T207 [US1] Integrate claude-agent-sdk ClaudeSDKClient (src/claude_evaluator/agents/worker.py)
-- [ ] T208 [US1] Implement query execution with permission modes (src/claude_evaluator/agents/worker.py)
-- [ ] T209 [US1] Add PreToolUse hook for tool invocation tracking (src/claude_evaluator/agents/worker.py)
-- [ ] T210 [US1] Capture ResultMessage metrics (tokens, cost, duration) (src/claude_evaluator/agents/worker.py)
+- [X] T207 [US1] Integrate claude-agent-sdk ClaudeSDKClient (src/claude_evaluator/agents/worker.py)
+- [X] T208 [US1] Implement query execution with permission modes (src/claude_evaluator/agents/worker.py)
+- [X] T209 [US1] Add PreToolUse hook for tool invocation tracking (src/claude_evaluator/agents/worker.py)
+- [X] T210 [US1] Capture ResultMessage metrics (tokens, cost, duration) (src/claude_evaluator/agents/worker.py)
 
 ### Developer Agent Implementation
-- [ ] T211 [US1] Implement Developer agent state machine (src/claude_evaluator/agents/developer.py)
-- [ ] T212 [US1] Add decision logging to Developer agent (src/claude_evaluator/agents/developer.py)
-- [ ] T213 [US1] Implement fallback response handling (src/claude_evaluator/agents/developer.py)
-- [ ] T214 [US1] Add loop detection (max_iterations) (src/claude_evaluator/agents/developer.py)
+- [X] T211 [US1] Implement Developer agent state machine (src/claude_evaluator/agents/developer.py)
+- [X] T212 [US1] Add decision logging to Developer agent (src/claude_evaluator/agents/developer.py)
+- [X] T213 [US1] Implement fallback response handling (src/claude_evaluator/agents/developer.py)
+- [X] T214 [US1] Add loop detection (max_iterations) (src/claude_evaluator/agents/developer.py)
 
 ### Metrics Collection
-- [ ] T215 [US1] Create MetricsCollector class (src/claude_evaluator/metrics/collector.py)
-- [ ] T216 [US1] Aggregate tokens from ResultMessage (src/claude_evaluator/metrics/collector.py)
-- [ ] T217 [US1] Track tool invocations via hooks (src/claude_evaluator/metrics/collector.py)
-- [ ] T218 [US1] Calculate per-phase token breakdown (src/claude_evaluator/metrics/collector.py)
-- [ ] T219 [US1] Create metrics module init (src/claude_evaluator/metrics/__init__.py)
+- [X] T215 [US1] Create MetricsCollector class (src/claude_evaluator/metrics/collector.py)
+- [X] T216 [US1] Aggregate tokens from ResultMessage (src/claude_evaluator/metrics/collector.py)
+- [X] T217 [US1] Track tool invocations via hooks (src/claude_evaluator/metrics/collector.py)
+- [X] T218 [US1] Calculate per-phase token breakdown (src/claude_evaluator/metrics/collector.py)
+- [X] T219 [US1] Create metrics module init (src/claude_evaluator/metrics/__init__.py)
 
 ### Report Generation
-- [ ] T220 [US1] Define EvaluationReport dataclass (src/claude_evaluator/report/models.py)
-- [ ] T221 [US1] Create ReportGenerator class (src/claude_evaluator/report/generator.py)
-- [ ] T222 [US1] Implement JSON report serialization (src/claude_evaluator/report/generator.py)
-- [ ] T223 [US1] Build timeline from evaluation events (src/claude_evaluator/report/generator.py)
-- [ ] T224 [US1] Create report module init (src/claude_evaluator/report/__init__.py)
+- [X] T220 [US1] Define EvaluationReport dataclass (src/claude_evaluator/report/models.py)
+- [X] T221 [US1] Create ReportGenerator class (src/claude_evaluator/report/generator.py)
+- [X] T222 [US1] Implement JSON report serialization (src/claude_evaluator/report/generator.py)
+- [X] T223 [US1] Build timeline from evaluation events (src/claude_evaluator/report/generator.py)
+- [X] T224 [US1] Create report module init (src/claude_evaluator/report/__init__.py)
 
 ### US-001 Tests
-- [ ] T225 [P] [US1] Write unit tests for Worker agent (tests/unit/test_worker_agent.py)
-- [ ] T226 [P] [US1] Write unit tests for Developer agent (tests/unit/test_developer_agent.py)
-- [ ] T227 [P] [US1] Write unit tests for Evaluation lifecycle (tests/unit/test_evaluation.py)
-- [ ] T228 [P] [US1] Write unit tests for MetricsCollector (tests/unit/test_metrics.py)
-- [ ] T229 [US1] Write integration test for SDK integration (tests/integration/test_sdk_integration.py)
+- [X] T225 [P] [US1] Write unit tests for Worker agent (tests/unit/test_worker_agent.py)
+- [X] T226 [P] [US1] Write unit tests for Developer agent (tests/unit/test_developer_agent.py)
+- [X] T227 [P] [US1] Write unit tests for Evaluation lifecycle (tests/unit/test_evaluation.py)
+- [X] T228 [P] [US1] Write unit tests for MetricsCollector (tests/unit/test_metrics.py)
+- [X] T229 [US1] Write integration test for SDK integration (tests/integration/test_sdk_integration.py)
 
 ### Checkpoint
 - [ ] T230 [US1] CHECKPOINT: Verify basic evaluation runs autonomously with metrics capture
