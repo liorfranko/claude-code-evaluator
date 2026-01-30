@@ -1218,3 +1218,473 @@ class TestPlanThenImplementWorkflowErrorHandling:
             asyncio.run(workflow.execute(evaluation))
 
         assert "Specific error message" in evaluation.error
+
+
+# =============================================================================
+# MultiCommandWorkflow Tests
+# =============================================================================
+
+from claude_evaluator.config.models import Phase
+from claude_evaluator.workflows.multi_command import MultiCommandWorkflow
+
+
+class TestMultiCommandWorkflowInitialization:
+    """Tests for MultiCommandWorkflow initialization."""
+
+    def test_initialization_with_phases(self) -> None:
+        """Test workflow can be initialized with phases."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(name="analyze", permission_mode=PermissionMode.plan),
+            Phase(name="implement", permission_mode=PermissionMode.acceptEdits),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        assert workflow.metrics_collector is collector
+        assert len(workflow.phases) == 2
+
+    def test_phases_property_returns_configured_phases(self) -> None:
+        """Test that phases property returns the configured phases."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(name="step1", permission_mode=PermissionMode.plan),
+            Phase(name="step2", permission_mode=PermissionMode.acceptEdits),
+            Phase(name="step3", permission_mode=PermissionMode.bypassPermissions),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        assert workflow.phases == phases
+        assert workflow.phases[0].name == "step1"
+        assert workflow.phases[1].name == "step2"
+        assert workflow.phases[2].name == "step3"
+
+    def test_phase_results_initially_empty(self) -> None:
+        """Test that phase_results is empty before execution."""
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        assert workflow.phase_results == {}
+
+    def test_current_phase_index_initially_zero(self) -> None:
+        """Test that current_phase_index starts at zero."""
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        assert workflow.current_phase_index == 0
+
+    def test_workflow_inherits_from_base_workflow(self) -> None:
+        """Test that MultiCommandWorkflow inherits from BaseWorkflow."""
+        from claude_evaluator.workflows.base import BaseWorkflow
+
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        assert isinstance(workflow, BaseWorkflow)
+
+
+class TestMultiCommandWorkflowExecution:
+    """Tests for MultiCommandWorkflow execution."""
+
+    def create_mock_evaluation(self) -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        developer = DeveloperAgent()
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        evaluation = Evaluation(
+            task_description="Build a REST API with authentication",
+            workflow_type=WorkflowType.multi_command,
+            developer_agent=developer,
+            worker_agent=worker,
+        )
+        return evaluation
+
+    def test_execute_runs_all_phases_in_order(self) -> None:
+        """Test that execute runs all phases in configured order."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(name="design", permission_mode=PermissionMode.plan),
+            Phase(name="implement", permission_mode=PermissionMode.acceptEdits),
+            Phase(name="test", permission_mode=PermissionMode.acceptEdits),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        executed_phases: list[str] = []
+
+        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+            executed_phases.append(phase)
+            return QueryMetrics(
+                query_index=len(executed_phases),
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.003,
+                duration_ms=1000,
+                num_turns=3,
+                response=f"Result from {phase}",
+            )
+
+        evaluation.worker_agent.execute_query = mock_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert executed_phases == ["design", "implement", "test"]
+
+    def test_execute_sets_correct_permission_per_phase(self) -> None:
+        """Test that each phase uses its configured permission mode."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(name="phase1", permission_mode=PermissionMode.plan),
+            Phase(name="phase2", permission_mode=PermissionMode.acceptEdits),
+            Phase(name="phase3", permission_mode=PermissionMode.bypassPermissions),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        permission_sequence: list[PermissionMode] = []
+
+        original_set_mode = evaluation.worker_agent.set_permission_mode
+
+        def capture_mode(mode: PermissionMode) -> None:
+            permission_sequence.append(mode)
+            original_set_mode(mode)
+
+        evaluation.worker_agent.set_permission_mode = capture_mode
+
+        sample_metrics = QueryMetrics(
+            query_index=1,
+            prompt="test",
+            phase="test",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.003,
+            duration_ms=1000,
+            num_turns=3,
+            response="Response",
+        )
+
+        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+            return sample_metrics
+
+        evaluation.worker_agent.execute_query = mock_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert permission_sequence == [
+            PermissionMode.plan,
+            PermissionMode.acceptEdits,
+            PermissionMode.bypassPermissions,
+        ]
+
+    def test_execute_stores_phase_results(self) -> None:
+        """Test that phase results are stored after execution."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(name="analyze", permission_mode=PermissionMode.plan),
+            Phase(name="implement", permission_mode=PermissionMode.acceptEdits),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+            return QueryMetrics(
+                query_index=1,
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.003,
+                duration_ms=1000,
+                num_turns=3,
+                response=f"Result from {phase} phase",
+            )
+
+        evaluation.worker_agent.execute_query = mock_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert workflow.phase_results["analyze"] == "Result from analyze phase"
+        assert workflow.phase_results["implement"] == "Result from implement phase"
+
+
+class TestMultiCommandWorkflowContextPassing:
+    """Tests for context passing between phases."""
+
+    def create_mock_evaluation(self) -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        developer = DeveloperAgent()
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        evaluation = Evaluation(
+            task_description="Create a logging utility",
+            workflow_type=WorkflowType.multi_command,
+            developer_agent=developer,
+            worker_agent=worker,
+        )
+        return evaluation
+
+    def test_previous_result_passed_to_next_phase(self) -> None:
+        """Test that previous phase result is passed to the next phase."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="design",
+                permission_mode=PermissionMode.plan,
+                prompt_template="Design for: {task}",
+            ),
+            Phase(
+                name="implement",
+                permission_mode=PermissionMode.acceptEdits,
+                prompt_template="Implement based on: {previous_result}",
+            ),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        received_prompts: list[str] = []
+
+        async def capture_query(query: str, phase: str) -> QueryMetrics:
+            received_prompts.append(query)
+            return QueryMetrics(
+                query_index=len(received_prompts),
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.003,
+                duration_ms=1000,
+                num_turns=3,
+                response="Design output: Logger class with levels" if phase == "design" else "Done",
+            )
+
+        evaluation.worker_agent.execute_query = capture_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        # Second prompt should contain the previous result
+        assert "Design output: Logger class with levels" in received_prompts[1]
+
+    def test_task_placeholder_substituted(self) -> None:
+        """Test that {task} placeholder is substituted in prompts."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="analyze",
+                permission_mode=PermissionMode.plan,
+                prompt_template="Analyze the following: {task}",
+            ),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        received_query: str | None = None
+
+        async def capture_query(query: str, phase: str) -> QueryMetrics:
+            nonlocal received_query
+            received_query = query
+            return QueryMetrics(
+                query_index=1,
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.003,
+                duration_ms=1000,
+                num_turns=3,
+                response="Analysis complete",
+            )
+
+        evaluation.worker_agent.execute_query = capture_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert evaluation.task_description in received_query
+
+    def test_static_prompt_used_when_provided(self) -> None:
+        """Test that static prompt is used instead of template when provided."""
+        collector = MetricsCollector()
+        static_prompt = "Run the pre-defined test suite"
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.acceptEdits,
+                prompt=static_prompt,
+                prompt_template="This should not be used: {task}",
+            ),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        received_query: str | None = None
+
+        async def capture_query(query: str, phase: str) -> QueryMetrics:
+            nonlocal received_query
+            received_query = query
+            return QueryMetrics(
+                query_index=1,
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.003,
+                duration_ms=1000,
+                num_turns=3,
+                response="Tests passed",
+            )
+
+        evaluation.worker_agent.execute_query = capture_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert received_query == static_prompt
+
+
+class TestMultiCommandWorkflowMetrics:
+    """Tests for metrics collection across phases."""
+
+    def create_mock_evaluation(self) -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        developer = DeveloperAgent()
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        evaluation = Evaluation(
+            task_description="Build API",
+            workflow_type=WorkflowType.multi_command,
+            developer_agent=developer,
+            worker_agent=worker,
+        )
+        return evaluation
+
+    def test_aggregate_metrics_from_all_phases(self) -> None:
+        """Test that metrics are aggregated from all phases."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(name="phase1", permission_mode=PermissionMode.plan),
+            Phase(name="phase2", permission_mode=PermissionMode.acceptEdits),
+            Phase(name="phase3", permission_mode=PermissionMode.acceptEdits),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        phase_tokens = {"phase1": 100, "phase2": 200, "phase3": 300}
+
+        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+            tokens = phase_tokens[phase]
+            return QueryMetrics(
+                query_index=1,
+                prompt=query,
+                phase=phase,
+                input_tokens=tokens,
+                output_tokens=tokens * 2,
+                cost_usd=tokens * 0.00001,
+                duration_ms=1000,
+                num_turns=3,
+                response=f"Done {phase}",
+            )
+
+        evaluation.worker_agent.execute_query = mock_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        result = asyncio.run(workflow.execute(evaluation))
+
+        # Total input: 100 + 200 + 300 = 600
+        # Total output: 200 + 400 + 600 = 1200
+        assert result.input_tokens == 600
+        assert result.output_tokens == 1200
+        assert result.total_tokens == 1800
+        assert result.prompt_count == 3
+
+    def test_per_phase_token_breakdown(self) -> None:
+        """Test that tokens are broken down by phase."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(name="design", permission_mode=PermissionMode.plan),
+            Phase(name="code", permission_mode=PermissionMode.acceptEdits),
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+        evaluation = self.create_mock_evaluation()
+
+        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+            if phase == "design":
+                return QueryMetrics(
+                    query_index=1,
+                    prompt=query,
+                    phase=phase,
+                    input_tokens=100,
+                    output_tokens=200,
+                    cost_usd=0.003,
+                    duration_ms=1000,
+                    num_turns=3,
+                    response="Design",
+                )
+            return QueryMetrics(
+                query_index=2,
+                prompt=query,
+                phase=phase,
+                input_tokens=400,
+                output_tokens=800,
+                cost_usd=0.012,
+                duration_ms=5000,
+                num_turns=10,
+                response="Code",
+            )
+
+        evaluation.worker_agent.execute_query = mock_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        result = asyncio.run(workflow.execute(evaluation))
+
+        assert result.tokens_by_phase["design"] == 300  # 100 + 200
+        assert result.tokens_by_phase["code"] == 1200  # 400 + 800
+
+
+class TestMultiCommandWorkflowReset:
+    """Tests for workflow reset functionality."""
+
+    def test_reset_clears_phase_results(self) -> None:
+        """Test that reset clears phase results."""
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        # Manually add some results
+        workflow._phase_results["test"] = "Some result"
+        workflow._current_phase_index = 5
+
+        workflow.reset()
+
+        assert workflow.phase_results == {}
+        assert workflow.current_phase_index == 0
