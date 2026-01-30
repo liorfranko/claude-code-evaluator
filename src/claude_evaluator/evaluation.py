@@ -11,12 +11,16 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from .agents.developer import DeveloperAgent
 from .agents.worker import WorkerAgent
 from .models.enums import EvaluationStatus, WorkflowType
 from .models.metrics import Metrics
+
+if TYPE_CHECKING:
+    from .metrics.collector import MetricsCollector
+    from .workflows.direct import DirectWorkflow
 
 __all__ = ["Evaluation", "InvalidEvaluationStateError"]
 
@@ -185,3 +189,38 @@ class Evaluation:
             return None
         delta = self.end_time - self.start_time
         return int(delta.total_seconds() * 1000)
+
+    async def run_direct_workflow(
+        self, metrics_collector: "MetricsCollector"
+    ) -> Metrics:
+        """Execute this evaluation using the DirectWorkflow.
+
+        Convenience method for running a single-phase direct implementation
+        workflow. Creates a DirectWorkflow instance and executes it.
+
+        Args:
+            metrics_collector: The MetricsCollector instance for aggregating
+                metrics during execution.
+
+        Returns:
+            A Metrics object containing all collected metrics from the execution.
+
+        Raises:
+            InvalidEvaluationStateError: If the evaluation is in a terminal state.
+            Exception: If the workflow execution fails.
+
+        Example:
+            collector = MetricsCollector()
+            evaluation = Evaluation(
+                task_description="Create a hello world script",
+                workflow_type=WorkflowType.direct,
+                developer_agent=developer,
+                worker_agent=worker,
+            )
+            metrics = await evaluation.run_direct_workflow(collector)
+        """
+        # Import here to avoid circular imports
+        from .workflows.direct import DirectWorkflow
+
+        workflow = DirectWorkflow(metrics_collector)
+        return await workflow.execute(self)
