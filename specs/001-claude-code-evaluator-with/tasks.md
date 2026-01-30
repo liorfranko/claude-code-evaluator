@@ -241,7 +241,7 @@ Final integration, CLI interface, and success criteria verification.
 - [X] T615 Write full workflow E2E tests (tests/e2e/test_full_workflow.py)
 
 ### Checkpoint
-- [ ] T616 CHECKPOINT: All success criteria verified, CLI functional
+- [X] T616 CHECKPOINT: All success criteria verified, CLI functional
 
 ---
 
