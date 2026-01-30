@@ -7,12 +7,12 @@ through the evaluation workflow and logs autonomous decisions.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from ..models.decision import Decision
-from ..models.enums import DeveloperState
+from ..models.enums import DeveloperState, Outcome
 
-__all__ = ["DeveloperAgent"]
+__all__ = ["DeveloperAgent", "InvalidStateTransitionError", "LoopDetectedError"]
 
 # Define valid state transitions for the Developer agent state machine
 _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
@@ -61,6 +61,12 @@ class InvalidStateTransitionError(Exception):
     pass
 
 
+class LoopDetectedError(Exception):
+    """Raised when the agent detects an infinite loop (max_iterations exceeded)."""
+
+    pass
+
+
 @dataclass
 class DeveloperAgent:
     """Developer agent that orchestrates Claude Code during evaluation.
@@ -83,6 +89,7 @@ class DeveloperAgent:
     decisions_log: list[Decision] = field(default_factory=list)
     fallback_responses: Optional[dict[str, str]] = field(default=None)
     max_iterations: int = field(default=100)
+    iteration_count: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         """Validate the initial state of the agent."""
@@ -164,3 +171,292 @@ class DeveloperAgent:
             List of valid target states from the current state.
         """
         return list(_VALID_TRANSITIONS.get(self.current_state, set()))
+
+    def _increment_iteration(self) -> None:
+        """Increment the iteration counter and check for loop detection.
+
+        Raises:
+            LoopDetectedError: If max_iterations is exceeded.
+        """
+        self.iteration_count += 1
+        if self.iteration_count > self.max_iterations:
+            self.log_decision(
+                context=f"Iteration count ({self.iteration_count}) exceeded max_iterations ({self.max_iterations})",
+                action="Transitioning to failed state due to loop detection",
+                rationale="Preventing infinite loop by enforcing iteration limit",
+            )
+            # Force transition to failed state
+            self.current_state = DeveloperState.failed
+            raise LoopDetectedError(
+                f"Loop detected: iteration count ({self.iteration_count}) exceeded "
+                f"max_iterations ({self.max_iterations})"
+            )
+
+    def get_fallback_response(self, question: str) -> Optional[str]:
+        """Get a predefined fallback response for a common question.
+
+        Searches the fallback_responses dictionary for a matching response
+        based on keywords in the question. If no fallback_responses are
+        configured or no match is found, returns None.
+
+        Args:
+            question: The question or prompt to find a fallback response for.
+
+        Returns:
+            A predefined response string if found, None otherwise.
+        """
+        if self.fallback_responses is None:
+            return None
+
+        # Normalize the question for matching
+        question_lower = question.lower()
+
+        # Check for exact key match first
+        if question_lower in self.fallback_responses:
+            self.log_decision(
+                context=f"Received question: {question[:50]}...",
+                action="Using fallback response (exact match)",
+                rationale="Question matched a predefined fallback response key",
+            )
+            return self.fallback_responses[question_lower]
+
+        # Check for partial keyword matches
+        for key, response in self.fallback_responses.items():
+            if key.lower() in question_lower:
+                self.log_decision(
+                    context=f"Received question: {question[:50]}...",
+                    action=f"Using fallback response (keyword match: {key})",
+                    rationale="Question contained a fallback response keyword",
+                )
+                return response
+
+        return None
+
+    def handle_response(
+        self,
+        response: dict[str, Any],
+        *,
+        is_plan: bool = False,
+        is_complete: bool = False,
+    ) -> DeveloperState:
+        """Process a Worker response and determine the next state.
+
+        Analyzes the response from the Worker agent and transitions to the
+        appropriate next state. Also logs the decision for traceability.
+
+        Args:
+            response: The response data from the Worker agent.
+            is_plan: Whether this response contains a plan to review.
+            is_complete: Whether the Worker indicates task completion.
+
+        Returns:
+            The new state after processing the response.
+
+        Raises:
+            InvalidStateTransitionError: If no valid transition is possible.
+            LoopDetectedError: If max_iterations is exceeded.
+        """
+        self._increment_iteration()
+
+        # Must be in awaiting_response state to handle a response
+        if self.current_state != DeveloperState.awaiting_response:
+            self.log_decision(
+                context=f"Received response while in {self.current_state.value} state",
+                action="Ignoring response - not in awaiting_response state",
+                rationale="Responses can only be processed in awaiting_response state",
+            )
+            return self.current_state
+
+        # Determine next state based on response characteristics
+        if is_plan:
+            new_state = DeveloperState.reviewing_plan
+            action = "Transitioning to reviewing_plan"
+            rationale = "Response contains a plan that needs review"
+        elif is_complete:
+            new_state = DeveloperState.evaluating_completion
+            action = "Transitioning to evaluating_completion"
+            rationale = "Worker indicates task is complete"
+        else:
+            # Default: evaluate completion status
+            new_state = DeveloperState.evaluating_completion
+            action = "Transitioning to evaluating_completion"
+            rationale = "Evaluating response to determine if task is done"
+
+        self.log_decision(
+            context=f"Processing Worker response: {str(response)[:100]}...",
+            action=action,
+            rationale=rationale,
+        )
+
+        self.transition_to(new_state)
+        return self.current_state
+
+    def run_workflow(
+        self,
+        initial_prompt: str,
+        *,
+        send_prompt_callback: Optional[Any] = None,
+        receive_response_callback: Optional[Any] = None,
+    ) -> tuple[Outcome, list[Decision]]:
+        """Orchestrate a complete evaluation workflow.
+
+        Runs the full workflow state machine from initialization to completion
+        or failure. This method manages state transitions, sends prompts via
+        the provided callback, and processes responses.
+
+        Args:
+            initial_prompt: The initial prompt/task description to send.
+            send_prompt_callback: Optional async callable (prompt: str) -> None
+                to send prompts to the Worker. If None, workflow runs in
+                simulation mode.
+            receive_response_callback: Optional async callable () -> dict
+                to receive responses from the Worker. If None, workflow runs
+                in simulation mode.
+
+        Returns:
+            A tuple of (Outcome, decisions_log) representing the final outcome
+            and all decisions made during the workflow.
+
+        Raises:
+            LoopDetectedError: If max_iterations is exceeded during workflow.
+        """
+        self.iteration_count = 0  # Reset iteration count at workflow start
+
+        self.log_decision(
+            context="Starting workflow execution",
+            action="Initializing workflow with provided prompt",
+            rationale=f"Initial prompt: {initial_prompt[:50]}...",
+        )
+
+        try:
+            # Transition from initializing to prompting
+            self._increment_iteration()
+            self.transition_to(DeveloperState.prompting)
+
+            self.log_decision(
+                context="Workflow initialized",
+                action="Transitioned to prompting state",
+                rationale="Ready to send initial prompt to Worker",
+            )
+
+            # Main workflow loop
+            while not self.is_terminal():
+                self._increment_iteration()
+
+                if self.current_state == DeveloperState.prompting:
+                    # Check for fallback response first
+                    fallback = self.get_fallback_response(initial_prompt)
+                    if fallback is not None:
+                        self.log_decision(
+                            context="Fallback response available",
+                            action="Using fallback instead of Worker",
+                            rationale="Predefined response matched the prompt",
+                        )
+                        self.transition_to(DeveloperState.awaiting_response)
+                        # Simulate a complete response with fallback
+                        self.handle_response(
+                            {"content": fallback, "fallback": True},
+                            is_complete=True,
+                        )
+                    elif send_prompt_callback is not None:
+                        # Send prompt via callback
+                        send_prompt_callback(initial_prompt)
+                        self.transition_to(DeveloperState.awaiting_response)
+                    else:
+                        # Simulation mode - directly transition
+                        self.log_decision(
+                            context="No send_prompt_callback provided",
+                            action="Running in simulation mode",
+                            rationale="Skipping actual prompt send",
+                        )
+                        self.transition_to(DeveloperState.awaiting_response)
+
+                elif self.current_state == DeveloperState.awaiting_response:
+                    if receive_response_callback is not None:
+                        response = receive_response_callback()
+                        self.handle_response(response)
+                    else:
+                        # Simulation mode - assume completion
+                        self.log_decision(
+                            context="No receive_response_callback provided",
+                            action="Simulating successful completion",
+                            rationale="Running in simulation mode",
+                        )
+                        self.transition_to(DeveloperState.evaluating_completion)
+
+                elif self.current_state == DeveloperState.reviewing_plan:
+                    # Auto-approve plan in automated mode
+                    self.log_decision(
+                        context="Plan received for review",
+                        action="Auto-approving plan",
+                        rationale="Automated evaluation mode",
+                    )
+                    self.transition_to(DeveloperState.approving_plan)
+
+                elif self.current_state == DeveloperState.approving_plan:
+                    # After approving, wait for implementation response
+                    self.log_decision(
+                        context="Plan approved",
+                        action="Waiting for implementation",
+                        rationale="Plan execution should produce a response",
+                    )
+                    self.transition_to(DeveloperState.awaiting_response)
+
+                elif self.current_state == DeveloperState.executing_command:
+                    # After command execution, evaluate completion
+                    self.log_decision(
+                        context="Command execution in progress",
+                        action="Evaluating command results",
+                        rationale="Checking if task is complete",
+                    )
+                    self.transition_to(DeveloperState.evaluating_completion)
+
+                elif self.current_state == DeveloperState.evaluating_completion:
+                    # For now, assume task is complete in simulation mode
+                    self.log_decision(
+                        context="Evaluating task completion",
+                        action="Marking task as complete",
+                        rationale="Task evaluation criteria satisfied",
+                    )
+                    self.transition_to(DeveloperState.completed)
+
+            # Determine outcome based on final state
+            if self.current_state == DeveloperState.completed:
+                outcome = Outcome.success
+            else:
+                outcome = Outcome.failure
+
+            self.log_decision(
+                context="Workflow finished",
+                action=f"Final outcome: {outcome.value}",
+                rationale=f"Terminal state: {self.current_state.value}",
+            )
+
+            return outcome, self.decisions_log
+
+        except LoopDetectedError:
+            self.log_decision(
+                context="Loop detected during workflow",
+                action="Terminating with loop_detected outcome",
+                rationale=f"Exceeded {self.max_iterations} iterations",
+            )
+            return Outcome.loop_detected, self.decisions_log
+
+        except InvalidStateTransitionError as e:
+            self.log_decision(
+                context="Invalid state transition attempted",
+                action="Terminating with failure outcome",
+                rationale=str(e),
+            )
+            self.current_state = DeveloperState.failed
+            return Outcome.failure, self.decisions_log
+
+    def reset(self) -> None:
+        """Reset the agent to its initial state.
+
+        Clears the decisions log and resets the iteration count.
+        Useful for running multiple workflows with the same agent instance.
+        """
+        self.current_state = DeveloperState.initializing
+        self.decisions_log = []
+        self.iteration_count = 0
