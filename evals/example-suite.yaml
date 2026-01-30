@@ -1,0 +1,384 @@
+# =============================================================================
+# Example Evaluation Suite
+# =============================================================================
+# This file demonstrates all features of the Claude Code Evaluator YAML config
+# format. Use this as a reference when creating your own evaluation suites.
+#
+# An evaluation suite is a collection of related evaluations that test
+# Claude Code's ability to complete software development tasks.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# SUITE METADATA
+# -----------------------------------------------------------------------------
+
+# Required: Unique identifier for the suite (used in CLI and reports)
+name: example-suite
+
+# Required: Human-readable description of what this suite tests
+description: |
+  Example evaluation suite demonstrating all features of the YAML config format.
+  This suite includes examples of single-phase, two-phase, and multi-phase
+  evaluation patterns for testing Claude Code's development capabilities.
+
+# Required: Semantic version of this suite configuration
+# Useful for tracking changes and ensuring reproducibility
+version: "1.0.0"
+
+# -----------------------------------------------------------------------------
+# SUITE-LEVEL DEFAULTS
+# -----------------------------------------------------------------------------
+# These defaults apply to all evaluations in this suite unless overridden
+# at the evaluation or phase level.
+
+defaults:
+  # Maximum number of conversation turns before the evaluation times out
+  # A "turn" is one user message + one assistant response
+  max_turns: 10
+
+  # Maximum cost in USD before the evaluation is stopped
+  # Helps prevent runaway costs during evaluation
+  max_budget_usd: 5.0
+
+  # List of tools Claude Code is allowed to use during evaluation
+  # Common tools: Read, Edit, Write, Bash, Glob, Grep, LSP, WebFetch
+  allowed_tools:
+    - Read
+    - Edit
+    - Bash
+    - Glob
+    - Grep
+
+  # Default model to use for evaluations
+  # Options: sonnet, opus, haiku (or full model identifiers)
+  model: sonnet
+
+  # Maximum time in seconds for the entire evaluation
+  timeout_seconds: 300
+
+# -----------------------------------------------------------------------------
+# EVALUATIONS
+# -----------------------------------------------------------------------------
+# Each evaluation defines a specific task and how it should be executed.
+# Evaluations can have one or more phases to test different workflows.
+
+evaluations:
+  # ===========================================================================
+  # EXAMPLE 1: Simple Direct Implementation (Single Phase)
+  # ===========================================================================
+  # This pattern is ideal for straightforward tasks where Claude can
+  # immediately start implementing without needing a planning phase.
+
+  - id: simple-function-implementation
+    # Unique identifier for this evaluation (used in reports and filtering)
+
+    name: Implement Utility Function
+    # Human-readable name shown in reports and logs
+
+    description: |
+      Tests Claude's ability to implement a simple utility function with
+      proper error handling and type hints. This is a basic implementation
+      task that should be completed in a single phase.
+
+    task: |
+      Create a Python utility function called `parse_duration` in
+      `src/utils/time_utils.py` that converts human-readable duration
+      strings (like "2h30m", "1d", "45s") into total seconds.
+
+      Requirements:
+      - Support days (d), hours (h), minutes (m), and seconds (s)
+      - Handle combinations like "1h30m45s"
+      - Return an integer representing total seconds
+      - Raise ValueError for invalid formats
+      - Include comprehensive docstring with examples
+      - Add type hints
+
+    # Tags for filtering and categorization
+    # Run specific tags with: claude-eval run --tags utils,python
+    tags:
+      - utils
+      - python
+      - beginner
+
+    # Whether this evaluation should run (set to false to skip)
+    enabled: true
+
+    # Single phase for direct implementation
+    phases:
+      - name: implement
+        # Permission mode controls what Claude can do:
+        # - plan: Claude can only read files and plan, no modifications
+        # - acceptEdits: Claude must ask permission for each edit
+        # - bypassPermissions: Claude can make changes without asking
+        permission_mode: bypassPermissions
+
+        # prompt_template uses {task} to inject the task description
+        # You can also use {context} for additional context variables
+        prompt_template: "{task}"
+
+  # ===========================================================================
+  # EXAMPLE 2: Plan-Then-Implement (Two Phases)
+  # ===========================================================================
+  # This pattern is useful for complex tasks where you want to:
+  # 1. First have Claude analyze and plan the implementation
+  # 2. Then execute the plan in a separate phase
+  # This allows evaluating both planning and execution capabilities.
+
+  - id: api-endpoint-with-planning
+    name: Add REST API Endpoint with Planning
+    description: |
+      Tests Claude's ability to first analyze an existing codebase and create
+      a plan, then implement a new API endpoint following existing patterns.
+      The two-phase approach ensures Claude understands the codebase before
+      making changes.
+
+    task: |
+      Add a new REST API endpoint for managing user preferences in the
+      existing Express.js application.
+
+      Requirements:
+      - GET /api/users/:id/preferences - Retrieve user preferences
+      - PUT /api/users/:id/preferences - Update user preferences
+      - Follow existing patterns in the codebase
+      - Include input validation using the existing validation middleware
+      - Add appropriate error handling
+      - Write unit tests following existing test patterns
+
+    tags:
+      - api
+      - nodejs
+      - intermediate
+
+    enabled: true
+
+    phases:
+      # Phase 1: Planning
+      - name: plan
+        permission_mode: plan
+        # Custom prompt for the planning phase
+        prompt: |
+          Analyze the existing codebase to understand:
+          1. The current API structure and routing patterns
+          2. How other endpoints handle authentication and validation
+          3. The database models and how preferences might be stored
+          4. Existing test patterns and coverage requirements
+
+          Create a detailed implementation plan that specifies:
+          - Which files need to be created or modified
+          - The specific changes for each file
+          - Any new dependencies required
+          - Test cases to be added
+
+          Task: {task}
+
+      # Phase 2: Implementation
+      - name: implement
+        permission_mode: bypassPermissions
+        # continue_session: true means this phase continues from the previous
+        # Claude will have context of the planning phase
+        continue_session: true
+        prompt: |
+          Now implement the plan you created in the previous phase.
+          Make sure to follow the patterns you identified and create
+          all necessary files, tests, and documentation.
+
+  # ===========================================================================
+  # EXAMPLE 3: Multi-Phase Iterative Workflow
+  # ===========================================================================
+  # This pattern demonstrates a more complex workflow with multiple phases:
+  # 1. Analysis/Discovery phase
+  # 2. Implementation phase
+  # 3. Testing/Verification phase
+  # 4. Documentation phase
+  # Each phase builds on the previous, simulating a real development workflow.
+
+  - id: refactor-legacy-module
+    name: Refactor Legacy Module
+    description: |
+      Tests Claude's ability to perform a complex refactoring task using
+      an iterative workflow. This evaluation simulates a real-world scenario
+      where Claude must analyze legacy code, plan refactoring, implement
+      changes incrementally, verify functionality, and update documentation.
+
+    task: |
+      Refactor the legacy authentication module in `src/auth/legacy_auth.js`
+      to use modern async/await patterns and improve security.
+
+      The module currently:
+      - Uses callback-based authentication
+      - Has hardcoded configuration values
+      - Lacks proper error handling
+      - Has no unit tests
+
+      Goals:
+      - Convert to async/await with proper error handling
+      - Extract configuration to environment variables
+      - Add input sanitization and security improvements
+      - Maintain backward compatibility with existing consumers
+      - Add comprehensive unit tests
+      - Update JSDoc documentation
+
+    tags:
+      - refactoring
+      - security
+      - nodejs
+      - advanced
+
+    enabled: true
+
+    # Override suite defaults for this complex evaluation
+    max_turns: 20
+    max_budget_usd: 10.0
+    timeout_seconds: 600
+
+    phases:
+      # Phase 1: Discovery and Analysis
+      - name: analyze
+        permission_mode: plan
+        prompt: |
+          Analyze the legacy authentication module and its dependencies.
+
+          Identify:
+          1. All functions that need to be refactored
+          2. All consumers of this module (files that import it)
+          3. Hardcoded values that should become configuration
+          4. Security vulnerabilities or concerns
+          5. Missing error handling scenarios
+
+          Create a detailed analysis report with your findings.
+
+          Task context: {task}
+
+      # Phase 2: Implementation
+      - name: implement
+        permission_mode: bypassPermissions
+        continue_session: true
+        prompt: |
+          Based on your analysis, implement the refactoring.
+
+          Work incrementally:
+          1. First, extract configuration values
+          2. Then convert callback functions to async/await
+          3. Add proper error handling
+          4. Implement security improvements
+
+          Ensure backward compatibility by keeping the original function
+          signatures where possible, or creating adapter functions.
+
+      # Phase 3: Testing
+      - name: test
+        permission_mode: bypassPermissions
+        continue_session: true
+        prompt: |
+          Create comprehensive unit tests for the refactored module.
+
+          Your tests should cover:
+          1. Happy path scenarios for all functions
+          2. Error handling and edge cases
+          3. Security-related test cases
+          4. Backward compatibility verification
+
+          Run the tests to verify everything works correctly.
+
+      # Phase 4: Documentation
+      - name: document
+        permission_mode: bypassPermissions
+        continue_session: true
+        prompt: |
+          Update all documentation for the refactored module:
+
+          1. Update JSDoc comments for all public functions
+          2. Add migration notes for consumers of the old API
+          3. Document new configuration options
+          4. Add security considerations section
+
+          Make sure the documentation is clear and helpful for
+          developers who will use this module.
+
+  # ===========================================================================
+  # EXAMPLE 4: Bug Fix Evaluation
+  # ===========================================================================
+  # This pattern tests Claude's debugging and bug-fixing capabilities.
+
+  - id: fix-memory-leak
+    name: Fix Memory Leak in Cache Module
+    description: |
+      Tests Claude's ability to identify and fix a memory leak bug.
+      This requires analyzing runtime behavior, understanding the root cause,
+      and implementing a proper fix without breaking existing functionality.
+
+    task: |
+      Users are reporting that the application's memory usage grows
+      continuously over time. Investigation has narrowed the issue to
+      the caching module in `src/cache/memory_cache.py`.
+
+      The cache is supposed to:
+      - Store items with an optional TTL (time-to-live)
+      - Automatically evict expired items
+      - Have a maximum size limit
+
+      However, something is causing items to never be properly removed.
+
+      Requirements:
+      - Find the root cause of the memory leak
+      - Implement a fix that properly handles TTL expiration
+      - Add a cleanup mechanism for the max size limit
+      - Add tests that verify the fix
+      - Do not change the public API of the cache
+
+    tags:
+      - bugfix
+      - performance
+      - python
+      - intermediate
+
+    enabled: true
+
+    phases:
+      - name: investigate
+        permission_mode: plan
+        prompt: |
+          Investigate the memory leak in the caching module.
+
+          1. Read and analyze the cache implementation
+          2. Identify where items should be removed but aren't
+          3. Look for reference cycles or forgotten cleanup
+          4. Document your findings and proposed fix
+
+          Task: {task}
+
+      - name: fix
+        permission_mode: bypassPermissions
+        continue_session: true
+        prompt: |
+          Implement the fix based on your investigation.
+          Make sure to add tests that would have caught this bug.
+
+  # ===========================================================================
+  # EXAMPLE 5: Disabled Evaluation (for reference/future use)
+  # ===========================================================================
+  # Set enabled: false to skip an evaluation while keeping it in the suite.
+  # This is useful for work-in-progress evaluations or temporary disabling.
+
+  - id: future-feature-evaluation
+    name: Implement GraphQL Subscriptions
+    description: |
+      This evaluation is currently disabled and will be enabled when
+      the GraphQL subscription feature is ready for testing.
+
+    task: |
+      Implement real-time GraphQL subscriptions for the notification system.
+      (Details to be added when this evaluation is enabled)
+
+    tags:
+      - graphql
+      - realtime
+      - advanced
+
+    # This evaluation will be skipped when running the suite
+    enabled: false
+
+    phases:
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt_template: "{task}"
