@@ -58,3 +58,6 @@ logs/
 *.swp
 *.swo
 *~
+
+# Evaluation outputs
+evaluations/

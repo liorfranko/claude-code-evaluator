@@ -303,10 +303,6 @@ async def run_evaluation(
         if verbose:
             print(f"Evaluation failed: {e}")
 
-    finally:
-        # Clean up workspace
-        evaluation.cleanup()
-
     # Generate report
     generator = ReportGenerator()
     report = generator.generate(evaluation)
