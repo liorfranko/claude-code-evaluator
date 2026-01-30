@@ -141,7 +141,7 @@ Story: As a developer workflow researcher, I want to run an evaluation that simu
 - [X] T229 [US1] Write integration test for SDK integration (tests/integration/test_sdk_integration.py)
 
 ### Checkpoint
-- [ ] T230 [US1] CHECKPOINT: Verify basic evaluation runs autonomously with metrics capture
+- [X] T230 [US1] CHECKPOINT: Verify basic evaluation runs autonomously with metrics capture
 
 ---
 
@@ -150,21 +150,21 @@ Story: As a developer workflow researcher, I want to run an evaluation that simu
 Story: As a developer workflow researcher, I want to run evaluations with single-prompt direct implementation.
 
 ### Workflow Base
-- [ ] T300 [US4] Define BaseWorkflow abstract class (src/claude_evaluator/workflows/base.py)
-- [ ] T301 [US4] Create workflows module init (src/claude_evaluator/workflows/__init__.py)
+- [X] T300 [US4] Define BaseWorkflow abstract class (src/claude_evaluator/workflows/base.py)
+- [X] T301 [US4] Create workflows module init (src/claude_evaluator/workflows/__init__.py)
 
 ### Direct Workflow
-- [ ] T302 [US4] Implement DirectWorkflow class (src/claude_evaluator/workflows/direct.py)
-- [ ] T303 [US4] Single-phase execution with acceptEdits permission (src/claude_evaluator/workflows/direct.py)
-- [ ] T304 [US4] Connect DirectWorkflow to Evaluation orchestrator (src/claude_evaluator/evaluation.py)
+- [X] T302 [US4] Implement DirectWorkflow class (src/claude_evaluator/workflows/direct.py)
+- [X] T303 [US4] Single-phase execution with acceptEdits permission (src/claude_evaluator/workflows/direct.py)
+- [X] T304 [US4] Connect DirectWorkflow to Evaluation orchestrator (src/claude_evaluator/evaluation.py)
 
 ### US-004 Tests
-- [ ] T305 [US4] Write unit tests for DirectWorkflow (tests/unit/test_workflows.py)
-- [ ] T306 [US4] Verify: Worker completes task without planning phases (tests/e2e/test_direct_workflow.py)
-- [ ] T307 [US4] Verify: Metrics captured for single-shot approach (tests/e2e/test_direct_workflow.py)
+- [X] T305 [US4] Write unit tests for DirectWorkflow (tests/unit/test_workflows.py)
+- [X] T306 [US4] Verify: Worker completes task without planning phases (tests/e2e/test_direct_workflow.py)
+- [X] T307 [US4] Verify: Metrics captured for single-shot approach (tests/e2e/test_direct_workflow.py)
 
 ### Checkpoint
-- [ ] T308 [US4] CHECKPOINT: Verify direct implementation workflow completes successfully
+- [X] T308 [US4] CHECKPOINT: Verify direct implementation workflow completes successfully
 
 ---
 
