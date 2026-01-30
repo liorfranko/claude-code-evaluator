@@ -195,20 +195,20 @@ Story: As a developer workflow researcher, I want to run evaluations that use Cl
 Story: As a developer workflow researcher, I want to run evaluations that involve sequential command execution.
 
 ### Multi-Command Workflow
-- [ ] T500 [US2] Implement MultiCommandWorkflow class (src/claude_evaluator/workflows/multi_command.py)
-- [ ] T501 [US2] Execute phases sequentially from YAML config (src/claude_evaluator/workflows/multi_command.py)
-- [ ] T502 [US2] Pass context between phases via prompt_template (src/claude_evaluator/workflows/multi_command.py)
-- [ ] T503 [US2] Track per-command metrics and aggregate (src/claude_evaluator/workflows/multi_command.py)
-- [ ] T504 [US2] Maintain workflow state between commands (src/claude_evaluator/workflows/multi_command.py)
+- [X] T500 [US2] Implement MultiCommandWorkflow class (src/claude_evaluator/workflows/multi_command.py)
+- [X] T501 [US2] Execute phases sequentially from YAML config (src/claude_evaluator/workflows/multi_command.py)
+- [X] T502 [US2] Pass context between phases via prompt_template (src/claude_evaluator/workflows/multi_command.py)
+- [X] T503 [US2] Track per-command metrics and aggregate (src/claude_evaluator/workflows/multi_command.py)
+- [X] T504 [US2] Maintain workflow state between commands (src/claude_evaluator/workflows/multi_command.py)
 
 ### US-002 Tests
-- [ ] T505 [US2] Write unit tests for MultiCommandWorkflow (tests/unit/test_workflows.py)
-- [ ] T506 [US2] Verify: Sequential command execution (tests/e2e/test_multi_command.py)
-- [ ] T507 [US2] Verify: Context passing between commands (tests/e2e/test_multi_command.py)
-- [ ] T508 [US2] Verify: Per-command and aggregate metrics (tests/e2e/test_multi_command.py)
+- [X] T505 [US2] Write unit tests for MultiCommandWorkflow (tests/unit/test_workflows.py)
+- [X] T506 [US2] Verify: Sequential command execution (tests/e2e/test_multi_command.py)
+- [X] T507 [US2] Verify: Context passing between commands (tests/e2e/test_multi_command.py)
+- [X] T508 [US2] Verify: Per-command and aggregate metrics (tests/e2e/test_multi_command.py)
 
 ### Checkpoint
-- [ ] T509 [US2] CHECKPOINT: Verify multi-command workflow with context passing
+- [X] T509 [US2] CHECKPOINT: Verify multi-command workflow with context passing
 
 ---
 
