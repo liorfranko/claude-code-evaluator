@@ -60,15 +60,21 @@ class DirectWorkflow(BaseWorkflow):
             # Set the phase for metrics tracking
             self.set_phase("implementation")
 
-            # Configure Worker permission - use bypassPermissions for file creation
+            # Configure Worker with acceptEdits permission for direct execution
             worker = evaluation.worker_agent
-            # Only set acceptEdits if not already bypassPermissions
-            if worker.permission_mode != PermissionMode.bypassPermissions:
-                worker.set_permission_mode(PermissionMode.acceptEdits)
+            worker.set_permission_mode(PermissionMode.acceptEdits)
+
+            # Add workspace context to help Claude use relative paths
+            workspace_path = worker.project_directory
+            prompt = (
+                f"Working directory: {workspace_path}\n"
+                f"Use relative paths for all file operations.\n\n"
+                f"{evaluation.task_description}"
+            )
 
             # Execute the task prompt directly
             query_metrics = await worker.execute_query(
-                query=evaluation.task_description,
+                query=prompt,
                 phase="implementation",
             )
 

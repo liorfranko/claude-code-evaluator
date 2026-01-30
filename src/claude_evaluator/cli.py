@@ -238,7 +238,7 @@ async def run_evaluation(
         execution_mode=ExecutionMode.sdk,
         project_directory=str(output_dir),
         active_session=False,
-        permission_mode=PermissionMode.bypassPermissions,
+        permission_mode=PermissionMode.acceptEdits,
     )
 
     # Create evaluation
