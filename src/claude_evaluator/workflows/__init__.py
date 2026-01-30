@@ -10,7 +10,7 @@ Available workflows:
 - MultiCommandWorkflow: Sequential command execution with context passing
 """
 
-from claude_evaluator.workflows.base import BaseWorkflow
+from claude_evaluator.workflows.base import BaseWorkflow, WorkflowTimeoutError
 from claude_evaluator.workflows.direct import DirectWorkflow
 from claude_evaluator.workflows.multi_command import MultiCommandWorkflow
 from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
@@ -20,4 +20,5 @@ __all__ = [
     "DirectWorkflow",
     "MultiCommandWorkflow",
     "PlanThenImplementWorkflow",
+    "WorkflowTimeoutError",
 ]

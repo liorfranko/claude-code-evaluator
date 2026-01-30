@@ -5,16 +5,30 @@ foundation for all workflow implementations. Workflows orchestrate the evaluatio
 process, managing the execution of tasks and collection of metrics.
 """
 
+import asyncio
+import logging
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from claude_evaluator.evaluation import Evaluation
     from claude_evaluator.metrics.collector import MetricsCollector
     from claude_evaluator.models.metrics import Metrics
 
-__all__ = ["BaseWorkflow"]
+__all__ = ["BaseWorkflow", "WorkflowTimeoutError"]
+
+logger = logging.getLogger(__name__)
+
+
+class WorkflowTimeoutError(Exception):
+    """Raised when a workflow execution exceeds its timeout."""
+
+    def __init__(self, timeout_seconds: int, message: Optional[str] = None):
+        self.timeout_seconds = timeout_seconds
+        super().__init__(
+            message or f"Workflow execution exceeded timeout of {timeout_seconds} seconds"
+        )
 
 
 class BaseWorkflow(ABC):
@@ -150,3 +164,44 @@ class BaseWorkflow(ABC):
             Current time as milliseconds since epoch.
         """
         return int(time.time() * 1000)
+
+    async def execute_with_timeout(
+        self,
+        evaluation: "Evaluation",
+        timeout_seconds: Optional[int] = None,
+    ) -> "Metrics":
+        """Execute the workflow with an optional timeout.
+
+        Wraps the execute() method with asyncio timeout handling. If the
+        workflow exceeds the timeout, a WorkflowTimeoutError is raised
+        and the evaluation is marked as failed.
+
+        Args:
+            evaluation: The Evaluation instance containing the task and agents.
+            timeout_seconds: Maximum execution time in seconds. If None, no timeout.
+
+        Returns:
+            A Metrics object containing all collected metrics from the execution.
+
+        Raises:
+            WorkflowTimeoutError: If the workflow exceeds the timeout.
+            Exception: If the workflow execution fails for other reasons.
+        """
+        if timeout_seconds is None:
+            return await self.execute(evaluation)
+
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                return await self.execute(evaluation)
+        except asyncio.TimeoutError:
+            logger.error(
+                f"Workflow execution timed out after {timeout_seconds} seconds "
+                f"for evaluation {evaluation.id}"
+            )
+            # Set end time and fail the evaluation
+            self._metrics_collector.set_end_time(self._current_time_ms())
+            if not evaluation.is_terminal():
+                evaluation.fail(
+                    f"Workflow execution exceeded timeout of {timeout_seconds} seconds"
+                )
+            raise WorkflowTimeoutError(timeout_seconds)

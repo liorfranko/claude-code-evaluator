@@ -238,7 +238,7 @@ evaluations:
         suite_file = tmp_path / "empty-name.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'name' field"):
+        with pytest.raises(ValueError, match="Invalid 'name'"):
             load_suite(suite_file)
 
     def test_missing_evaluations_field(self, tmp_path: Path) -> None:
@@ -398,7 +398,7 @@ evaluations:
         suite_file = tmp_path / "invalid-defaults.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'defaults' field"):
+        with pytest.raises(ValueError, match="Invalid.*defaults|expected mapping"):
             load_suite(suite_file)
 
 

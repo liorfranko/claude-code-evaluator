@@ -5,6 +5,7 @@ test run. It manages state transitions, workspace lifecycle, and collects metric
 during evaluation execution.
 """
 
+import logging
 import shutil
 import tempfile
 import uuid
@@ -12,6 +13,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
+
+logger = logging.getLogger(__name__)
 
 from .agents.developer import DeveloperAgent
 from .agents.worker import WorkerAgent
@@ -152,11 +155,20 @@ class Evaluation:
         Cleans up the workspace directory created during start(). This method
         is safe to call multiple times and will silently handle cases where
         the workspace doesn't exist or has already been cleaned up.
+
+        Cleanup failures are logged as warnings but don't raise exceptions,
+        since cleanup is best-effort and shouldn't mask the original result.
         """
         if self.workspace_path is not None:
             workspace = Path(self.workspace_path)
             if workspace.exists():
-                shutil.rmtree(self.workspace_path)
+                try:
+                    shutil.rmtree(self.workspace_path)
+                except (OSError, PermissionError) as e:
+                    # Log but don't raise - cleanup is best effort
+                    logger.warning(
+                        f"Failed to clean up workspace {self.workspace_path}: {e}"
+                    )
             self.workspace_path = None
 
     def is_terminal(self) -> bool:

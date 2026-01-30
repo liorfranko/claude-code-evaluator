@@ -147,17 +147,6 @@ class TestWorkerAgentInitialization:
 
         assert agent._query_counter == 0
 
-    def test_sdk_client_initialized_to_none(self) -> None:
-        """Test that internal SDK client starts as None."""
-        agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-        )
-
-        assert agent._sdk_client is None
-
 
 class TestSetPermissionMode:
     """Tests for WorkerAgent.set_permission_mode method."""
@@ -616,7 +605,7 @@ class TestPreToolUseHook:
         invocation = agent.tool_invocations[0]
         assert invocation.tool_name == "Read"
         assert invocation.tool_use_id == "test-id-123"
-        assert invocation.success is True
+        assert invocation.success is None  # Success is unknown until tool completes
 
     def test_on_pre_tool_use_multiple_calls(self) -> None:
         """Test multiple _on_pre_tool_use calls accumulate invocations."""

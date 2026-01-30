@@ -22,7 +22,7 @@ class ToolInvocation:
         timestamp: When the tool was invoked.
         tool_name: Name of the tool (Read, Bash, Edit, etc.).
         tool_use_id: Unique identifier for this invocation.
-        success: Whether the tool call succeeded.
+        success: Whether the tool call succeeded. None if unknown (pre-tool hook only).
         phase: Workflow phase when invoked (optional).
         input_summary: Summarized input, truncated for large inputs (optional).
     """
@@ -30,6 +30,6 @@ class ToolInvocation:
     timestamp: datetime
     tool_name: str
     tool_use_id: str
-    success: bool
+    success: Optional[bool] = None
     phase: Optional[str] = None
     input_summary: Optional[str] = None

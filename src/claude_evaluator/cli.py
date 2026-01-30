@@ -8,10 +8,14 @@ various output and configuration options.
 import argparse
 import asyncio
 import json
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 from claude_evaluator import __version__
 from claude_evaluator.agents.developer import DeveloperAgent
@@ -31,6 +35,7 @@ from claude_evaluator.workflows import (
     DirectWorkflow,
     MultiCommandWorkflow,
     PlanThenImplementWorkflow,
+    WorkflowTimeoutError,
 )
 
 __all__ = ["main", "create_parser", "run_evaluation", "run_suite"]
@@ -133,6 +138,13 @@ For more information, see the documentation.
         help="Maximum cost in USD per evaluation",
     )
 
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        metavar="SECONDS",
+        help="Maximum execution time in seconds per evaluation",
+    )
+
     # Output format
     parser.add_argument(
         "--verbose",
@@ -198,6 +210,7 @@ async def run_evaluation(
     output_dir: Path,
     max_turns: Optional[int] = None,
     max_budget: Optional[float] = None,
+    timeout_seconds: Optional[int] = None,
     verbose: bool = False,
     phases: Optional[list[Phase]] = None,
 ) -> EvaluationReport:
@@ -209,6 +222,7 @@ async def run_evaluation(
         output_dir: Directory to save the report.
         max_turns: Maximum conversation turns (optional).
         max_budget: Maximum cost in USD (optional).
+        timeout_seconds: Maximum execution time in seconds (optional).
         verbose: Whether to print progress.
         phases: Phases for multi-command workflow (optional).
 
@@ -247,12 +261,11 @@ async def run_evaluation(
 
     try:
         # Execute based on workflow type
+        # Note: Workflows handle state transitions internally via on_execution_start/complete/error
         if workflow_type == WorkflowType.direct:
             workflow = DirectWorkflow(collector)
-            metrics = await workflow.execute(evaluation)
         elif workflow_type == WorkflowType.plan_then_implement:
             workflow = PlanThenImplementWorkflow(collector)
-            metrics = await workflow.execute(evaluation)
         elif workflow_type == WorkflowType.multi_command:
             if phases is None:
                 # Create default phases for multi-command
@@ -264,20 +277,29 @@ async def run_evaluation(
                     ),
                 ]
             workflow = MultiCommandWorkflow(collector, phases)
-            metrics = await workflow.execute(evaluation)
         else:
             raise ValueError(f"Unknown workflow type: {workflow_type}")
 
-        # Complete the evaluation
-        evaluation.complete(metrics)
+        # Execute with optional timeout
+        await workflow.execute_with_timeout(evaluation, timeout_seconds)
+
+        # Workflow already calls evaluation.complete() in on_execution_complete()
 
         if verbose:
             print(f"Evaluation completed in {evaluation.get_duration_ms()}ms")
-            print(f"Total tokens: {metrics.total_tokens}")
-            print(f"Total cost: ${metrics.total_cost_usd:.4f}")
+            if evaluation.metrics:
+                print(f"Total tokens: {evaluation.metrics.total_tokens}")
+                print(f"Total cost: ${evaluation.metrics.total_cost_usd:.4f}")
 
     except Exception as e:
-        evaluation.fail(str(e))
+        # Log error always, print to console if verbose
+        logger.error(f"Evaluation {evaluation.id} failed: {e}", exc_info=True)
+
+        # Only call fail() if not already in a terminal state
+        # (workflow may have already called on_execution_error)
+        if not evaluation.is_terminal():
+            evaluation.fail(str(e))
+
         if verbose:
             print(f"Evaluation failed: {e}")
 
@@ -356,6 +378,7 @@ async def run_suite(
         # Apply overrides
         effective_max_turns = max_turns or config.max_turns
         effective_max_budget = max_budget or config.max_budget_usd
+        effective_timeout = config.timeout_seconds  # Use config timeout
 
         try:
             report = await run_evaluation(
@@ -364,12 +387,42 @@ async def run_suite(
                 output_dir=output_dir,
                 max_turns=effective_max_turns,
                 max_budget=effective_max_budget,
+                timeout_seconds=effective_timeout,
                 verbose=verbose,
                 phases=config.phases,
             )
             reports.append(report)
         except Exception as e:
+            # Log the error and create a failed report to track this evaluation
+            logger.error(f"Error running evaluation '{config.id}': {e}", exc_info=True)
             print(f"Error running evaluation '{config.id}': {e}")
+
+            # Create a minimal failed report so it's tracked in results
+            from claude_evaluator.models.enums import Outcome
+            from claude_evaluator.models.metrics import Metrics
+            from claude_evaluator.report.models import EvaluationReport
+
+            failed_report = EvaluationReport(
+                evaluation_id=config.id,
+                task_description=config.task,
+                workflow_type=workflow_type,
+                outcome=Outcome.failure,
+                metrics=Metrics(
+                    total_runtime_ms=0,
+                    total_tokens=0,
+                    input_tokens=0,
+                    output_tokens=0,
+                    total_cost_usd=0.0,
+                    prompt_count=0,
+                    turn_count=0,
+                    tool_invocations=[],
+                    tokens_by_phase={},
+                ),
+                timeline=[],
+                decisions=[],
+                errors=[str(e)],
+            )
+            reports.append(failed_report)
 
     return reports
 
@@ -506,6 +559,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = create_parser()
     args = parser.parse_args(argv)
 
+    # Set up logging
+    _setup_logging(args.verbose)
+
     # Validate arguments
     error = validate_args(args)
     if error:
@@ -542,6 +598,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                     workflow_type=workflow_type,
                     output_dir=output_dir,
                     max_turns=args.max_turns,
+                    timeout_seconds=args.timeout,
                     max_budget=args.max_budget,
                     verbose=args.verbose,
                 )
@@ -561,12 +618,35 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 130
 
     except Exception as e:
+        # Always log the full exception for debugging
+        logger.exception(f"Fatal error: {e}")
         print(f"Error: {e}", file=sys.stderr)
         if args.verbose:
             import traceback
 
             traceback.print_exc()
         return 1
+
+
+def _setup_logging(verbose: bool = False) -> None:
+    """Configure logging for the CLI.
+
+    Args:
+        verbose: Whether to enable debug-level logging to console.
+    """
+    log_level = logging.DEBUG if verbose else logging.WARNING
+
+    # Configure root logger
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stderr),
+        ],
+    )
+
+    # Set our logger level
+    logger.setLevel(log_level)
 
 
 if __name__ == "__main__":

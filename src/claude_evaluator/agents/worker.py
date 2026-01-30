@@ -15,11 +15,16 @@ from ..models.query_metrics import QueryMetrics
 
 # Optional SDK import - allows tests to run without SDK installed
 try:
-    from claude_code_sdk import ClaudeSDKClient, ClaudeAgentOptions
+    from claude_agent_sdk import (
+        query as sdk_query,
+        ClaudeAgentOptions,
+        ResultMessage,
+    )
     SDK_AVAILABLE = True
 except ImportError:
-    ClaudeSDKClient = None  # type: ignore
+    sdk_query = None  # type: ignore
     ClaudeAgentOptions = None  # type: ignore
+    ResultMessage = None  # type: ignore
     SDK_AVAILABLE = False
 
 __all__ = ["WorkerAgent", "SDK_AVAILABLE"]
@@ -44,7 +49,6 @@ class WorkerAgent:
         max_budget_usd: Maximum spend limit per query in USD (optional).
         tool_invocations: List of tool invocations tracked during current query.
         _query_counter: Internal counter for query indexing.
-        _sdk_client: Cached SDK client instance.
     """
 
     execution_mode: ExecutionMode
@@ -57,7 +61,6 @@ class WorkerAgent:
     max_budget_usd: Optional[float] = None
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
     _query_counter: int = field(default=0, repr=False)
-    _sdk_client: Optional[Any] = field(default=None, repr=False)
 
     async def execute_query(
         self,
@@ -103,57 +106,75 @@ class WorkerAgent:
         Raises:
             RuntimeError: If SDK is not available.
         """
-        if not SDK_AVAILABLE or ClaudeSDKClient is None:
+        if not SDK_AVAILABLE or sdk_query is None:
             raise RuntimeError(
-                "claude-code-sdk is not installed. "
-                "Install with: pip install claude-code-sdk"
+                "claude-agent-sdk is not installed. "
+                "Install with: pip install claude-agent-sdk"
             )
 
         # Clear tool invocations for this query
         self.tool_invocations = []
         self._query_counter += 1
 
-        # Create SDK client if not cached
-        if self._sdk_client is None:
-            self._sdk_client = ClaudeSDKClient()
-
         # Map permission mode to SDK permission string
         permission_map = {
             PermissionMode.plan: "plan",
-            PermissionMode.acceptEdits: "accept-edits",
-            PermissionMode.bypassPermissions: "bypass-permissions",
+            PermissionMode.acceptEdits: "acceptEdits",
+            PermissionMode.bypassPermissions: "bypassPermissions",
         }
 
         # Configure agent options
         options = ClaudeAgentOptions(
             cwd=self.project_directory,
-            permission_mode=permission_map.get(
-                self.permission_mode, "plan"
-            ),
-            allowed_tools=self.allowed_tools if self.allowed_tools else None,
+            permission_mode=permission_map.get(self.permission_mode, "plan"),
+            allowed_tools=self.allowed_tools if self.allowed_tools else [],
             max_turns=self.max_turns,
             max_budget_usd=self.max_budget_usd,
         )
 
-        # Execute with PreToolUse hook for tracking tool invocations
-        result = await self._sdk_client.run(
-            prompt=query,
-            options=options,
-            hooks={
-                "pre_tool_use": self._on_pre_tool_use,
-            },
-        )
+        # Execute query and collect messages
+        result_message = None
+        response_content = None
 
-        # Extract metrics from ResultMessage
+        async for message in sdk_query(prompt=query, options=options):
+            # Track tool uses from messages
+            if hasattr(message, "tool_use_id") and hasattr(message, "tool_name"):
+                self._on_pre_tool_use(
+                    message.tool_name,
+                    message.tool_use_id,
+                    getattr(message, "tool_input", {}),
+                )
+
+            # Capture content from assistant messages
+            if hasattr(message, "content"):
+                response_content = message.content
+
+            # The last message should be the ResultMessage
+            if isinstance(message, ResultMessage):
+                result_message = message
+
+        if result_message is None:
+            raise RuntimeError("No result message received from SDK")
+
+        # Extract usage metrics
+        usage = result_message.usage or {}
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+
+        # Use result field if available, otherwise use captured content
+        if result_message.result:
+            response_content = result_message.result
+
         return QueryMetrics(
             query_index=self._query_counter,
             prompt=query,
-            duration_ms=result.duration_ms,
-            input_tokens=result.usage.input_tokens,
-            output_tokens=result.usage.output_tokens,
-            cost_usd=result.total_cost_usd,
-            num_turns=result.num_turns,
+            duration_ms=result_message.duration_ms,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=result_message.total_cost_usd or 0.0,
+            num_turns=result_message.num_turns,
             phase=phase,
+            response=str(response_content) if response_content else None,
         )
 
     def _on_pre_tool_use(
@@ -178,7 +199,7 @@ class WorkerAgent:
             timestamp=datetime.now(),
             tool_name=tool_name,
             tool_use_id=tool_use_id,
-            success=True,  # Pre-tool, assume success until we know otherwise
+            success=None,  # Unknown until tool completes - will be updated if post_tool_use hook is added
             phase=None,  # Will be set by caller if needed
             input_summary=input_summary,
         )

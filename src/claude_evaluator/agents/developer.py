@@ -291,6 +291,127 @@ class DeveloperAgent:
         self.transition_to(new_state)
         return self.current_state
 
+    # =========================================================================
+    # State Handlers (Strategy pattern for run_workflow)
+    # =========================================================================
+
+    def _handle_prompting(
+        self,
+        initial_prompt: str,
+        send_prompt_callback: Optional[Any],
+    ) -> None:
+        """Handle the prompting state - send prompt to Worker.
+
+        Checks for fallback responses first, then sends via callback or
+        simulates in simulation mode.
+        """
+        # Check for fallback response first
+        fallback = self.get_fallback_response(initial_prompt)
+        if fallback is not None:
+            self.log_decision(
+                context="Fallback response available",
+                action="Using fallback instead of Worker",
+                rationale="Predefined response matched the prompt",
+            )
+            self.transition_to(DeveloperState.awaiting_response)
+            # Simulate a complete response with fallback
+            self.handle_response(
+                {"content": fallback, "fallback": True},
+                is_complete=True,
+            )
+            return
+
+        if send_prompt_callback is not None:
+            send_prompt_callback(initial_prompt)
+            self.transition_to(DeveloperState.awaiting_response)
+            return
+
+        # Simulation mode - directly transition
+        self.log_decision(
+            context="No send_prompt_callback provided",
+            action="Running in simulation mode",
+            rationale="Skipping actual prompt send",
+        )
+        self.transition_to(DeveloperState.awaiting_response)
+
+    def _handle_awaiting_response(
+        self,
+        receive_response_callback: Optional[Any],
+    ) -> None:
+        """Handle the awaiting_response state - receive and process response."""
+        if receive_response_callback is not None:
+            response = receive_response_callback()
+            self.handle_response(response)
+            return
+
+        # Simulation mode - assume completion
+        self.log_decision(
+            context="No receive_response_callback provided",
+            action="Simulating successful completion",
+            rationale="Running in simulation mode",
+        )
+        self.transition_to(DeveloperState.evaluating_completion)
+
+    def _handle_reviewing_plan(self) -> None:
+        """Handle the reviewing_plan state - auto-approve in automated mode."""
+        self.log_decision(
+            context="Plan received for review",
+            action="Auto-approving plan",
+            rationale="Automated evaluation mode",
+        )
+        self.transition_to(DeveloperState.approving_plan)
+
+    def _handle_approving_plan(self) -> None:
+        """Handle the approving_plan state - wait for implementation."""
+        self.log_decision(
+            context="Plan approved",
+            action="Waiting for implementation",
+            rationale="Plan execution should produce a response",
+        )
+        self.transition_to(DeveloperState.awaiting_response)
+
+    def _handle_executing_command(self) -> None:
+        """Handle the executing_command state - evaluate completion."""
+        self.log_decision(
+            context="Command execution in progress",
+            action="Evaluating command results",
+            rationale="Checking if task is complete",
+        )
+        self.transition_to(DeveloperState.evaluating_completion)
+
+    def _handle_evaluating_completion(self) -> None:
+        """Handle the evaluating_completion state - mark as complete."""
+        self.log_decision(
+            context="Evaluating task completion",
+            action="Marking task as complete",
+            rationale="Task evaluation criteria satisfied",
+        )
+        self.transition_to(DeveloperState.completed)
+
+    def _process_current_state(
+        self,
+        initial_prompt: str,
+        send_prompt_callback: Optional[Any],
+        receive_response_callback: Optional[Any],
+    ) -> None:
+        """Dispatch to the appropriate state handler based on current state."""
+        handlers = {
+            DeveloperState.prompting: lambda: self._handle_prompting(
+                initial_prompt, send_prompt_callback
+            ),
+            DeveloperState.awaiting_response: lambda: self._handle_awaiting_response(
+                receive_response_callback
+            ),
+            DeveloperState.reviewing_plan: self._handle_reviewing_plan,
+            DeveloperState.approving_plan: self._handle_approving_plan,
+            DeveloperState.executing_command: self._handle_executing_command,
+            DeveloperState.evaluating_completion: self._handle_evaluating_completion,
+        }
+
+        handler = handlers.get(self.current_state)
+        if handler:
+            handler()
+
     def run_workflow(
         self,
         initial_prompt: str,
@@ -339,92 +460,19 @@ class DeveloperAgent:
                 rationale="Ready to send initial prompt to Worker",
             )
 
-            # Main workflow loop
+            # Main workflow loop - dispatch to state handlers
             while not self.is_terminal():
                 self._increment_iteration()
-
-                if self.current_state == DeveloperState.prompting:
-                    # Check for fallback response first
-                    fallback = self.get_fallback_response(initial_prompt)
-                    if fallback is not None:
-                        self.log_decision(
-                            context="Fallback response available",
-                            action="Using fallback instead of Worker",
-                            rationale="Predefined response matched the prompt",
-                        )
-                        self.transition_to(DeveloperState.awaiting_response)
-                        # Simulate a complete response with fallback
-                        self.handle_response(
-                            {"content": fallback, "fallback": True},
-                            is_complete=True,
-                        )
-                    elif send_prompt_callback is not None:
-                        # Send prompt via callback
-                        send_prompt_callback(initial_prompt)
-                        self.transition_to(DeveloperState.awaiting_response)
-                    else:
-                        # Simulation mode - directly transition
-                        self.log_decision(
-                            context="No send_prompt_callback provided",
-                            action="Running in simulation mode",
-                            rationale="Skipping actual prompt send",
-                        )
-                        self.transition_to(DeveloperState.awaiting_response)
-
-                elif self.current_state == DeveloperState.awaiting_response:
-                    if receive_response_callback is not None:
-                        response = receive_response_callback()
-                        self.handle_response(response)
-                    else:
-                        # Simulation mode - assume completion
-                        self.log_decision(
-                            context="No receive_response_callback provided",
-                            action="Simulating successful completion",
-                            rationale="Running in simulation mode",
-                        )
-                        self.transition_to(DeveloperState.evaluating_completion)
-
-                elif self.current_state == DeveloperState.reviewing_plan:
-                    # Auto-approve plan in automated mode
-                    self.log_decision(
-                        context="Plan received for review",
-                        action="Auto-approving plan",
-                        rationale="Automated evaluation mode",
-                    )
-                    self.transition_to(DeveloperState.approving_plan)
-
-                elif self.current_state == DeveloperState.approving_plan:
-                    # After approving, wait for implementation response
-                    self.log_decision(
-                        context="Plan approved",
-                        action="Waiting for implementation",
-                        rationale="Plan execution should produce a response",
-                    )
-                    self.transition_to(DeveloperState.awaiting_response)
-
-                elif self.current_state == DeveloperState.executing_command:
-                    # After command execution, evaluate completion
-                    self.log_decision(
-                        context="Command execution in progress",
-                        action="Evaluating command results",
-                        rationale="Checking if task is complete",
-                    )
-                    self.transition_to(DeveloperState.evaluating_completion)
-
-                elif self.current_state == DeveloperState.evaluating_completion:
-                    # For now, assume task is complete in simulation mode
-                    self.log_decision(
-                        context="Evaluating task completion",
-                        action="Marking task as complete",
-                        rationale="Task evaluation criteria satisfied",
-                    )
-                    self.transition_to(DeveloperState.completed)
+                self._process_current_state(
+                    initial_prompt, send_prompt_callback, receive_response_callback
+                )
 
             # Determine outcome based on final state
-            if self.current_state == DeveloperState.completed:
-                outcome = Outcome.success
-            else:
-                outcome = Outcome.failure
+            outcome = (
+                Outcome.success
+                if self.current_state == DeveloperState.completed
+                else Outcome.failure
+            )
 
             self.log_decision(
                 context="Workflow finished",
