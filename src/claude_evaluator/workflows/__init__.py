@@ -7,13 +7,17 @@ Available workflows:
 - BaseWorkflow: Abstract base class for all workflows
 - DirectWorkflow: Single-phase execution with acceptEdits permission
 - PlanThenImplementWorkflow: Plan mode followed by implementation
-
-Future implementations:
-- MultiCommandWorkflow: Sequential command execution
+- MultiCommandWorkflow: Sequential command execution with context passing
 """
 
 from claude_evaluator.workflows.base import BaseWorkflow
 from claude_evaluator.workflows.direct import DirectWorkflow
+from claude_evaluator.workflows.multi_command import MultiCommandWorkflow
 from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
 
-__all__ = ["BaseWorkflow", "DirectWorkflow", "PlanThenImplementWorkflow"]
+__all__ = [
+    "BaseWorkflow",
+    "DirectWorkflow",
+    "MultiCommandWorkflow",
+    "PlanThenImplementWorkflow",
+]
