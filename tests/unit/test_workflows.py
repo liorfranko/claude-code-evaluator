@@ -618,3 +618,603 @@ class TestDirectWorkflowToolCounts:
         assert result.tool_counts["Read"] == 2
         assert result.tool_counts["Edit"] == 1
         assert result.tool_counts["Bash"] == 1
+
+
+# =============================================================================
+# PlanThenImplementWorkflow Tests
+# =============================================================================
+
+from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
+
+
+class TestPlanThenImplementWorkflowInitialization:
+    """Tests for PlanThenImplementWorkflow initialization."""
+
+    def test_initialization_with_metrics_collector(self) -> None:
+        """Test workflow can be initialized with a MetricsCollector."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+
+        assert workflow.metrics_collector is collector
+
+    def test_default_planning_prompt_template(self) -> None:
+        """Test default planning prompt template is set."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+
+        assert workflow.planning_prompt_template == PlanThenImplementWorkflow.DEFAULT_PLANNING_PROMPT
+        assert "{task_description}" in workflow.planning_prompt_template
+
+    def test_default_implementation_prompt_template(self) -> None:
+        """Test default implementation prompt template is set."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+
+        assert workflow.implementation_prompt_template == PlanThenImplementWorkflow.DEFAULT_IMPLEMENTATION_PROMPT
+
+    def test_custom_planning_prompt_template(self) -> None:
+        """Test custom planning prompt template can be set."""
+        collector = MetricsCollector()
+        custom_template = "Create a plan for: {task_description}"
+        workflow = PlanThenImplementWorkflow(collector, planning_prompt_template=custom_template)
+
+        assert workflow.planning_prompt_template == custom_template
+
+    def test_custom_implementation_prompt_template(self) -> None:
+        """Test custom implementation prompt template can be set."""
+        collector = MetricsCollector()
+        custom_template = "Execute the plan now."
+        workflow = PlanThenImplementWorkflow(collector, implementation_prompt_template=custom_template)
+
+        assert workflow.implementation_prompt_template == custom_template
+
+    def test_planning_response_initially_none(self) -> None:
+        """Test planning response is None before execution."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+
+        assert workflow.planning_response is None
+
+    def test_workflow_inherits_from_base_workflow(self) -> None:
+        """Test that PlanThenImplementWorkflow inherits from BaseWorkflow."""
+        from claude_evaluator.workflows.base import BaseWorkflow
+
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+
+        assert isinstance(workflow, BaseWorkflow)
+
+
+class TestPlanThenImplementWorkflowExecution:
+    """Tests for PlanThenImplementWorkflow execution."""
+
+    def create_mock_evaluation(self) -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        developer = DeveloperAgent()
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        evaluation = Evaluation(
+            task_description="Implement a simple calculator function",
+            workflow_type=WorkflowType.plan_then_implement,
+            developer_agent=developer,
+            worker_agent=worker,
+        )
+        return evaluation
+
+    def test_execute_calls_planning_phase_first(self) -> None:
+        """Test that execute calls the planning phase first."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        planning_metrics = QueryMetrics(
+            query_index=1,
+            prompt="planning query",
+            phase="planning",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+        )
+        implementation_metrics = QueryMetrics(
+            query_index=2,
+            prompt="implementation query",
+            phase="implementation",
+            input_tokens=150,
+            output_tokens=250,
+            cost_usd=0.002,
+            duration_ms=2000,
+            num_turns=5,
+        )
+
+        call_count = 0
+        phases_called = []
+
+        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+            nonlocal call_count
+            call_count += 1
+            phases_called.append(phase)
+            if phase == "planning":
+                return planning_metrics
+            return implementation_metrics
+
+        evaluation.worker_agent.execute_query = mock_execute_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert call_count == 2
+        assert phases_called == ["planning", "implementation"]
+
+    def test_execute_sets_plan_permission_for_planning(self) -> None:
+        """Test that execute sets plan permission mode for planning phase."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        permission_modes = []
+
+        original_set_permission_mode = evaluation.worker_agent.set_permission_mode
+
+        def capture_permission_mode(mode: PermissionMode) -> None:
+            permission_modes.append(mode)
+            original_set_permission_mode(mode)
+
+        evaluation.worker_agent.set_permission_mode = capture_permission_mode
+
+        sample_metrics = QueryMetrics(
+            query_index=1,
+            prompt="test",
+            phase="test",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+            response="response",
+        )
+
+        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert PermissionMode.plan in permission_modes
+        assert permission_modes[0] == PermissionMode.plan
+
+    def test_execute_sets_accept_edits_for_implementation(self) -> None:
+        """Test that execute sets acceptEdits permission for implementation phase."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        permission_modes = []
+
+        original_set_permission_mode = evaluation.worker_agent.set_permission_mode
+
+        def capture_permission_mode(mode: PermissionMode) -> None:
+            permission_modes.append(mode)
+            original_set_permission_mode(mode)
+
+        evaluation.worker_agent.set_permission_mode = capture_permission_mode
+
+        sample_metrics = QueryMetrics(
+            query_index=1,
+            prompt="test",
+            phase="test",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+            response="response",
+        )
+
+        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert PermissionMode.acceptEdits in permission_modes
+        assert permission_modes[1] == PermissionMode.acceptEdits
+
+    def test_execute_formats_planning_prompt_with_task(self) -> None:
+        """Test that planning prompt includes the task description."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        captured_queries = []
+
+        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+            captured_queries.append((phase, query))
+            return QueryMetrics(
+                query_index=1,
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.001,
+                duration_ms=1000,
+                num_turns=3,
+                response="response",
+            )
+
+        evaluation.worker_agent.execute_query = mock_execute_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        planning_phase, planning_query = captured_queries[0]
+        assert planning_phase == "planning"
+        assert evaluation.task_description in planning_query
+
+    def test_execute_stores_planning_response(self) -> None:
+        """Test that execute stores the planning phase response."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        planning_response = "Here is my detailed plan for the implementation..."
+
+        call_count = 0
+
+        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+            nonlocal call_count
+            call_count += 1
+            response = planning_response if phase == "planning" else "Done"
+            return QueryMetrics(
+                query_index=1,
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.001,
+                duration_ms=1000,
+                num_turns=3,
+                response=response,
+            )
+
+        evaluation.worker_agent.execute_query = mock_execute_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        asyncio.run(workflow.execute(evaluation))
+
+        assert workflow.planning_response == planning_response
+
+    def test_execute_clears_tool_invocations_between_phases(self) -> None:
+        """Test that tool invocations are cleared between phases."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        sample_metrics = QueryMetrics(
+            query_index=1,
+            prompt="test",
+            phase="test",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+            response="response",
+        )
+
+        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        clear_mock = MagicMock()
+        evaluation.worker_agent.clear_tool_invocations = clear_mock
+
+        asyncio.run(workflow.execute(evaluation))
+
+        # clear_tool_invocations should be called once after planning phase
+        clear_mock.assert_called_once()
+
+
+class TestPlanThenImplementWorkflowMetrics:
+    """Tests for PlanThenImplementWorkflow metrics collection."""
+
+    def create_mock_evaluation(self) -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        developer = DeveloperAgent()
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        evaluation = Evaluation(
+            task_description="Implement feature",
+            workflow_type=WorkflowType.plan_then_implement,
+            developer_agent=developer,
+            worker_agent=worker,
+        )
+        return evaluation
+
+    def test_execute_collects_metrics_from_both_phases(self) -> None:
+        """Test that metrics are collected from both planning and implementation phases."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        planning_metrics = QueryMetrics(
+            query_index=1,
+            prompt="planning query",
+            phase="planning",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+            response="Plan",
+        )
+        implementation_metrics = QueryMetrics(
+            query_index=2,
+            prompt="implementation query",
+            phase="implementation",
+            input_tokens=150,
+            output_tokens=250,
+            cost_usd=0.002,
+            duration_ms=2000,
+            num_turns=5,
+            response="Done",
+        )
+
+        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+            if phase == "planning":
+                return planning_metrics
+            return implementation_metrics
+
+        evaluation.worker_agent.execute_query = mock_execute_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        result = asyncio.run(workflow.execute(evaluation))
+
+        # Total tokens should be sum of both phases
+        assert result.total_tokens == 700
+        assert result.input_tokens == 250
+        assert result.output_tokens == 450
+        assert result.total_cost_usd == pytest.approx(0.003)
+
+    def test_execute_tracks_prompts_from_both_phases(self) -> None:
+        """Test that prompt count includes both phases."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        sample_metrics = QueryMetrics(
+            query_index=1,
+            prompt="test",
+            phase="test",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+            response="response",
+        )
+
+        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        result = asyncio.run(workflow.execute(evaluation))
+
+        assert result.prompt_count == 2
+
+    def test_execute_aggregates_tool_invocations_from_both_phases(self) -> None:
+        """Test that tool invocations are aggregated from both phases."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        planning_tools = [
+            ToolInvocation(
+                timestamp=datetime.now(),
+                tool_name="Read",
+                tool_use_id="inv-001",
+                success=True,
+            ),
+            ToolInvocation(
+                timestamp=datetime.now(),
+                tool_name="Glob",
+                tool_use_id="inv-002",
+                success=True,
+            ),
+        ]
+        implementation_tools = [
+            ToolInvocation(
+                timestamp=datetime.now(),
+                tool_name="Edit",
+                tool_use_id="inv-003",
+                success=True,
+            ),
+            ToolInvocation(
+                timestamp=datetime.now(),
+                tool_name="Write",
+                tool_use_id="inv-004",
+                success=True,
+            ),
+        ]
+
+        sample_metrics = QueryMetrics(
+            query_index=1,
+            prompt="test",
+            phase="test",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+            response="response",
+        )
+
+        call_count = 0
+
+        def get_tools_by_phase() -> list[ToolInvocation]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return planning_tools
+            return implementation_tools
+
+        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
+        evaluation.worker_agent.get_tool_invocations = get_tools_by_phase
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        result = asyncio.run(workflow.execute(evaluation))
+
+        assert result.tool_counts["Read"] == 1
+        assert result.tool_counts["Glob"] == 1
+        assert result.tool_counts["Edit"] == 1
+        assert result.tool_counts["Write"] == 1
+
+    def test_execute_tracks_phases_separately(self) -> None:
+        """Test that phases are tracked separately in phase_tokens."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        planning_metrics = QueryMetrics(
+            query_index=1,
+            prompt="planning",
+            phase="planning",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=3,
+            response="Plan",
+        )
+        implementation_metrics = QueryMetrics(
+            query_index=2,
+            prompt="implementation",
+            phase="implementation",
+            input_tokens=150,
+            output_tokens=250,
+            cost_usd=0.002,
+            duration_ms=2000,
+            num_turns=5,
+            response="Done",
+        )
+
+        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+            if phase == "planning":
+                return planning_metrics
+            return implementation_metrics
+
+        evaluation.worker_agent.execute_query = mock_execute_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        result = asyncio.run(workflow.execute(evaluation))
+
+        assert "planning" in result.tokens_by_phase
+        assert "implementation" in result.tokens_by_phase
+        assert result.tokens_by_phase["planning"] == 300
+        assert result.tokens_by_phase["implementation"] == 400
+
+
+class TestPlanThenImplementWorkflowErrorHandling:
+    """Tests for PlanThenImplementWorkflow error handling."""
+
+    def create_mock_evaluation(self) -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        developer = DeveloperAgent()
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        evaluation = Evaluation(
+            task_description="Implement feature",
+            workflow_type=WorkflowType.plan_then_implement,
+            developer_agent=developer,
+            worker_agent=worker,
+        )
+        return evaluation
+
+    def test_planning_phase_error_transitions_to_failed(self) -> None:
+        """Test that an error in planning phase transitions evaluation to failed."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        async def mock_execute_query_error(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+            raise RuntimeError("Planning phase failed")
+
+        evaluation.worker_agent.execute_query = mock_execute_query_error
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        with pytest.raises(RuntimeError, match="Planning phase failed"):
+            asyncio.run(workflow.execute(evaluation))
+
+        assert evaluation.status == EvaluationStatus.failed
+
+    def test_implementation_phase_error_transitions_to_failed(self) -> None:
+        """Test that an error in implementation phase transitions evaluation to failed."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        call_count = 0
+
+        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+            nonlocal call_count
+            call_count += 1
+            if phase == "implementation":
+                raise RuntimeError("Implementation phase failed")
+            return QueryMetrics(
+                query_index=1,
+                prompt=query,
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.001,
+                duration_ms=1000,
+                num_turns=3,
+                response="Plan",
+            )
+
+        evaluation.worker_agent.execute_query = mock_execute_query
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        with pytest.raises(RuntimeError, match="Implementation phase failed"):
+            asyncio.run(workflow.execute(evaluation))
+
+        assert evaluation.status == EvaluationStatus.failed
+
+    def test_error_sets_failure_reason(self) -> None:
+        """Test that error message is captured as failure reason."""
+        collector = MetricsCollector()
+        workflow = PlanThenImplementWorkflow(collector)
+        evaluation = self.create_mock_evaluation()
+
+        async def mock_execute_query_error(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+            raise ValueError("Specific error message")
+
+        evaluation.worker_agent.execute_query = mock_execute_query_error
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+
+        with pytest.raises(ValueError):
+            asyncio.run(workflow.execute(evaluation))
+
+        assert "Specific error message" in evaluation.error
