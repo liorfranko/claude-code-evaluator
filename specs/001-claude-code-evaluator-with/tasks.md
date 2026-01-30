@@ -217,19 +217,19 @@ Story: As a developer workflow researcher, I want to run evaluations that involv
 Final integration, CLI interface, and success criteria verification.
 
 ### CLI Implementation
-- [ ] T600 Implement CLI argument parsing with argparse (src/claude_evaluator/cli.py)
-- [ ] T601 Add --suite option for YAML suite execution (src/claude_evaluator/cli.py)
-- [ ] T602 Add --eval option for specific evaluation selection (src/claude_evaluator/cli.py)
-- [ ] T603 Add --workflow option for ad-hoc evaluation (src/claude_evaluator/cli.py)
-- [ ] T604 Add --output, --max-turns, --max-budget options (src/claude_evaluator/cli.py)
-- [ ] T605 Add --verbose and --json output options (src/claude_evaluator/cli.py)
-- [ ] T606 Implement --dry-run for suite validation (src/claude_evaluator/cli.py)
-- [ ] T607 Add console output formatting (src/claude_evaluator/cli.py)
+- [X] T600 Implement CLI argument parsing with argparse (src/claude_evaluator/cli.py)
+- [X] T601 Add --suite option for YAML suite execution (src/claude_evaluator/cli.py)
+- [X] T602 Add --eval option for specific evaluation selection (src/claude_evaluator/cli.py)
+- [X] T603 Add --workflow option for ad-hoc evaluation (src/claude_evaluator/cli.py)
+- [X] T604 Add --output, --max-turns, --max-budget options (src/claude_evaluator/cli.py)
+- [X] T605 Add --verbose and --json output options (src/claude_evaluator/cli.py)
+- [X] T606 Implement --dry-run for suite validation (src/claude_evaluator/cli.py)
+- [X] T607 Add console output formatting (src/claude_evaluator/cli.py)
 
 ### Integration
-- [ ] T608 Connect CLI to Evaluation orchestrator (src/claude_evaluator/cli.py)
-- [ ] T609 Wire up all workflow types to CLI (src/claude_evaluator/cli.py)
-- [ ] T610 Add entry point in pyproject.toml (pyproject.toml)
+- [X] T608 Connect CLI to Evaluation orchestrator (src/claude_evaluator/cli.py)
+- [X] T609 Wire up all workflow types to CLI (src/claude_evaluator/cli.py)
+- [X] T610 Add entry point in pyproject.toml (pyproject.toml)
 
 ### Success Criteria Verification
 - [ ] T611 [SC1] E2E test: 10 diverse evaluations run autonomously (tests/e2e/test_autonomous_evaluation.py)
