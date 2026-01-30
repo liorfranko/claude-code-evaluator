@@ -237,8 +237,8 @@ Final integration, CLI interface, and success criteria verification.
 - [X] T613 [SC3] Workflow coverage: Test all 3 workflow types (tests/e2e/test_workflow_coverage.py)
 
 ### Final Integration Tests
-- [ ] T614 Write agent communication integration tests (tests/integration/test_agent_communication.py)
-- [ ] T615 Write full workflow E2E tests (tests/e2e/test_full_workflow.py)
+- [X] T614 Write agent communication integration tests (tests/integration/test_agent_communication.py)
+- [X] T615 Write full workflow E2E tests (tests/e2e/test_full_workflow.py)
 
 ### Checkpoint
 - [ ] T616 CHECKPOINT: All success criteria verified, CLI functional
