@@ -232,9 +232,9 @@ Final integration, CLI interface, and success criteria verification.
 - [X] T610 Add entry point in pyproject.toml (pyproject.toml)
 
 ### Success Criteria Verification
-- [ ] T611 [SC1] E2E test: 10 diverse evaluations run autonomously (tests/e2e/test_autonomous_evaluation.py)
-- [ ] T612 [SC2] Schema validation: All metrics fields present in reports (tests/e2e/test_metrics_completeness.py)
-- [ ] T613 [SC3] Workflow coverage: Test all 3 workflow types (tests/e2e/test_workflow_coverage.py)
+- [X] T611 [SC1] E2E test: 10 diverse evaluations run autonomously (tests/e2e/test_autonomous_evaluation.py)
+- [X] T612 [SC2] Schema validation: All metrics fields present in reports (tests/e2e/test_metrics_completeness.py)
+- [X] T613 [SC3] Workflow coverage: Test all 3 workflow types (tests/e2e/test_workflow_coverage.py)
 
 ### Final Integration Tests
 - [ ] T614 Write agent communication integration tests (tests/integration/test_agent_communication.py)

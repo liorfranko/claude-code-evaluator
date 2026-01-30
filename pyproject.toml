@@ -27,6 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
 ]
@@ -94,3 +95,5 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
