@@ -56,6 +56,7 @@ class MetricsCollector:
                 cost_usd=query_metrics.cost_usd,
                 num_turns=query_metrics.num_turns,
                 phase=self._current_phase,
+                response=query_metrics.response,
             )
         self._queries.append(query_metrics)
 

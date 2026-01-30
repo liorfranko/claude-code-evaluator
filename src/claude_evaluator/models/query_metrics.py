@@ -26,6 +26,7 @@ class QueryMetrics:
         cost_usd: Cost for this query in USD.
         num_turns: Number of agentic turns in this query.
         phase: Workflow phase (planning, implementation, etc.).
+        response: The response received from Claude Code.
     """
 
     query_index: int
@@ -36,3 +37,4 @@ class QueryMetrics:
     cost_usd: float
     num_turns: int
     phase: Optional[str] = None
+    response: Optional[str] = None
