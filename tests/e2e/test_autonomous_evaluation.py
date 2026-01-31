@@ -45,7 +45,7 @@ class TestAutonomousEvaluationSC001:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
                 prompt=query,
@@ -262,7 +262,7 @@ class TestAutonomousEvaluationSequential:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
                 prompt=query,

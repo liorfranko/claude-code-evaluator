@@ -43,7 +43,7 @@ class TestDeveloperWorkerCommunication:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
                 prompt=query,
@@ -221,7 +221,7 @@ class TestAgentCoordinationInWorkflows:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(
                 query_index=call_counter[0] - 1,
@@ -328,7 +328,7 @@ class TestAgentCoordinationInWorkflows:
             permission_mode=PermissionMode.plan,
         )
 
-        async def capture_query(query: str, phase: str) -> QueryMetrics:
+        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             received_queries.append(query)
             return QueryMetrics(
                 query_index=0,

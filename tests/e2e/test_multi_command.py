@@ -66,7 +66,7 @@ class TestMultiCommandE2ESequentialExecution:
 
         execution_order: list[str] = []
 
-        async def capture_order(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def capture_order(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             execution_order.append(phase)
             return QueryMetrics(
                 query_index=len(execution_order),
@@ -100,7 +100,7 @@ class TestMultiCommandE2ESequentialExecution:
 
         events: list[tuple[str, str]] = []  # (phase, event_type)
 
-        async def capture_events(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def capture_events(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             events.append((phase, "start"))
             events.append((phase, "end"))
             return QueryMetrics(
@@ -163,7 +163,7 @@ class TestMultiCommandE2ESequentialExecution:
             response="Done",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -198,7 +198,7 @@ class TestMultiCommandE2ESequentialExecution:
             response="Single step done",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -256,7 +256,7 @@ class TestMultiCommandE2EContextPassing:
 
         received_prompts: list[tuple[str, str]] = []  # (phase, prompt)
 
-        async def capture_prompts(query: str, phase: str) -> QueryMetrics:
+        async def capture_prompts(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             received_prompts.append((phase, query))
             responses = {
                 "design": "Design: CLI with argparse, file handlers, progress bar",
@@ -309,7 +309,7 @@ class TestMultiCommandE2EContextPassing:
 
         received_prompts: list[str] = []
 
-        async def capture_prompts(query: str, phase: str) -> QueryMetrics:
+        async def capture_prompts(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             received_prompts.append(query)
             return QueryMetrics(
                 query_index=len(received_prompts),
@@ -363,7 +363,7 @@ class TestMultiCommandE2EContextPassing:
 
         call_count = [0]
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             call_count[0] += 1
             return QueryMetrics(
                 query_index=call_count[0],
@@ -403,7 +403,7 @@ class TestMultiCommandE2EContextPassing:
 
         received_prompt: str | None = None
 
-        async def capture_prompt(query: str, phase: str) -> QueryMetrics:
+        async def capture_prompt(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             nonlocal received_prompt
             received_prompt = query
             return QueryMetrics(
@@ -466,7 +466,7 @@ class TestMultiCommandE2EMetrics:
             "load": (200, 400),
         }
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             inp, out = phase_tokens[phase]
             return QueryMetrics(
                 query_index=1,
@@ -508,7 +508,7 @@ class TestMultiCommandE2EMetrics:
             "phase3": (300, 600, 0.009, 15),
         }
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             inp, out, cost, turns = phase_metrics[phase]
             return QueryMetrics(
                 query_index=1,
@@ -546,75 +546,57 @@ class TestMultiCommandE2EMetrics:
         workflow = MultiCommandWorkflow(collector, phases)
         evaluation = self.create_evaluation()
 
-        read_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="read-001",
-                success=True,
-                phase="read_phase",
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Grep",
-                tool_use_id="grep-001",
-                success=True,
-                phase="read_phase",
-            ),
+        # Create messages with tool use blocks for each phase
+        read_messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Read", "id": "read-001"},
+                    {"type": "ToolUseBlock", "name": "Grep", "id": "grep-001"},
+                ],
+            }
         ]
 
-        write_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Edit",
-                tool_use_id="edit-001",
-                success=True,
-                phase="write_phase",
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Write",
-                tool_use_id="write-001",
-                success=True,
-                phase="write_phase",
-            ),
+        write_messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Edit", "id": "edit-001"},
+                    {"type": "ToolUseBlock", "name": "Write", "id": "write-001"},
+                ],
+            }
         ]
 
         call_count = [0]
 
-        def get_tools() -> list[ToolInvocation]:
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+            nonlocal call_count
             call_count[0] += 1
-            if call_count[0] == 1:
-                return read_tools
-            return write_tools
-
-        sample_metrics = QueryMetrics(
-            query_index=1,
-            prompt="test",
-            phase="test",
-            input_tokens=100,
-            output_tokens=200,
-            cost_usd=0.003,
-            duration_ms=1000,
-            num_turns=3,
-            response="Done",
-        )
-
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
-            return sample_metrics
+            messages = read_messages if call_count[0] == 1 else write_messages
+            return QueryMetrics(
+                query_index=call_count[0],
+                prompt="test",
+                phase=phase,
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=0.003,
+                duration_ms=1000,
+                num_turns=3,
+                response="Done",
+                messages=messages,
+            )
 
         evaluation.worker_agent.execute_query = mock_query
-        evaluation.worker_agent.get_tool_invocations = get_tools
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
         evaluation.worker_agent.clear_tool_invocations = MagicMock()
 
         result = asyncio.run(workflow.execute(evaluation))
 
-        # Check all tools were collected
+        # Check all tools were collected via tool_counts from messages
         assert result.tool_counts["Read"] == 1
         assert result.tool_counts["Grep"] == 1
         assert result.tool_counts["Edit"] == 1
         assert result.tool_counts["Write"] == 1
-        assert len(result.tool_invocations) == 4
 
     def test_report_generation_with_multi_command_metrics(self) -> None:
         """Test that a complete report can be generated from multi-command workflow."""
@@ -626,7 +608,7 @@ class TestMultiCommandE2EMetrics:
         workflow = MultiCommandWorkflow(collector, phases)
         evaluation = self.create_evaluation()
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=1,
                 prompt=query,
@@ -687,7 +669,7 @@ class TestMultiCommandE2EErrorHandling:
 
         executed_phases: list[str] = []
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             executed_phases.append(phase)
             if phase == "phase2":
                 raise RuntimeError("Phase 2 failed")
@@ -721,7 +703,7 @@ class TestMultiCommandE2EErrorHandling:
         workflow = MultiCommandWorkflow(collector, phases)
         evaluation = self.create_evaluation()
 
-        async def mock_query_error(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Specific failure reason")
 
         evaluation.worker_agent.execute_query = mock_query_error

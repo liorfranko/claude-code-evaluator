@@ -44,7 +44,7 @@ class TestWorkflowCoverageSC003:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(
                 query_index=call_counter[0] - 1,

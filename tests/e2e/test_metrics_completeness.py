@@ -41,7 +41,6 @@ REQUIRED_METRICS_FIELDS = [
     "turn_count",
     "tokens_by_phase",
     "tool_counts",
-    "tool_invocations",
     "queries",
 ]
 
@@ -89,7 +88,18 @@ class TestMetricsSchemaValidation:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        # Include messages with tool use blocks so tool_counts will be populated
+        messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Read", "id": "tool-123"},
+                    {"type": "ToolUseBlock", "name": "Edit", "id": "tool-456"},
+                ],
+            }
+        ]
+
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=0,
                 prompt=query,
@@ -100,31 +110,11 @@ class TestMetricsSchemaValidation:
                 num_turns=2,
                 phase=phase,
                 response="Task completed successfully",
+                messages=messages,
             )
 
         worker.execute_query = mock_execute_query  # type: ignore
-
-        # Return tool invocations for completeness testing
-        worker.get_tool_invocations = MagicMock(
-            return_value=[
-                ToolInvocation(
-                    timestamp=datetime.now(),
-                    tool_name="Read",
-                    tool_use_id="tool-123",
-                    success=True,
-                    phase="implementation",
-                    input_summary="Read file.py",
-                ),
-                ToolInvocation(
-                    timestamp=datetime.now(),
-                    tool_name="Edit",
-                    tool_use_id="tool-456",
-                    success=True,
-                    phase="implementation",
-                    input_summary="Edit file.py",
-                ),
-            ]
-        )
+        worker.get_tool_invocations = MagicMock(return_value=[])
         worker.clear_tool_invocations = MagicMock()
 
         return worker
@@ -226,12 +216,12 @@ class TestMetricsSchemaValidation:
         evaluation.cleanup()
 
     @pytest.mark.asyncio
-    async def test_tool_invocation_metrics_complete(self) -> None:
-        """Verify tool invocation metrics contain all required fields."""
+    async def test_tool_counts_extracted_from_messages(self) -> None:
+        """Verify tool counts are properly extracted from query messages."""
         developer = DeveloperAgent()
         worker = self.create_mock_worker()
         evaluation = Evaluation(
-            task_description="Test task for tool invocation metrics",
+            task_description="Test task for tool count extraction",
             workflow_type=WorkflowType.direct,
             developer_agent=developer,
             worker_agent=worker,
@@ -241,7 +231,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -249,12 +239,12 @@ class TestMetricsSchemaValidation:
         json_str = generator.to_json(report)
         report_dict = json.loads(json_str)
 
-        invocations = report_dict["metrics"]["tool_invocations"]
-        assert len(invocations) >= 1
-
-        for invocation in invocations:
-            for field in REQUIRED_TOOL_INVOCATION_FIELDS:
-                assert field in invocation, f"Missing tool invocation field: {field}"
+        tool_counts = report_dict["metrics"]["tool_counts"]
+        # Should have Read and Edit from mock messages with ToolUseBlock
+        assert "Read" in tool_counts, "Read tool should be in tool_counts"
+        assert "Edit" in tool_counts, "Edit tool should be in tool_counts"
+        assert tool_counts["Read"] == 1
+        assert tool_counts["Edit"] == 1
 
         evaluation.cleanup()
 
@@ -296,7 +286,6 @@ class TestMetricsSchemaValidation:
         # Check collection types
         assert isinstance(metrics_dict["tokens_by_phase"], dict)
         assert isinstance(metrics_dict["tool_counts"], dict)
-        assert isinstance(metrics_dict["tool_invocations"], list)
         assert isinstance(metrics_dict["queries"], list)
 
         evaluation.cleanup()
@@ -380,7 +369,7 @@ class TestMultiPhaseMetricsCompleteness:
 
         self.call_count = 0
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             self.call_count += 1
             return QueryMetrics(
                 query_index=self.call_count - 1,

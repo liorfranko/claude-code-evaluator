@@ -48,7 +48,7 @@ class TestFullWorkflowExecution:
 
         self.query_count = 0
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             self.query_count += 1
             return QueryMetrics(
                 query_index=self.query_count - 1,
@@ -230,7 +230,7 @@ class TestFullWorkflowWithYAMLConfig:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
                 prompt=query,
@@ -325,7 +325,7 @@ class TestFullWorkflowReportPersistence:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
                 prompt=query,
@@ -494,7 +494,7 @@ class TestFullWorkflowErrorScenarios:
 
         call_count = [0]
 
-        async def sometimes_failing_query(query: str, phase: str) -> QueryMetrics:
+        async def sometimes_failing_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             call_count[0] += 1
             if call_count[0] == 2:  # Fail on second call
                 raise RuntimeError("Second phase failed")

@@ -245,7 +245,7 @@ class TestDirectWorkflowE2EExecution:
 
         received_queries: List[str] = []
 
-        async def capture_query(query: str, phase: str = None) -> QueryMetrics:
+        async def capture_query(query: str, phase: str = None, resume_session: bool = False) -> QueryMetrics:
             received_queries.append(query)
             return realistic_query_metrics
 
@@ -376,6 +376,19 @@ class TestDirectWorkflowMetricsCapture:
         collector = MetricsCollector()
         workflow = DirectWorkflow(collector)
 
+        # Create messages with tool use blocks (tool_counts are extracted from these)
+        messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Read", "id": "read-001"},
+                    {"type": "ToolUseBlock", "name": "Write", "id": "write-001"},
+                    {"type": "ToolUseBlock", "name": "Write", "id": "write-002"},
+                    {"type": "ToolUseBlock", "name": "Bash", "id": "bash-001"},
+                ],
+            }
+        ]
+
         query_metrics = QueryMetrics(
             query_index=1,
             prompt="Test",
@@ -384,46 +397,15 @@ class TestDirectWorkflowMetricsCapture:
             output_tokens=300,
             cost_usd=0.03,
             num_turns=3,
+            messages=messages,
         )
-
-        tool_invocations = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="read-001",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Write",
-                tool_use_id="write-001",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Write",
-                tool_use_id="write-002",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Bash",
-                tool_use_id="bash-001",
-                success=True,
-            ),
-        ]
 
         evaluation.worker_agent.execute_query = AsyncMock(return_value=query_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(
-            return_value=tool_invocations
-        )
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         metrics = asyncio.run(workflow.execute(evaluation))
 
-        # Verify tool invocations are in metrics
-        assert len(metrics.tool_invocations) == 4
-
-        # Verify tool counts are aggregated
+        # Verify tool counts are aggregated from messages
         assert metrics.tool_counts["Read"] == 1
         assert metrics.tool_counts["Write"] == 2
         assert metrics.tool_counts["Bash"] == 1
@@ -631,6 +613,20 @@ class TestDirectWorkflowCompleteLifecycle:
         collector = MetricsCollector()
         workflow = DirectWorkflow(collector)
 
+        # Create messages with tool use blocks (tool_counts are extracted from these)
+        messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Read", "id": f"inv-{i}"}
+                    for i in range(5)
+                ] + [
+                    {"type": "ToolUseBlock", "name": "Write", "id": f"write-{i}"}
+                    for i in range(3)
+                ],
+            }
+        ]
+
         # Simulate a realistic execution
         query_metrics = QueryMetrics(
             query_index=1,
@@ -641,34 +637,13 @@ class TestDirectWorkflowCompleteLifecycle:
             cost_usd=0.18,
             num_turns=12,
             phase="implementation",
+            messages=messages,
         )
-
-        tool_invocations = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id=f"inv-{i}",
-                success=True,
-                phase="implementation",
-            )
-            for i in range(5)
-        ] + [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Write",
-                tool_use_id=f"write-{i}",
-                success=True,
-                phase="implementation",
-            )
-            for i in range(3)
-        ]
 
         full_evaluation.worker_agent.execute_query = AsyncMock(
             return_value=query_metrics
         )
-        full_evaluation.worker_agent.get_tool_invocations = MagicMock(
-            return_value=tool_invocations
-        )
+        full_evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         # Initial state
         assert full_evaluation.status == EvaluationStatus.pending
@@ -689,7 +664,6 @@ class TestDirectWorkflowCompleteLifecycle:
         assert metrics.total_cost_usd == 0.18
         assert metrics.prompt_count == 1
         assert metrics.turn_count == 12
-        assert len(metrics.tool_invocations) == 8
         assert metrics.tool_counts["Read"] == 5
         assert metrics.tool_counts["Write"] == 3
         assert "implementation" in metrics.tokens_by_phase

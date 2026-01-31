@@ -91,7 +91,7 @@ class TestPlanWorkflowE2EPlanModeExecution:
             response="Implementation complete. Created yaml_config.py with YAMLConfig class.",
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -113,7 +113,7 @@ class TestPlanWorkflowE2EPlanModeExecution:
 
         received_queries: list[tuple[str, str]] = []
 
-        async def capture_query(query: str, phase: str) -> QueryMetrics:
+        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             received_queries.append((query, phase))
             return QueryMetrics(
                 query_index=len(received_queries),
@@ -147,7 +147,7 @@ class TestPlanWorkflowE2EPlanModeExecution:
         # Track the permission mode when execute_query is called
         permission_during_planning: PermissionMode | None = None
 
-        async def capture_permission_and_query(query: str, phase: str) -> QueryMetrics:
+        async def capture_permission_and_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             nonlocal permission_during_planning
             if phase == "planning":
                 permission_during_planning = evaluation.worker_agent.permission_mode
@@ -220,7 +220,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
             response="Response",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -241,7 +241,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
 
         received_queries: list[tuple[str, str]] = []
 
-        async def capture_query(query: str, phase: str) -> QueryMetrics:
+        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             received_queries.append((query, phase))
             return QueryMetrics(
                 query_index=len(received_queries),
@@ -282,7 +282,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         5. Add refresh token support
         """
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             response = planning_response if phase == "planning" else "Done"
             return QueryMetrics(
                 query_index=1,
@@ -305,75 +305,58 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         assert workflow.planning_response == planning_response
 
     def test_session_continuity_between_phases(self) -> None:
-        """Test that tool invocations are properly separated between phases."""
+        """Test that tool counts are properly aggregated between phases."""
         collector = MetricsCollector()
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_evaluation()
 
-        planning_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="plan-001",
-                success=True,
-                phase="planning",
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Grep",
-                tool_use_id="plan-002",
-                success=True,
-                phase="planning",
-            ),
+        # Create messages with tool use blocks for each phase
+        planning_messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Read", "id": "plan-001"},
+                    {"type": "ToolUseBlock", "name": "Grep", "id": "plan-002"},
+                ],
+            }
         ]
 
-        implementation_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Edit",
-                tool_use_id="impl-001",
-                success=True,
-                phase="implementation",
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Write",
-                tool_use_id="impl-002",
-                success=True,
-                phase="implementation",
-            ),
+        implementation_messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Edit", "id": "impl-001"},
+                    {"type": "ToolUseBlock", "name": "Write", "id": "impl-002"},
+                ],
+            }
         ]
 
         call_count = [0]
 
-        def get_tools() -> list[ToolInvocation]:
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+            nonlocal call_count
             call_count[0] += 1
-            if call_count[0] == 1:
-                return planning_tools
-            return implementation_tools
-
-        sample_metrics = QueryMetrics(
-            query_index=1,
-            prompt="test",
-            phase="test",
-            input_tokens=500,
-            output_tokens=1000,
-            cost_usd=0.015,
-            duration_ms=5000,
-            num_turns=5,
-            response="Response",
-        )
-
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
-            return sample_metrics
+            messages = planning_messages if call_count[0] == 1 else implementation_messages
+            return QueryMetrics(
+                query_index=call_count[0],
+                prompt="test",
+                phase=phase,
+                input_tokens=500,
+                output_tokens=1000,
+                cost_usd=0.015,
+                duration_ms=5000,
+                num_turns=5,
+                response="Response",
+                messages=messages,
+            )
 
         evaluation.worker_agent.execute_query = mock_query
-        evaluation.worker_agent.get_tool_invocations = get_tools
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
         evaluation.worker_agent.clear_tool_invocations = MagicMock()
 
         result = asyncio.run(workflow.execute(evaluation))
 
-        # Should have all 4 tools
+        # Should have all 4 tools from both phases
         assert result.tool_counts["Read"] == 1
         assert result.tool_counts["Grep"] == 1
         assert result.tool_counts["Edit"] == 1
@@ -429,7 +412,7 @@ class TestPlanWorkflowE2EMetricsCapture:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -475,7 +458,7 @@ class TestPlanWorkflowE2EMetricsCapture:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -527,7 +510,7 @@ class TestPlanWorkflowE2EMetricsCapture:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -550,73 +533,59 @@ class TestPlanWorkflowE2EMetricsCapture:
         # Implementation should use about 80% of tokens (2400 / 3000)
         assert implementation_ratio == pytest.approx(0.8, abs=0.01)
 
-    def test_tool_invocations_tagged_by_phase(self) -> None:
-        """Test that tool invocations are tagged with their phase."""
+    def test_tool_counts_aggregated_across_phases(self) -> None:
+        """Test that tool counts are aggregated across both phases."""
         collector = MetricsCollector()
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_evaluation()
 
-        planning_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="plan-001",
-                success=True,
-                phase="planning",
-            ),
+        # Create messages with tool use blocks (tool_counts are extracted from these)
+        planning_messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Read", "id": "plan-001"},
+                ],
+            }
         ]
 
-        implementation_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Edit",
-                tool_use_id="impl-001",
-                success=True,
-                phase="implementation",
-            ),
+        implementation_messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "ToolUseBlock", "name": "Edit", "id": "impl-001"},
+                ],
+            }
         ]
 
         call_count = [0]
 
-        def get_tools() -> list[ToolInvocation]:
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+            nonlocal call_count
             call_count[0] += 1
-            if call_count[0] == 1:
-                return planning_tools
-            return implementation_tools
-
-        sample_metrics = QueryMetrics(
-            query_index=1,
-            prompt="test",
-            phase="test",
-            input_tokens=500,
-            output_tokens=1000,
-            cost_usd=0.015,
-            duration_ms=5000,
-            num_turns=5,
-            response="Response",
-        )
-
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
-            return sample_metrics
+            messages = planning_messages if call_count[0] == 1 else implementation_messages
+            return QueryMetrics(
+                query_index=call_count[0],
+                prompt="test",
+                phase=phase,
+                input_tokens=500,
+                output_tokens=1000,
+                cost_usd=0.015,
+                duration_ms=5000,
+                num_turns=5,
+                response="Response",
+                messages=messages,
+            )
 
         evaluation.worker_agent.execute_query = mock_query
-        evaluation.worker_agent.get_tool_invocations = get_tools
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
         evaluation.worker_agent.clear_tool_invocations = MagicMock()
 
         result = asyncio.run(workflow.execute(evaluation))
 
-        # Verify tool invocations have phase info
-        planning_invocations = [
-            inv for inv in result.tool_invocations if inv.phase == "planning"
-        ]
-        implementation_invocations = [
-            inv for inv in result.tool_invocations if inv.phase == "implementation"
-        ]
-
-        assert len(planning_invocations) == 1
-        assert len(implementation_invocations) == 1
-        assert planning_invocations[0].tool_name == "Read"
-        assert implementation_invocations[0].tool_name == "Edit"
+        # Verify tool counts are aggregated from both phases
+        assert result.tool_counts["Read"] == 1
+        assert result.tool_counts["Edit"] == 1
 
 
 class TestPlanWorkflowE2ECompleteLifecycle:
@@ -668,7 +637,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
             response="Cache implementation complete",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -701,7 +670,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
             response="Response",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -742,7 +711,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -767,7 +736,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_evaluation()
 
-        async def mock_query_error(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 raise RuntimeError("Planning failed: Cannot access repository")
             return QueryMetrics(
@@ -798,7 +767,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_evaluation()
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             if phase == "implementation":
                 raise RuntimeError("Implementation failed: Syntax error")
             return QueryMetrics(
