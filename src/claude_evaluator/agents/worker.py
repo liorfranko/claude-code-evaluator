@@ -16,7 +16,7 @@ from ..models.query_metrics import QueryMetrics
 # Optional SDK import - allows tests to run without SDK installed
 try:
     from claude_agent_sdk import (
-        query as sdk_query,
+        ClaudeSDKClient,
         ClaudeAgentOptions,
         ResultMessage,
         AssistantMessage,
@@ -25,7 +25,7 @@ try:
     )
     SDK_AVAILABLE = True
 except ImportError:
-    sdk_query = None  # type: ignore
+    ClaudeSDKClient = None  # type: ignore
     ClaudeAgentOptions = None  # type: ignore
     ResultMessage = None  # type: ignore
     AssistantMessage = None  # type: ignore
@@ -61,6 +61,7 @@ class WorkerAgent:
         model: Model identifier to use for SDK execution (optional, defaults to DEFAULT_MODEL).
         tool_invocations: List of tool invocations tracked during current query.
         _query_counter: Internal counter for query indexing.
+        _client: Internal ClaudeSDKClient instance for session management.
     """
 
     execution_mode: ExecutionMode
@@ -75,7 +76,7 @@ class WorkerAgent:
     model: Optional[str] = None
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
     _query_counter: int = field(default=0, repr=False)
-    _last_session_id: Optional[str] = field(default=None, repr=False)
+    _client: Optional[Any] = field(default=None, repr=False)
 
     async def execute_query(
         self,
@@ -114,6 +115,10 @@ class WorkerAgent:
     ) -> QueryMetrics:
         """Execute a query using the Claude SDK.
 
+        Uses ClaudeSDKClient for multi-turn conversation support. When resume_session
+        is True and a client exists, the query continues in the same session context.
+        Otherwise, a new client is created.
+
         Args:
             query: The prompt to send to Claude Code.
             phase: Current workflow phase for tracking.
@@ -125,7 +130,7 @@ class WorkerAgent:
         Raises:
             RuntimeError: If SDK is not available.
         """
-        if not SDK_AVAILABLE or sdk_query is None:
+        if not SDK_AVAILABLE or ClaudeSDKClient is None:
             raise RuntimeError(
                 "claude-agent-sdk is not installed. "
                 "Install with: pip install claude-agent-sdk"
@@ -135,22 +140,34 @@ class WorkerAgent:
         self.tool_invocations = []
         self._query_counter += 1
 
-        # Build SDK options and execute query
-        options = self._build_sdk_options(resume_session)
-        result_message, response_content, all_messages = await self._stream_sdk_messages(
-            query, options
-        )
+        # Determine if we should reuse existing client or create new one
+        if resume_session and self._client is not None:
+            # Continue conversation with existing client
+            result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
+                query, self._client
+            )
+        else:
+            # Clean up existing client if any
+            if self._client is not None:
+                await self._client.disconnect()
+                self._client = None
+
+            # Build SDK options and create new client session
+            options = self._build_sdk_options()
+            self._client = ClaudeSDKClient(options)
+            await self._client.connect()
+
+            result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
+                query, self._client
+            )
 
         # Build and return metrics
         return self._build_query_metrics(
             query, phase, result_message, response_content, all_messages
         )
 
-    def _build_sdk_options(self, resume_session: bool) -> Any:
+    def _build_sdk_options(self) -> Any:
         """Build ClaudeAgentOptions for SDK execution.
-
-        Args:
-            resume_session: If True, include session resumption.
 
         Returns:
             Configured ClaudeAgentOptions instance.
@@ -169,19 +186,21 @@ class WorkerAgent:
             max_turns=self.max_turns,
             max_budget_usd=self.max_budget_usd,
             model=self.model or DEFAULT_MODEL,
-            resume=self._last_session_id if resume_session and self._last_session_id else None,
         )
 
-    async def _stream_sdk_messages(
+    async def _stream_sdk_messages_with_client(
         self,
         query: str,
-        options: Any,
+        client: Any,
     ) -> tuple[Any, Any, list[dict[str, Any]]]:
-        """Stream and process messages from SDK execution.
+        """Stream and process messages from ClaudeSDKClient.
+
+        Uses the client's query() and receive_response() methods to send
+        a prompt and process the streaming response.
 
         Args:
             query: The prompt to send.
-            options: The ClaudeAgentOptions to use.
+            client: The ClaudeSDKClient instance to use.
 
         Returns:
             Tuple of (result_message, response_content, all_messages).
@@ -194,7 +213,11 @@ class WorkerAgent:
         pending_tool_uses: dict[str, ToolInvocation] = {}
         all_messages: list[dict[str, Any]] = []
 
-        async for message in sdk_query(prompt=query, options=options):
+        # Send query through client
+        await client.query(query)
+
+        # Process streaming response
+        async for message in client.receive_response():
             message_type = type(message).__name__
 
             if message_type == "AssistantMessage" and hasattr(message, "content"):
@@ -288,11 +311,6 @@ class WorkerAgent:
         """
         msg_record = self._serialize_message(message, "system")
         all_messages.append(msg_record)
-
-        # Extract session_id from init message for session resumption
-        if hasattr(message, "subtype") and message.subtype == "init":
-            if hasattr(message, "data") and isinstance(message.data, dict):
-                self._last_session_id = message.data.get("session_id")
 
     def _build_query_metrics(
         self,
@@ -508,17 +526,19 @@ class WorkerAgent:
         """Clear the list of tracked tool invocations."""
         self.tool_invocations = []
 
-    def get_last_session_id(self) -> Optional[str]:
-        """Get the session ID from the last query execution.
+    def has_active_client(self) -> bool:
+        """Check if there is an active ClaudeSDKClient for session resumption.
 
         Returns:
-            The session ID if available, None otherwise.
+            True if a client exists for session continuation, False otherwise.
         """
-        return self._last_session_id
+        return self._client is not None
 
-    def clear_session(self) -> None:
-        """Clear the stored session ID to start fresh."""
-        self._last_session_id = None
+    async def clear_session(self) -> None:
+        """Disconnect and clear the stored client to start a fresh session."""
+        if self._client is not None:
+            await self._client.disconnect()
+            self._client = None
 
     def set_permission_mode(self, mode: PermissionMode) -> None:
         """Update the permission mode for subsequent executions.
