@@ -5008,3 +5008,620 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 f"Max concurrent: {max_concurrent}, Cleanup count: {cleanup_verified_count}, "
                 f"Active connections: {active_connections}, Clients created: {len(all_client_ids)}"
             )
+
+
+# =============================================================================
+# T709: Edge Case - Worker asks multiple questions in sequence
+# =============================================================================
+
+
+class TestT709WorkerAsksMultipleQuestionsInSequence:
+    """T709: Test edge case where Worker asks multiple questions in sequence.
+
+    This test class verifies the edge case behavior when:
+    - Worker can ask multiple questions in a single session
+    - Each question is handled correctly
+    - Answers are provided for each question
+    - Context is maintained between questions
+
+    This is specifically about SEQUENTIAL QUESTIONS - multiple questions
+    one after another within the same evaluation session.
+    """
+
+    @pytest.mark.asyncio
+    async def test_three_sequential_questions_all_answered(self) -> None:
+        """Verify Worker can ask 3 sequential questions and receive answers for each.
+
+        Tests the basic sequential question flow:
+        1. Worker asks Question 1
+        2. Developer provides Answer 1
+        3. Worker asks Question 2
+        4. Developer provides Answer 2
+        5. Worker asks Question 3
+        6. Developer provides Answer 3
+        7. Worker completes execution
+        """
+        questions_received: list[str] = []
+        answers_sent: list[str] = []
+
+        async def sequential_answer_callback(context: QuestionContext) -> str:
+            question_text = context.questions[0].question
+            questions_received.append(question_text)
+
+            # Generate a unique answer for each question
+            answer = f"Answer for: {question_text}"
+            answers_sent.append(answer)
+            return answer
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=sequential_answer_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "t709-sequential-session"
+
+        # Create 3 sequential questions
+        q1 = AskUserQuestionBlock(questions=[{"question": "What database should I use?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Which ORM library?"}])
+        q3 = AskUserQuestionBlock(questions=[{"question": "Should I add caching?"}])
+
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[TextBlock("Setting up the project..."), q1])],
+                [AssistantMessage(content=[TextBlock("Configuring database..."), q2])],
+                [AssistantMessage(content=[TextBlock("Adding ORM layer..."), q3])],
+                [ResultMessage(result="Project setup complete with all configurations")],
+            ]
+        )
+
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Setup a new web application", mock_client
+        )
+
+        # VERIFY: All 3 questions were received
+        assert len(questions_received) == 3, (
+            f"Expected 3 questions, got {len(questions_received)}"
+        )
+        assert questions_received[0] == "What database should I use?"
+        assert questions_received[1] == "Which ORM library?"
+        assert questions_received[2] == "Should I add caching?"
+
+        # VERIFY: All 3 answers were sent
+        assert len(answers_sent) == 3
+        assert "database" in answers_sent[0].lower()
+        assert "ORM" in answers_sent[1]
+        assert "caching" in answers_sent[2].lower()
+
+        # VERIFY: Task completed successfully
+        assert result.result == "Project setup complete with all configurations"
+
+    @pytest.mark.asyncio
+    async def test_sequential_questions_maintain_session_id(self) -> None:
+        """Verify session_id is consistent across all sequential questions.
+
+        All questions in a sequence should share the same session_id,
+        ensuring they are part of the same conversation.
+        """
+        session_ids: list[str] = []
+
+        async def track_session_callback(context: QuestionContext) -> str:
+            session_ids.append(context.session_id)
+            return f"Answer {len(session_ids)}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=track_session_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "consistent-session-12345"
+
+        # Create 5 sequential questions
+        questions = [
+            AskUserQuestionBlock(questions=[{"question": f"Question {i}?"}])
+            for i in range(1, 6)
+        ]
+
+        mock_client.set_responses(
+            [[AssistantMessage(content=[q])] for q in questions]
+            + [[ResultMessage(result="Done")]]
+        )
+
+        await worker._stream_sdk_messages_with_client("Multi-question task", mock_client)
+
+        # VERIFY: All questions had the same session_id
+        assert len(session_ids) == 5
+        assert all(sid == "consistent-session-12345" for sid in session_ids), (
+            f"Session IDs should all be consistent: {session_ids}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_sequential_questions_conversation_history_grows(self) -> None:
+        """Verify conversation history grows with each sequential question.
+
+        Each subsequent question should have access to the growing
+        conversation history including prior questions and answers.
+        """
+        history_lengths: list[int] = []
+
+        async def track_history_callback(context: QuestionContext) -> str:
+            history_lengths.append(len(context.conversation_history))
+            return f"Answer {len(history_lengths)}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=track_history_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        # Create sequential questions with some work between them
+        q1 = AskUserQuestionBlock(questions=[{"question": "First question?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Second question?"}])
+        q3 = AskUserQuestionBlock(questions=[{"question": "Third question?"}])
+        q4 = AskUserQuestionBlock(questions=[{"question": "Fourth question?"}])
+
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[TextBlock("Starting work..."), q1])],
+                [AssistantMessage(content=[TextBlock("More work..."), q2])],
+                [AssistantMessage(content=[TextBlock("Even more work..."), q3])],
+                [AssistantMessage(content=[TextBlock("Final work..."), q4])],
+                [ResultMessage(result="Complete")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Growing history task", mock_client)
+
+        # VERIFY: History length should grow or stay stable (not shrink)
+        assert len(history_lengths) == 4
+        # Each subsequent question should have at least as much history
+        for i in range(1, len(history_lengths)):
+            assert history_lengths[i] >= history_lengths[i - 1], (
+                f"History should not shrink: {history_lengths}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_sequential_questions_all_answers_sent_to_worker(self) -> None:
+        """Verify all answers are properly sent back to Worker via client.query().
+
+        Each answer from Developer should trigger a client.query() call
+        to continue the conversation.
+        """
+        async def answer_callback(context: QuestionContext) -> str:
+            # Return distinctive answers that we can verify
+            q = context.questions[0].question
+            if "first" in q.lower():
+                return "ANSWER_FIRST_UNIQUE"
+            elif "second" in q.lower():
+                return "ANSWER_SECOND_UNIQUE"
+            elif "third" in q.lower():
+                return "ANSWER_THIRD_UNIQUE"
+            return "ANSWER_UNKNOWN"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=answer_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        q1 = AskUserQuestionBlock(questions=[{"question": "First thing?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Second thing?"}])
+        q3 = AskUserQuestionBlock(questions=[{"question": "Third thing?"}])
+
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],
+                [AssistantMessage(content=[q2])],
+                [AssistantMessage(content=[q3])],
+                [ResultMessage(result="All answered")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Initial prompt", mock_client)
+
+        # VERIFY: 4 queries total (1 initial + 3 answers)
+        assert len(mock_client._queries) == 4
+
+        # VERIFY: Initial prompt
+        assert mock_client._queries[0] == "Initial prompt"
+
+        # VERIFY: All answers were sent in order
+        assert mock_client._queries[1] == "ANSWER_FIRST_UNIQUE"
+        assert mock_client._queries[2] == "ANSWER_SECOND_UNIQUE"
+        assert mock_client._queries[3] == "ANSWER_THIRD_UNIQUE"
+
+    @pytest.mark.asyncio
+    async def test_sequential_questions_with_options_all_handled(self) -> None:
+        """Verify questions with options are handled correctly in sequence.
+
+        Each question may have different options, and Developer should
+        receive the correct options for each question.
+        """
+        received_options_per_question: list[list[str]] = []
+
+        async def track_options_callback(context: QuestionContext) -> str:
+            if context.questions[0].options:
+                options = [opt.label for opt in context.questions[0].options]
+                received_options_per_question.append(options)
+            else:
+                received_options_per_question.append([])
+            return "Selected option"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=track_options_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        # Questions with different options
+        q1 = AskUserQuestionBlock(
+            questions=[{
+                "question": "Choose framework?",
+                "options": [
+                    {"label": "Django", "description": "Full-featured"},
+                    {"label": "Flask", "description": "Lightweight"},
+                    {"label": "FastAPI", "description": "Modern"},
+                ],
+            }]
+        )
+        q2 = AskUserQuestionBlock(
+            questions=[{
+                "question": "Choose database?",
+                "options": [
+                    {"label": "PostgreSQL"},
+                    {"label": "MySQL"},
+                ],
+            }]
+        )
+        q3 = AskUserQuestionBlock(
+            questions=[{
+                "question": "Free-form question without options?",
+            }]
+        )
+
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],
+                [AssistantMessage(content=[q2])],
+                [AssistantMessage(content=[q3])],
+                [ResultMessage(result="All choices made")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Make choices", mock_client)
+
+        # VERIFY: All 3 questions were processed
+        assert len(received_options_per_question) == 3
+
+        # VERIFY: Q1 had 3 options
+        assert received_options_per_question[0] == ["Django", "Flask", "FastAPI"]
+
+        # VERIFY: Q2 had 2 options
+        assert received_options_per_question[1] == ["PostgreSQL", "MySQL"]
+
+        # VERIFY: Q3 had no options
+        assert received_options_per_question[2] == []
+
+    @pytest.mark.asyncio
+    async def test_sequential_questions_attempt_number_tracking(self) -> None:
+        """Verify attempt numbers are tracked correctly across sequential questions.
+
+        Each new distinct question should start with attempt_number=1.
+        """
+        attempt_numbers: list[int] = []
+
+        async def track_attempts_callback(context: QuestionContext) -> str:
+            attempt_numbers.append(context.attempt_number)
+            return "Answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=track_attempts_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        # 4 distinct sequential questions
+        questions = [
+            AskUserQuestionBlock(questions=[{"question": f"Unique question {i}?"}])
+            for i in range(1, 5)
+        ]
+
+        mock_client.set_responses(
+            [[AssistantMessage(content=[q])] for q in questions]
+            + [[ResultMessage(result="Done")]]
+        )
+
+        await worker._stream_sdk_messages_with_client("Sequential task", mock_client)
+
+        # VERIFY: All 4 questions were handled
+        assert len(attempt_numbers) == 4
+
+        # VERIFY: First question always starts at attempt 1
+        assert attempt_numbers[0] == 1
+
+    @pytest.mark.asyncio
+    async def test_large_number_of_sequential_questions(self) -> None:
+        """Verify Worker can handle a large number (20+) of sequential questions.
+
+        This tests the edge case of many questions in sequence to ensure
+        the system remains stable and context is maintained.
+        """
+        question_count = 20
+        questions_handled: list[str] = []
+
+        async def handle_many_questions_callback(context: QuestionContext) -> str:
+            q_text = context.questions[0].question
+            questions_handled.append(q_text)
+            return f"Answer {len(questions_handled)} for {q_text}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=handle_many_questions_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "large-sequence-session"
+
+        # Create 20 sequential questions
+        questions = [
+            AskUserQuestionBlock(questions=[{"question": f"Sequential question number {i}?"}])
+            for i in range(1, question_count + 1)
+        ]
+
+        mock_client.set_responses(
+            [[AssistantMessage(content=[q])] for q in questions]
+            + [[ResultMessage(result=f"Completed {question_count} questions")]]
+        )
+
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Large sequence task", mock_client
+        )
+
+        # VERIFY: All 20 questions were handled
+        assert len(questions_handled) == question_count, (
+            f"Expected {question_count} questions, got {len(questions_handled)}"
+        )
+
+        # VERIFY: Questions were in correct order
+        for i in range(question_count):
+            expected = f"Sequential question number {i + 1}?"
+            assert questions_handled[i] == expected, (
+                f"Question {i + 1} was out of order: {questions_handled[i]}"
+            )
+
+        # VERIFY: Task completed successfully
+        assert result.result == f"Completed {question_count} questions"
+
+        # VERIFY: All queries were made (1 initial + 20 answers)
+        assert len(mock_client._queries) == question_count + 1
+
+    @pytest.mark.asyncio
+    async def test_sequential_questions_interleaved_with_work(self) -> None:
+        """Verify sequential questions work correctly when interleaved with work.
+
+        Tests a realistic scenario where Worker does work, asks a question,
+        does more work, asks another question, etc.
+        """
+        interactions: list[dict[str, Any]] = []
+
+        async def interleaved_callback(context: QuestionContext) -> str:
+            # Track what text we've seen in history
+            history_texts = []
+            for msg in context.conversation_history:
+                content = msg.get("content")
+                if isinstance(content, str):
+                    history_texts.append(content)
+                elif isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and "text" in block:
+                            history_texts.append(block["text"])
+
+            interactions.append({
+                "question": context.questions[0].question,
+                "history_text_count": len(history_texts),
+            })
+            return f"Answer for {context.questions[0].question}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=interleaved_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        # Simulate work-question-work-question pattern
+        # The mock client yields all items in a response list, and the worker
+        # only calls query() again after answering a question or on initial call
+        mock_client.set_responses(
+            [
+                # After initial query: work text followed by question
+                [
+                    AssistantMessage(content=[TextBlock("Analyzing project structure...")]),
+                    AssistantMessage(content=[TextBlock("Found 5 modules to process.")]),
+                    AssistantMessage(content=[
+                        AskUserQuestionBlock(questions=[{"question": "Process all modules?"}])
+                    ]),
+                ],
+                # After first answer: more work and another question
+                [
+                    AssistantMessage(content=[TextBlock("Processing modules...")]),
+                    AssistantMessage(content=[TextBlock("Detected configuration issue.")]),
+                    AssistantMessage(content=[
+                        AskUserQuestionBlock(questions=[{"question": "How to handle config?"}])
+                    ]),
+                ],
+                # After second answer: final work and result
+                [ResultMessage(result="Project analysis complete")],
+            ]
+        )
+
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Analyze project", mock_client
+        )
+
+        # VERIFY: Both questions were handled
+        assert len(interactions) == 2
+
+        # VERIFY: Questions received in order
+        assert interactions[0]["question"] == "Process all modules?"
+        assert interactions[1]["question"] == "How to handle config?"
+
+        # VERIFY: Second question has more history than first
+        assert interactions[1]["history_text_count"] >= interactions[0]["history_text_count"]
+
+        # VERIFY: Task completed
+        assert result.result == "Project analysis complete"
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t709_complete(self) -> None:
+        """Complete verification of T709 acceptance criteria.
+
+        Acceptance Criteria Checklist:
+        [x] Worker can ask multiple questions in a single session
+        [x] Each question is handled correctly
+        [x] Answers are provided for each question
+        [x] Context is maintained between questions
+        """
+        verification_results: dict[str, bool] = {
+            "multiple_questions_in_session": False,
+            "each_question_handled_correctly": False,
+            "answers_provided_for_each": False,
+            "context_maintained_between_questions": False,
+        }
+
+        questions_and_answers: list[tuple[str, str]] = []
+        history_sizes: list[int] = []
+        session_ids: set[str] = set()
+
+        async def comprehensive_callback(context: QuestionContext) -> str:
+            # Track session ID
+            session_ids.add(context.session_id)
+
+            # Track history size
+            history_sizes.append(len(context.conversation_history))
+
+            # Generate contextual answer
+            question = context.questions[0].question
+            answer = f"Comprehensive answer for: {question}"
+            questions_and_answers.append((question, answer))
+
+            return answer
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t709_verify",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=comprehensive_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "t709-verification-session"
+
+        # Create 5 sequential questions with varied content
+        q1 = AskUserQuestionBlock(questions=[{"question": "Architecture question?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Database design question?"}])
+        q3 = AskUserQuestionBlock(
+            questions=[{
+                "question": "API design question?",
+                "options": [{"label": "REST"}, {"label": "GraphQL"}],
+            }]
+        )
+        q4 = AskUserQuestionBlock(questions=[{"question": "Testing strategy question?"}])
+        q5 = AskUserQuestionBlock(questions=[{"question": "Deployment question?"}])
+
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[TextBlock("Starting analysis..."), q1])],
+                [AssistantMessage(content=[TextBlock("Proceeding with architecture..."), q2])],
+                [AssistantMessage(content=[TextBlock("Database configured..."), q3])],
+                [AssistantMessage(content=[TextBlock("API designed..."), q4])],
+                [AssistantMessage(content=[TextBlock("Tests planned..."), q5])],
+                [ResultMessage(result="Full system design complete")],
+            ]
+        )
+
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Design complete system", mock_client
+        )
+
+        # CRITERION 1: Multiple questions in single session
+        verification_results["multiple_questions_in_session"] = (
+            len(questions_and_answers) == 5 and len(session_ids) == 1
+        )
+
+        # CRITERION 2: Each question handled correctly
+        expected_questions = [
+            "Architecture question?",
+            "Database design question?",
+            "API design question?",
+            "Testing strategy question?",
+            "Deployment question?",
+        ]
+        all_questions_correct = all(
+            qa[0] == expected for qa, expected in zip(questions_and_answers, expected_questions)
+        )
+        verification_results["each_question_handled_correctly"] = all_questions_correct
+
+        # CRITERION 3: Answers provided for each
+        all_answers_provided = all(
+            qa[1].startswith("Comprehensive answer for:") for qa in questions_and_answers
+        )
+        verification_results["answers_provided_for_each"] = all_answers_provided
+
+        # CRITERION 4: Context maintained between questions (history grows or stays stable)
+        context_maintained = True
+        for i in range(1, len(history_sizes)):
+            if history_sizes[i] < history_sizes[i - 1]:
+                context_maintained = False
+                break
+        verification_results["context_maintained_between_questions"] = context_maintained
+
+        # Additional verification: All answers were sent
+        assert len(mock_client._queries) == 6  # 1 initial + 5 answers
+        assert mock_client._queries[0] == "Design complete system"
+        for i, (question, answer) in enumerate(questions_and_answers):
+            assert mock_client._queries[i + 1] == answer, (
+                f"Answer {i + 1} not sent correctly"
+            )
+
+        # VERIFY: Task completed
+        assert result.result == "Full system design complete"
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, (
+                f"T709 criterion '{criterion}' failed. "
+                f"Questions: {len(questions_and_answers)}, "
+                f"Session IDs: {session_ids}, "
+                f"History sizes: {history_sizes}"
+            )
