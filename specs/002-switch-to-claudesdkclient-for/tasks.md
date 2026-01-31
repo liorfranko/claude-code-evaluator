@@ -103,13 +103,13 @@ Detect AskUserQuestionBlock and invoke callback within client session.
 
 ### WorkerAgent Question Handling
 
-- [ ] T300 [US1] Add on_question_callback attribute to WorkerAgent
-- [ ] T301 [US1] Add question_timeout_seconds attribute (default: 60)
-- [ ] T302 [US1] Modify _process_assistant_message() to detect AskUserQuestionBlock
-- [ ] T303 [US1] Build QuestionContext from detected AskUserQuestionBlock
-- [ ] T304 [US1] Invoke on_question_callback with asyncio.wait_for timeout wrapper
-- [ ] T305 [US1] Use client's send/continue method to inject answer back into session
-- [ ] T306 [US1] Handle asyncio.TimeoutError gracefully with clear error message
+- [x] T300 [US1] Add on_question_callback attribute to WorkerAgent
+- [x] T301 [US1] Add question_timeout_seconds attribute (default: 60)
+- [x] T302 [US1] Modify _process_assistant_message() to detect AskUserQuestionBlock
+- [x] T303 [US1] Build QuestionContext from detected AskUserQuestionBlock
+- [x] T304 [US1] Invoke on_question_callback with asyncio.wait_for timeout wrapper
+- [x] T305 [US1] Use client's send/continue method to inject answer back into session
+- [x] T306 [US1] Handle asyncio.TimeoutError gracefully with clear error message
 
 ### Unit Tests - Question Detection
 
