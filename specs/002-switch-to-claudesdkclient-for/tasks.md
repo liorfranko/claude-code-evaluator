@@ -88,12 +88,12 @@ Refactor WorkerAgent from query() to ClaudeSDKClient.
 
 ### Unit Tests - ClaudeSDKClient Integration
 
-- [ ] T210 [P] [US1] Write unit test: WorkerAgent creates ClaudeSDKClient instance
-- [ ] T211 [P] [US1] Write unit test: async context manager pattern is used correctly
-- [ ] T212 [US3] Write unit test: client cleanup on normal completion
-- [ ] T213 [US3] Write unit test: client cleanup on exception/failure
+- [x] T210 [P] [US1] Write unit test: WorkerAgent creates ClaudeSDKClient instance
+- [x] T211 [P] [US1] Write unit test: async context manager pattern is used correctly
+- [x] T212 [US3] Write unit test: client cleanup on normal completion
+- [x] T213 [US3] Write unit test: client cleanup on exception/failure
 
-- [ ] T214 CHECKPOINT: Verify ClaudeSDKClient integration works with existing workflows
+- [x] T214 CHECKPOINT: Verify ClaudeSDKClient integration works with existing workflows
 
 ---
 
