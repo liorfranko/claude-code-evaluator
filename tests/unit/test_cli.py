@@ -245,7 +245,10 @@ class TestDetermineWorkflowType:
                 ),
             ],
         )
-        assert _determine_workflow_type(config) == WorkflowType.plan_then_implement
+        # Note: The current implementation uses multi_command for all multi-phase
+        # workflows to respect custom prompts from YAML config. PlanThenImplementWorkflow
+        # has hardcoded prompts that don't use the phase prompts from config.
+        assert _determine_workflow_type(config) == WorkflowType.multi_command
 
     def test_two_phases_without_plan_returns_multi_command(self) -> None:
         """Test that two phases without plan mode returns multi_command."""

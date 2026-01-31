@@ -198,9 +198,13 @@ class BaseWorkflow(ABC):
                 f"Workflow execution timed out after {timeout_seconds} seconds "
                 f"for evaluation {evaluation.id}"
             )
-            # Set end time and fail the evaluation
+            # Set end time and save partial metrics before failing
             self._metrics_collector.set_end_time(self._current_time_ms())
+            partial_metrics = self._metrics_collector.get_metrics()
+
             if not evaluation.is_terminal():
+                # Store partial metrics on evaluation before failing
+                evaluation.metrics = partial_metrics
                 evaluation.fail(
                     f"Workflow execution exceeded timeout of {timeout_seconds} seconds"
                 )

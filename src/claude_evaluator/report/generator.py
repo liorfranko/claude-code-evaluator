@@ -5,6 +5,7 @@ instances from completed evaluations and provides serialization methods.
 """
 
 import json
+import tempfile
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -121,18 +122,57 @@ class ReportGenerator:
             path: The file path to save the report to.
 
         Raises:
-            ReportGenerationError: If the file cannot be written.
+            ReportGenerationError: If the file cannot be written or path is invalid.
         """
         try:
+            # Validate path to prevent directory traversal attacks
+            resolved_path = self._validate_output_path(path)
+
             # Create parent directories if needed
-            path.parent.mkdir(parents=True, exist_ok=True)
+            resolved_path.parent.mkdir(parents=True, exist_ok=True)
 
             json_str = self.to_json(report)
-            path.write_text(json_str, encoding="utf-8")
+            resolved_path.write_text(json_str, encoding="utf-8")
         except (OSError, IOError) as e:
             raise ReportGenerationError(
                 f"Failed to save report to {path}: {e}"
             ) from e
+
+    def _validate_output_path(self, path: Path) -> Path:
+        """Validate that output path is within safe boundaries.
+
+        Prevents directory traversal attacks by ensuring the resolved path
+        is within the current working directory or temp directory.
+
+        Args:
+            path: The path to validate.
+
+        Returns:
+            The resolved absolute path.
+
+        Raises:
+            ReportGenerationError: If the path is outside allowed directories.
+        """
+        resolved_path = path.resolve()
+        cwd = Path.cwd().resolve()
+        temp_dir = Path(tempfile.gettempdir()).resolve()
+
+        # Check if path is within current directory or temp directory
+        try:
+            resolved_path.relative_to(cwd)
+            return resolved_path
+        except ValueError:
+            pass
+
+        try:
+            resolved_path.relative_to(temp_dir)
+            return resolved_path
+        except ValueError:
+            pass
+
+        raise ReportGenerationError(
+            f"Invalid path: {path} must be within current directory or temp directory"
+        )
 
     def build_timeline(self, evaluation: Evaluation) -> list[TimelineEvent]:
         """Build a timeline from evaluation events.
@@ -214,22 +254,28 @@ class ReportGenerator:
         Returns:
             The corresponding Outcome value.
         """
+        # Guard: Success case
         if evaluation.status == EvaluationStatus.completed:
             return Outcome.success
-        elif evaluation.status == EvaluationStatus.failed:
-            # Check for specific error patterns
-            if evaluation.error is not None:
-                error_lower = evaluation.error.lower()
-                if "timeout" in error_lower:
-                    return Outcome.timeout
-                elif "budget" in error_lower or "token" in error_lower:
-                    return Outcome.budget_exceeded
-                elif "loop" in error_lower:
-                    return Outcome.loop_detected
+
+        # Guard: Non-failed states default to failure
+        if evaluation.status != EvaluationStatus.failed:
             return Outcome.failure
-        else:
-            # Should not happen for terminal states
+
+        # Guard: No error message means generic failure
+        if not evaluation.error:
             return Outcome.failure
+
+        # Check for specific error patterns
+        error_lower = evaluation.error.lower()
+        if "timeout" in error_lower:
+            return Outcome.timeout
+        if "budget" in error_lower or "token" in error_lower:
+            return Outcome.budget_exceeded
+        if "loop" in error_lower:
+            return Outcome.loop_detected
+
+        return Outcome.failure
 
     def _create_empty_metrics(self) -> Metrics:
         """Create an empty Metrics object with default values.

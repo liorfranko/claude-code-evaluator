@@ -33,7 +33,11 @@ except ImportError:
     ToolResultBlock = None  # type: ignore
     SDK_AVAILABLE = False
 
-__all__ = ["WorkerAgent", "SDK_AVAILABLE"]
+__all__ = ["WorkerAgent", "SDK_AVAILABLE", "DEFAULT_MODEL"]
+
+
+# Default model to use for SDK execution
+DEFAULT_MODEL = "claude-haiku-4-5@20251001"
 
 
 @dataclass
@@ -54,6 +58,7 @@ class WorkerAgent:
         additional_dirs: Additional directories Claude can access beyond project_directory.
         max_turns: Maximum number of conversation turns per query.
         max_budget_usd: Maximum spend limit per query in USD (optional).
+        model: Model identifier to use for SDK execution (optional, defaults to DEFAULT_MODEL).
         tool_invocations: List of tool invocations tracked during current query.
         _query_counter: Internal counter for query indexing.
     """
@@ -67,6 +72,7 @@ class WorkerAgent:
     max_turns: int = 10
     session_id: Optional[str] = None
     max_budget_usd: Optional[float] = None
+    model: Optional[str] = None
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
     _query_counter: int = field(default=0, repr=False)
     _last_session_id: Optional[str] = field(default=None, repr=False)
@@ -125,104 +131,195 @@ class WorkerAgent:
                 "Install with: pip install claude-agent-sdk"
             )
 
-        # Clear tool invocations for this query
+        # Prepare for new query
         self.tool_invocations = []
         self._query_counter += 1
 
-        # Map permission mode to SDK permission string
+        # Build SDK options and execute query
+        options = self._build_sdk_options(resume_session)
+        result_message, response_content, all_messages = await self._stream_sdk_messages(
+            query, options
+        )
+
+        # Build and return metrics
+        return self._build_query_metrics(
+            query, phase, result_message, response_content, all_messages
+        )
+
+    def _build_sdk_options(self, resume_session: bool) -> Any:
+        """Build ClaudeAgentOptions for SDK execution.
+
+        Args:
+            resume_session: If True, include session resumption.
+
+        Returns:
+            Configured ClaudeAgentOptions instance.
+        """
         permission_map = {
             PermissionMode.plan: "plan",
             PermissionMode.acceptEdits: "acceptEdits",
             PermissionMode.bypassPermissions: "bypassPermissions",
         }
 
-        # Configure agent options
-        options = ClaudeAgentOptions(
+        return ClaudeAgentOptions(
             cwd=self.project_directory,
             add_dirs=self.additional_dirs if self.additional_dirs else [],
             permission_mode=permission_map.get(self.permission_mode, "plan"),
             allowed_tools=self.allowed_tools if self.allowed_tools else [],
             max_turns=self.max_turns,
             max_budget_usd=self.max_budget_usd,
-            model="claude-haiku-4-5@20251001",
-            # Resume previous session for continuity (like Claude Code CLI)
+            model=self.model or DEFAULT_MODEL,
             resume=self._last_session_id if resume_session and self._last_session_id else None,
         )
 
-        # Execute query and collect messages
+    async def _stream_sdk_messages(
+        self,
+        query: str,
+        options: Any,
+    ) -> tuple[Any, Any, list[dict[str, Any]]]:
+        """Stream and process messages from SDK execution.
+
+        Args:
+            query: The prompt to send.
+            options: The ClaudeAgentOptions to use.
+
+        Returns:
+            Tuple of (result_message, response_content, all_messages).
+
+        Raises:
+            RuntimeError: If no result message is received.
+        """
         result_message = None
         response_content = None
-        # Track pending tool uses to match with results
         pending_tool_uses: dict[str, ToolInvocation] = {}
-        # Capture all messages for full conversation history
         all_messages: list[dict[str, Any]] = []
 
         async for message in sdk_query(prompt=query, options=options):
             message_type = type(message).__name__
 
-            # Process AssistantMessage content blocks for tool uses
             if message_type == "AssistantMessage" and hasattr(message, "content"):
-                msg_record = self._serialize_message(message, "assistant")
-                all_messages.append(msg_record)
-
-                for block in message.content:
-                    block_type = type(block).__name__
-
-                    # Capture tool use (input)
-                    if block_type == "ToolUseBlock":
-                        invocation = self._on_tool_use(
-                            tool_name=block.name,
-                            tool_use_id=block.id,
-                            tool_input=block.input,
-                        )
-                        pending_tool_uses[block.id] = invocation
-
-                # Capture text content from assistant messages
-                response_content = message.content
-
-            # Process UserMessage for tool results
+                response_content = self._process_assistant_message(
+                    message, pending_tool_uses, all_messages
+                )
             elif message_type == "UserMessage" and hasattr(message, "content"):
-                msg_record = self._serialize_message(message, "user")
-                all_messages.append(msg_record)
-
-                # Check for tool results in content
-                if isinstance(message.content, list):
-                    for block in message.content:
-                        block_type = type(block).__name__
-                        if block_type == "ToolResultBlock":
-                            tool_use_id = getattr(block, "tool_use_id", None)
-                            if tool_use_id and tool_use_id in pending_tool_uses:
-                                invocation = pending_tool_uses[tool_use_id]
-                                invocation.tool_output = self._format_tool_output(
-                                    getattr(block, "content", None)
-                                )
-                                invocation.is_error = getattr(block, "is_error", False) or False
-                                invocation.success = not invocation.is_error
-
-            # Capture SystemMessage and extract session_id
+                self._process_user_message(message, pending_tool_uses, all_messages)
             elif message_type == "SystemMessage":
-                msg_record = self._serialize_message(message, "system")
-                all_messages.append(msg_record)
-                # Capture session_id from init message for session resumption
-                if hasattr(message, "subtype") and message.subtype == "init":
-                    if hasattr(message, "data") and isinstance(message.data, dict):
-                        self._last_session_id = message.data.get("session_id")
-
-            # The last message should be the ResultMessage
+                self._process_system_message(message, all_messages)
             elif message_type == "ResultMessage":
                 result_message = message
 
         if result_message is None:
             raise RuntimeError("No result message received from SDK")
 
-        # Extract usage metrics
+        return result_message, response_content, all_messages
+
+    def _process_assistant_message(
+        self,
+        message: Any,
+        pending_tool_uses: dict[str, ToolInvocation],
+        all_messages: list[dict[str, Any]],
+    ) -> Any:
+        """Process an AssistantMessage from the SDK stream.
+
+        Args:
+            message: The AssistantMessage to process.
+            pending_tool_uses: Dict to track pending tool invocations.
+            all_messages: List to append serialized message to.
+
+        Returns:
+            The message content for response tracking.
+        """
+        msg_record = self._serialize_message(message, "assistant")
+        all_messages.append(msg_record)
+
+        for block in message.content:
+            if type(block).__name__ == "ToolUseBlock":
+                invocation = self._on_tool_use(
+                    tool_name=block.name,
+                    tool_use_id=block.id,
+                    tool_input=block.input,
+                )
+                pending_tool_uses[block.id] = invocation
+
+        return message.content
+
+    def _process_user_message(
+        self,
+        message: Any,
+        pending_tool_uses: dict[str, ToolInvocation],
+        all_messages: list[dict[str, Any]],
+    ) -> None:
+        """Process a UserMessage from the SDK stream.
+
+        Args:
+            message: The UserMessage to process.
+            pending_tool_uses: Dict of pending tool invocations to update.
+            all_messages: List to append serialized message to.
+        """
+        msg_record = self._serialize_message(message, "user")
+        all_messages.append(msg_record)
+
+        if not isinstance(message.content, list):
+            return
+
+        for block in message.content:
+            if type(block).__name__ != "ToolResultBlock":
+                continue
+
+            tool_use_id = getattr(block, "tool_use_id", None)
+            if tool_use_id and tool_use_id in pending_tool_uses:
+                invocation = pending_tool_uses[tool_use_id]
+                invocation.tool_output = self._format_tool_output(
+                    getattr(block, "content", None)
+                )
+                invocation.is_error = getattr(block, "is_error", False) or False
+                invocation.success = not invocation.is_error
+
+    def _process_system_message(
+        self,
+        message: Any,
+        all_messages: list[dict[str, Any]],
+    ) -> None:
+        """Process a SystemMessage from the SDK stream.
+
+        Args:
+            message: The SystemMessage to process.
+            all_messages: List to append serialized message to.
+        """
+        msg_record = self._serialize_message(message, "system")
+        all_messages.append(msg_record)
+
+        # Extract session_id from init message for session resumption
+        if hasattr(message, "subtype") and message.subtype == "init":
+            if hasattr(message, "data") and isinstance(message.data, dict):
+                self._last_session_id = message.data.get("session_id")
+
+    def _build_query_metrics(
+        self,
+        query: str,
+        phase: Optional[str],
+        result_message: Any,
+        response_content: Any,
+        all_messages: list[dict[str, Any]],
+    ) -> QueryMetrics:
+        """Build QueryMetrics from execution results.
+
+        Args:
+            query: The original query prompt.
+            phase: Current workflow phase.
+            result_message: The ResultMessage from SDK.
+            response_content: The captured response content.
+            all_messages: All collected messages.
+
+        Returns:
+            Populated QueryMetrics instance.
+        """
         usage = result_message.usage or {}
         input_tokens = usage.get("input_tokens", 0)
         output_tokens = usage.get("output_tokens", 0)
 
         # Use result field if available, otherwise use captured content
-        if result_message.result:
-            response_content = result_message.result
+        final_response = result_message.result if result_message.result else response_content
 
         return QueryMetrics(
             query_index=self._query_counter,
@@ -233,7 +330,7 @@ class WorkerAgent:
             cost_usd=result_message.total_cost_usd or 0.0,
             num_turns=result_message.num_turns,
             phase=phase,
-            response=str(response_content) if response_content else None,
+            response=str(final_response) if final_response else None,
             messages=all_messages,
         )
 

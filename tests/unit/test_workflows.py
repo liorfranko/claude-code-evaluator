@@ -245,7 +245,7 @@ class TestDirectWorkflowPermissionMode:
         # Track permission mode changes
         permission_mode_during_execution = None
 
-        async def mock_execute_query(query: str, phase: str = None) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str = None, resume_session: bool = False) -> QueryMetrics:
             nonlocal permission_mode_during_execution
             permission_mode_during_execution = evaluation.worker_agent.permission_mode
             return sample_metrics
@@ -722,7 +722,7 @@ class TestPlanThenImplementWorkflowExecution:
         call_count = 0
         phases_called = []
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
             phases_called.append(phase)
@@ -821,7 +821,7 @@ class TestPlanThenImplementWorkflowExecution:
 
         captured_queries = []
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             captured_queries.append((phase, query))
             return QueryMetrics(
                 query_index=1,
@@ -855,7 +855,7 @@ class TestPlanThenImplementWorkflowExecution:
 
         call_count = 0
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
             response = planning_response if phase == "planning" else "Done"
@@ -956,7 +956,7 @@ class TestPlanThenImplementWorkflowMetrics:
             response="Done",
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -1095,7 +1095,7 @@ class TestPlanThenImplementWorkflowMetrics:
             response="Done",
         )
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -1139,7 +1139,7 @@ class TestPlanThenImplementWorkflowErrorHandling:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_mock_evaluation()
 
-        async def mock_execute_query_error(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_execute_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             raise RuntimeError("Planning phase failed")
 
         evaluation.worker_agent.execute_query = mock_execute_query_error
@@ -1159,7 +1159,7 @@ class TestPlanThenImplementWorkflowErrorHandling:
 
         call_count = 0
 
-        async def mock_execute_query(query: str, phase: str) -> QueryMetrics:
+        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
             if phase == "implementation":
@@ -1191,7 +1191,7 @@ class TestPlanThenImplementWorkflowErrorHandling:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_mock_evaluation()
 
-        async def mock_execute_query_error(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_execute_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Specific error message")
 
         evaluation.worker_agent.execute_query = mock_execute_query_error

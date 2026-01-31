@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -170,6 +171,41 @@ For more information, see the documentation.
     return parser
 
 
+def validate_output_path(output_path: str) -> Optional[str]:
+    """Validate that output path is within safe boundaries.
+
+    Prevents directory traversal attacks by ensuring the path
+    is within the current working directory or temp directory.
+
+    Args:
+        output_path: The output path to validate.
+
+    Returns:
+        Error message if validation fails, None if valid.
+    """
+    try:
+        path = Path(output_path).resolve()
+        cwd = Path.cwd().resolve()
+        temp_dir = Path(tempfile.gettempdir()).resolve()
+
+        # Check if path is within current directory or temp directory
+        try:
+            path.relative_to(cwd)
+            return None
+        except ValueError:
+            pass
+
+        try:
+            path.relative_to(temp_dir)
+            return None
+        except ValueError:
+            pass
+
+        return f"Error: Output path '{output_path}' must be within current directory or temp directory"
+    except Exception as e:
+        return f"Error: Invalid output path '{output_path}': {e}"
+
+
 def validate_args(args: argparse.Namespace) -> Optional[str]:
     """Validate CLI arguments for consistency.
 
@@ -179,12 +215,16 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
     Returns:
         Error message if validation fails, None if valid.
     """
+    # Check --workflow requires --task
+    if args.workflow is not None and args.task is None:
+        return "Error: --workflow requires --task"
+
+    # Check --task requires --workflow
+    if args.task is not None and args.workflow is None:
+        return "Error: --task requires --workflow"
+
     # Must have either --suite or (--workflow and --task)
-    if args.suite is None and (args.workflow is None or args.task is None):
-        if args.workflow is not None and args.task is None:
-            return "Error: --workflow requires --task"
-        if args.task is not None and args.workflow is None:
-            return "Error: --task requires --workflow"
+    if args.suite is None and not (args.workflow is not None and args.task is not None):
         return "Error: Either --suite or both --workflow and --task are required"
 
     # --eval requires --suite
@@ -200,6 +240,12 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
         suite_path = Path(args.suite)
         if not suite_path.exists():
             return f"Error: Suite file not found: {args.suite}"
+
+    # Validate output path is safe (if output is specified)
+    if hasattr(args, "output") and args.output:
+        output_error = validate_output_path(args.output)
+        if output_error:
+            return output_error
 
     return None
 
@@ -265,10 +311,9 @@ async def run_evaluation(
     collector = MetricsCollector()
 
     # Start evaluation with the pre-created workspace
+    # Note: Worker already has project_directory set to workspace_path during creation,
+    # so no need to update it after start() - this prevents race conditions
     evaluation.start(workspace_path=str(workspace_path))
-
-    # Update worker to use evaluation workspace
-    worker.project_directory = str(evaluation.workspace_path)
 
     if verbose:
         print(f"Workspace: {evaluation.workspace_path}")

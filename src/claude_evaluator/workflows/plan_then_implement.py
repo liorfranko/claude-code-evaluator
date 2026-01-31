@@ -201,10 +201,11 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         # Build implementation prompt - Claude will read the plan file
         implementation_prompt = self._implementation_prompt_template
 
-        # Execute implementation query
+        # Execute implementation query with session resumption for context continuity
         query_metrics = await worker.execute_query(
             query=implementation_prompt,
             phase="implementation",
+            resume_session=True,
         )
 
         # Collect metrics from the implementation phase
