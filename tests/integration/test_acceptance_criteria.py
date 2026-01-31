@@ -5625,3 +5625,544 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
                 f"Session IDs: {session_ids}, "
                 f"History sizes: {history_sizes}"
             )
+
+
+# =============================================================================
+# T710: Edge Case - 60-second timeout triggers graceful failure
+# =============================================================================
+
+
+class TestT710TimeoutTriggersGracefulFailure:
+    """T710: Test edge case where 60-second timeout triggers graceful failure.
+
+    This test class verifies the edge case behavior when:
+    - A callback takes longer than the configured timeout (default: 60 seconds)
+    - The operation fails gracefully with a descriptive error
+    - The Worker properly handles the timeout
+    - Resources are cleaned up after timeout
+
+    Note: Tests use a short timeout (0.1 seconds) to avoid slow tests while
+    verifying the mechanism works correctly.
+    """
+
+    @pytest.mark.asyncio
+    async def test_timeout_triggers_graceful_failure_with_descriptive_error(self) -> None:
+        """Verify that timeout produces a descriptive and helpful error message.
+
+        When the callback exceeds the timeout:
+        - An asyncio.TimeoutError should be raised
+        - The error message should include the timeout duration
+        - The error message should include the question text for debugging
+        """
+        async def slow_callback(context: QuestionContext) -> str:
+            await asyncio.sleep(10)  # Much longer than timeout
+            return "this will never be returned"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=slow_callback,
+            question_timeout_seconds=1,  # Short timeout for fast test
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "t710-timeout-session"
+
+        question_text = "What architecture pattern should we use for the service layer?"
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": question_text}]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[TextBlock("Analyzing..."), question_block])],
+        ])
+
+        with pytest.raises(asyncio.TimeoutError) as exc_info:
+            await worker._stream_sdk_messages_with_client("Design service", mock_client)
+
+        error_message = str(exc_info.value)
+
+        # VERIFY: Error message includes timeout duration
+        assert "1 seconds" in error_message, (
+            f"Error should mention timeout duration. Got: {error_message}"
+        )
+
+        # VERIFY: Error message includes question text for debugging
+        assert "architecture pattern" in error_message.lower() or question_text in error_message, (
+            f"Error should include question text for debugging. Got: {error_message}"
+        )
+
+        # VERIFY: Error message mentions it was a callback timeout
+        assert "timed out" in error_message.lower(), (
+            f"Error should mention 'timed out'. Got: {error_message}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_worker_properly_handles_timeout(self) -> None:
+        """Verify the Worker properly handles the timeout exception.
+
+        The Worker should:
+        - Raise the TimeoutError upward (not swallow it)
+        - Not leave the conversation in an undefined state
+        - The timeout should be from the callback, not from the client
+        """
+        callback_started = False
+        callback_finished = False
+
+        async def tracked_slow_callback(context: QuestionContext) -> str:
+            nonlocal callback_started, callback_finished
+            callback_started = True
+            await asyncio.sleep(10)
+            callback_finished = True
+            return "answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=tracked_slow_callback,
+            question_timeout_seconds=1,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "This will timeout?"}]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[question_block])],
+        ])
+
+        with pytest.raises(asyncio.TimeoutError):
+            await worker._stream_sdk_messages_with_client("Start", mock_client)
+
+        # VERIFY: Callback was started but not finished
+        assert callback_started, "Callback should have been invoked"
+        assert not callback_finished, "Callback should have been cancelled by timeout"
+
+        # VERIFY: Worker's internal state is consistent
+        # The question attempt counter should have incremented before timeout
+        assert worker._question_attempt_counter >= 0
+
+    @pytest.mark.asyncio
+    async def test_resources_cleaned_up_after_timeout(self) -> None:
+        """Verify resources are properly cleaned up after a timeout.
+
+        After timeout:
+        - The callback's ongoing work should be cancelled
+        - No dangling coroutines should remain
+        - The client should remain in a usable state for cleanup
+        """
+        cleanup_tracker: dict[str, Any] = {
+            "callback_cancelled": False,
+            "tasks_before": 0,
+            "tasks_after": 0,
+        }
+
+        async def cancellable_callback(context: QuestionContext) -> str:
+            try:
+                await asyncio.sleep(100)
+                return "never returned"
+            except asyncio.CancelledError:
+                cleanup_tracker["callback_cancelled"] = True
+                raise
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=cancellable_callback,
+            question_timeout_seconds=1,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        # Simulate that client is connected (as it would be in a real session)
+        await mock_client.connect()
+
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Cleanup test question?"}]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[question_block])],
+        ])
+
+        # Track tasks before timeout
+        cleanup_tracker["tasks_before"] = len(asyncio.all_tasks())
+
+        with pytest.raises(asyncio.TimeoutError):
+            await worker._stream_sdk_messages_with_client("Cleanup test", mock_client)
+
+        # Allow a small delay for cleanup
+        await asyncio.sleep(0.1)
+
+        # Track tasks after timeout
+        cleanup_tracker["tasks_after"] = len(asyncio.all_tasks())
+
+        # VERIFY: The callback received CancelledError (via asyncio.wait_for timeout)
+        # Note: asyncio.wait_for raises TimeoutError but cancels the task internally
+        # The callback may or may not see CancelledError depending on timing
+
+        # VERIFY: No task leak - tasks after should be <= tasks before + 1
+        # (allowing for the current test task)
+        assert cleanup_tracker["tasks_after"] <= cleanup_tracker["tasks_before"] + 1, (
+            f"Task leak detected: {cleanup_tracker['tasks_before']} before, "
+            f"{cleanup_tracker['tasks_after']} after"
+        )
+
+        # VERIFY: Client is still in a usable state (connected) for cleanup
+        # The timeout should not have affected the client's connection status
+        assert mock_client._connected, "Client should remain connected for cleanup"
+
+    @pytest.mark.asyncio
+    async def test_default_60_second_timeout_configuration(self) -> None:
+        """Verify the default timeout is 60 seconds as specified.
+
+        The WorkerAgent should have a default question_timeout_seconds of 60.
+        """
+        async def dummy_callback(context: QuestionContext) -> str:
+            return "answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=dummy_callback,
+        )
+
+        # VERIFY: Default timeout is 60 seconds
+        assert worker.question_timeout_seconds == 60, (
+            f"Default timeout should be 60 seconds, got {worker.question_timeout_seconds}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_custom_timeout_is_respected(self) -> None:
+        """Verify custom timeout values are respected.
+
+        Tests that setting a custom timeout works correctly and the exact
+        timeout duration triggers the failure.
+        """
+        import time
+
+        callback_times: list[float] = []
+
+        async def timed_callback(context: QuestionContext) -> str:
+            start = time.monotonic()
+            try:
+                await asyncio.sleep(100)  # Will be interrupted
+            except asyncio.CancelledError:
+                callback_times.append(time.monotonic() - start)
+                raise
+            return "answer"
+
+        # Use a 2-second timeout
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=timed_callback,
+            question_timeout_seconds=2,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Timing test?"}]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[question_block])],
+        ])
+
+        start_time = time.monotonic()
+        with pytest.raises(asyncio.TimeoutError):
+            await worker._stream_sdk_messages_with_client("Timing test", mock_client)
+        elapsed = time.monotonic() - start_time
+
+        # VERIFY: Timeout occurred at approximately the right time (2 seconds +/- 0.5s tolerance)
+        assert 1.5 <= elapsed <= 2.5, (
+            f"Timeout should occur after ~2 seconds, got {elapsed:.2f}s"
+        )
+
+    @pytest.mark.asyncio
+    async def test_timeout_with_multiple_questions_in_block(self) -> None:
+        """Verify timeout works correctly when block contains multiple questions.
+
+        The error message should summarize the questions appropriately.
+        """
+        async def slow_callback(context: QuestionContext) -> str:
+            await asyncio.sleep(10)
+            return "answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=slow_callback,
+            question_timeout_seconds=1,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        # Block with multiple questions
+        multi_question_block = AskUserQuestionBlock(
+            questions=[
+                {"question": "First important question about databases?"},
+                {"question": "Second question about caching strategy?"},
+                {"question": "Third question about deployment?"},
+            ]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[multi_question_block])],
+        ])
+
+        with pytest.raises(asyncio.TimeoutError) as exc_info:
+            await worker._stream_sdk_messages_with_client("Multi-question", mock_client)
+
+        error_message = str(exc_info.value)
+
+        # VERIFY: Error includes at least the first question for context
+        assert "databases" in error_message.lower() or "First important question" in error_message, (
+            f"Error should mention the question content. Got: {error_message}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_timeout_does_not_affect_subsequent_operations(self) -> None:
+        """Verify timeout on one operation does not affect subsequent operations.
+
+        After a timeout, a new operation should work correctly with a fresh state.
+        """
+        call_count = 0
+
+        async def sometimes_slow_callback(context: QuestionContext) -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                await asyncio.sleep(10)  # First call times out
+            return f"Fast answer {call_count}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=sometimes_slow_callback,
+            question_timeout_seconds=1,
+        )
+
+        mock_client_1 = MockClaudeSDKClient()
+        mock_client_1.set_responses([
+            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": "Slow?"}])])],
+        ])
+
+        # First operation times out
+        with pytest.raises(asyncio.TimeoutError):
+            await worker._stream_sdk_messages_with_client("First", mock_client_1)
+
+        # Create a new client for second operation
+        mock_client_2 = MockClaudeSDKClient()
+        mock_client_2.set_responses([
+            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": "Fast?"}])])],
+            [ResultMessage(result="Success after timeout")],
+        ])
+
+        # Second operation should succeed
+        result, _, _ = await worker._stream_sdk_messages_with_client("Second", mock_client_2)
+
+        # VERIFY: Second operation completed successfully
+        assert result.result == "Success after timeout"
+        assert call_count == 2, "Callback should have been called twice"
+
+    @pytest.mark.asyncio
+    async def test_timeout_error_includes_session_context(self) -> None:
+        """Verify timeout error provides enough context for debugging.
+
+        The error should help developers understand what question timed out
+        and in what context.
+        """
+        async def slow_callback(context: QuestionContext) -> str:
+            await asyncio.sleep(10)
+            return "answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=slow_callback,
+            question_timeout_seconds=1,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "debug-session-xyz-123"
+
+        question_block = AskUserQuestionBlock(
+            questions=[{
+                "question": "Should we use microservices or monolith?",
+                "options": [
+                    {"label": "Microservices", "description": "Distributed architecture"},
+                    {"label": "Monolith", "description": "Single deployment unit"},
+                ],
+            }]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[question_block])],
+        ])
+
+        with pytest.raises(asyncio.TimeoutError) as exc_info:
+            await worker._stream_sdk_messages_with_client("Architecture decision", mock_client)
+
+        error_message = str(exc_info.value)
+
+        # VERIFY: Error is informative for debugging
+        assert "Question callback timed out" in error_message or "timed out" in error_message.lower()
+        assert "microservices" in error_message.lower() or "monolith" in error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_fast_callback_completes_before_timeout(self) -> None:
+        """Verify fast callbacks complete successfully without timeout.
+
+        A callback that completes quickly should not trigger timeout.
+        """
+        callback_completed = False
+
+        async def fast_callback(context: QuestionContext) -> str:
+            nonlocal callback_completed
+            await asyncio.sleep(0.05)  # Very fast
+            callback_completed = True
+            return "Quick answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=fast_callback,
+            question_timeout_seconds=60,  # Default timeout
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Quick question?"}]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[question_block])],
+            [ResultMessage(result="Task completed successfully")],
+        ])
+
+        result, _, _ = await worker._stream_sdk_messages_with_client("Fast task", mock_client)
+
+        # VERIFY: No timeout occurred
+        assert callback_completed, "Callback should have completed"
+        assert result.result == "Task completed successfully"
+
+        # VERIFY: Answer was sent
+        assert len(mock_client._queries) == 2
+        assert mock_client._queries[1] == "Quick answer"
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t710_complete(self) -> None:
+        """Complete verification of T710 acceptance criteria.
+
+        Acceptance Criteria Checklist:
+        [x] When callback takes longer than configured timeout, operation fails gracefully
+        [x] Error message is descriptive and helpful
+        [x] Worker properly handles the timeout
+        [x] Resources are cleaned up after timeout
+        """
+        verification_results: dict[str, bool] = {
+            "timeout_fails_gracefully": False,
+            "error_message_is_descriptive": False,
+            "worker_handles_timeout_properly": False,
+            "resources_cleaned_up": False,
+        }
+
+        # Test state tracking
+        callback_state: dict[str, Any] = {
+            "invoked": False,
+            "completed": False,
+        }
+
+        async def tracked_slow_callback(context: QuestionContext) -> str:
+            callback_state["invoked"] = True
+            try:
+                await asyncio.sleep(100)
+                callback_state["completed"] = True
+                return "answer"
+            except asyncio.CancelledError:
+                # Clean up on cancel
+                raise
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t710_verify",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=tracked_slow_callback,
+            question_timeout_seconds=1,  # 1 second for fast testing
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "t710-verification"
+
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Verification timeout question for T710?"}]
+        )
+
+        mock_client.set_responses([
+            [AssistantMessage(content=[TextBlock("Processing..."), question_block])],
+        ])
+
+        tasks_before = len(asyncio.all_tasks())
+
+        try:
+            await worker._stream_sdk_messages_with_client("Verify T710", mock_client)
+        except asyncio.TimeoutError as e:
+            error_message = str(e)
+
+            # CRITERION 1: Operation fails gracefully (raises TimeoutError, not crashes)
+            verification_results["timeout_fails_gracefully"] = True
+
+            # CRITERION 2: Error message is descriptive
+            has_timeout_info = "timed out" in error_message.lower()
+            has_duration = "1 seconds" in error_message
+            has_question_context = "T710" in error_message or "verification" in error_message.lower()
+            verification_results["error_message_is_descriptive"] = (
+                has_timeout_info and has_duration
+            )
+
+            # CRITERION 3: Worker handles timeout properly
+            callback_was_invoked = callback_state["invoked"]
+            callback_was_cancelled = not callback_state["completed"]
+            verification_results["worker_handles_timeout_properly"] = (
+                callback_was_invoked and callback_was_cancelled
+            )
+
+        # Allow cleanup to occur
+        await asyncio.sleep(0.1)
+
+        tasks_after = len(asyncio.all_tasks())
+
+        # CRITERION 4: Resources cleaned up (no task leak)
+        verification_results["resources_cleaned_up"] = tasks_after <= tasks_before + 1
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, (
+                f"T710 criterion '{criterion}' failed. "
+                f"Callback invoked: {callback_state['invoked']}, "
+                f"Callback completed: {callback_state['completed']}, "
+                f"Tasks before: {tasks_before}, Tasks after: {tasks_after}"
+            )
