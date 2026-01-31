@@ -221,7 +221,7 @@ Final verification and documentation updates.
 - [x] T705 [US2] Verify: Worker remembers previous messages after Developer answers
 - [x] T706 [US3] Verify: Client connection established at evaluation start
 - [x] T707 [US3] Verify: Connection properly closed on completion or failure
-- [ ] T708 [US3] Verify: Multiple evaluations run sequentially without leaks
+- [x] T708 [US3] Verify: Multiple evaluations run sequentially without leaks
 
 ### Edge Case Testing
 

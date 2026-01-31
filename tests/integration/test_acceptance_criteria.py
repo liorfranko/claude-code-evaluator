@@ -20,6 +20,7 @@ from claude_evaluator.models.enums import (
     PermissionMode,
 )
 from claude_evaluator.models.question import QuestionContext, QuestionItem, QuestionOption
+from claude_evaluator.models.tool_invocation import ToolInvocation
 
 
 # =============================================================================
@@ -4485,4 +4486,525 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             assert passed, (
                 f"T707 criterion '{criterion}' failed. "
                 f"Events: {lifecycle_events}, Active: {active_connections}"
+            )
+
+
+# =============================================================================
+# T708: Verify Multiple Evaluations Run Sequentially Without Leaks
+# =============================================================================
+
+
+class TestT708MultipleSequentialEvaluationsNoLeaks:
+    """T708: Verify multiple evaluations run sequentially without leaks.
+
+    This test class verifies that running many sequential evaluations does not
+    cause resource accumulation, connection leaks, or memory issues.
+
+    Acceptance Criteria (US-003):
+    - Running multiple evaluations sequentially does not accumulate connections
+    - Each evaluation properly cleans up after itself
+    - Memory/resources are properly released between evaluations
+    - 50 sequential evaluations complete without resource leaks
+    """
+
+    @pytest.mark.asyncio
+    async def test_50_sequential_evaluations_no_connection_leaks(self) -> None:
+        """Run 50 sequential evaluations and verify no connection leaks.
+
+        This test implements the T608 requirement for 50 sequential evaluations
+        without resource leaks. It verifies:
+        - Each evaluation creates and properly closes its connection
+        - No connections accumulate over time
+        - The total number of connects equals total disconnects
+        """
+        active_connections: set[str] = set()
+        max_concurrent_connections = 0
+        total_connects = 0
+        total_disconnects = 0
+        client_counter = [0]
+
+        class LeakTrackingSequentialClient:
+            """Track connection state across 50 sequential evaluations."""
+
+            def __init__(self, options: Any = None) -> None:
+                nonlocal client_counter
+                client_counter[0] += 1
+                self.client_id = f"seq-client-{client_counter[0]}"
+                self.options = options
+                self.session_id = self.client_id
+
+            async def connect(self) -> None:
+                nonlocal total_connects, max_concurrent_connections
+                total_connects += 1
+                active_connections.add(self.client_id)
+                max_concurrent_connections = max(
+                    max_concurrent_connections, len(active_connections)
+                )
+
+            async def disconnect(self) -> None:
+                nonlocal total_disconnects
+                total_disconnects += 1
+                active_connections.discard(self.client_id)
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"{self.client_id} completed")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t708_50_eval_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", LeakTrackingSequentialClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Run 50 sequential evaluations
+                for i in range(50):
+                    await worker.execute_query(f"Evaluation {i + 1}")
+                    await worker.clear_session()
+
+                    # After each cleanup, no connections should be active
+                    assert len(active_connections) == 0, (
+                        f"Evaluation {i + 1}: Active connections should be 0, "
+                        f"got {len(active_connections)}: {active_connections}"
+                    )
+
+        # VERIFY: 50 connects and 50 disconnects
+        assert total_connects == 50, (
+            f"Expected 50 connects, got {total_connects}"
+        )
+        assert total_disconnects == 50, (
+            f"Expected 50 disconnects, got {total_disconnects}"
+        )
+
+        # VERIFY: Never more than 1 concurrent connection
+        assert max_concurrent_connections == 1, (
+            f"Max concurrent connections should be 1, got {max_concurrent_connections}"
+        )
+
+        # VERIFY: No leaked connections at the end
+        assert len(active_connections) == 0, (
+            f"Connection leak detected: {active_connections}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_sequential_evaluations_no_client_accumulation(self) -> None:
+        """Verify that client objects do not accumulate over sequential evaluations.
+
+        Each evaluation should create a new client and properly dispose of it,
+        without keeping references to old clients.
+        """
+        created_clients: list[Any] = []
+
+        class AccumulationTrackingClient:
+            """Track client object creation."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.client_id = len(created_clients) + 1
+                self.options = options
+                self.session_id = f"accumulation-{self.client_id}"
+                created_clients.append(self)
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"Client {self.client_id} done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t708_accumulation_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", AccumulationTrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Run 10 sequential evaluations
+                for i in range(10):
+                    await worker.execute_query(f"Eval {i + 1}")
+                    await worker.clear_session()
+
+                    # VERIFY: Worker no longer holds reference to client
+                    assert worker._client is None, (
+                        f"Evaluation {i + 1}: Worker should not hold client reference"
+                    )
+
+        # VERIFY: 10 clients were created (one per evaluation)
+        assert len(created_clients) == 10, (
+            f"Expected 10 clients created, got {len(created_clients)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_sequential_evaluations_with_questions_no_leaks(self) -> None:
+        """Verify sequential evaluations with questions do not leak resources.
+
+        Run multiple evaluations where each includes a question/answer exchange,
+        ensuring proper cleanup after each.
+        """
+        active_connections: set[str] = set()
+        question_count = 0
+        client_counter = [0]
+
+        class QuestionLeakTrackingClient:
+            """Track connections during Q&A exchanges."""
+
+            def __init__(self, options: Any = None) -> None:
+                nonlocal client_counter
+                client_counter[0] += 1
+                self.client_id = f"qa-client-{client_counter[0]}"
+                self.options = options
+                self.session_id = self.client_id
+                self._query_count = 0
+
+            async def connect(self) -> None:
+                active_connections.add(self.client_id)
+
+            async def disconnect(self) -> None:
+                active_connections.discard(self.client_id)
+
+            async def query(self, prompt: str) -> None:
+                self._query_count += 1
+
+            async def receive_response(self) -> Any:
+                if self._query_count == 1:
+                    # First query gets a question
+                    question_block = AskUserQuestionBlock(
+                        questions=[{"question": f"Question from {self.client_id}?"}]
+                    )
+                    yield AssistantMessage(content=[question_block])
+                else:
+                    # Second query gets the result
+                    yield ResultMessage(result=f"{self.client_id} completed with answer")
+
+        async def count_and_answer(context: QuestionContext) -> str:
+            nonlocal question_count
+            question_count += 1
+            return f"Answer {question_count}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t708_qa_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=count_and_answer,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", QuestionLeakTrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Run 10 sequential evaluations, each with a question
+                for i in range(10):
+                    await worker.execute_query(f"Evaluation with question {i + 1}")
+                    await worker.clear_session()
+
+                    # After cleanup, no connections should be active
+                    assert len(active_connections) == 0, (
+                        f"Eval {i + 1}: Expected 0 active connections, got {active_connections}"
+                    )
+
+        # VERIFY: 10 questions were answered
+        assert question_count == 10, (
+            f"Expected 10 questions answered, got {question_count}"
+        )
+
+        # VERIFY: No leaked connections
+        assert len(active_connections) == 0
+
+    @pytest.mark.asyncio
+    async def test_sequential_evaluations_with_failures_no_leaks(self) -> None:
+        """Verify that failed evaluations do not cause connection leaks.
+
+        Run sequential evaluations where some fail, ensuring proper cleanup
+        regardless of success or failure.
+        """
+        active_connections: set[str] = set()
+        total_connects = 0
+        total_disconnects = 0
+        client_counter = [0]
+        fail_on_eval = {3, 7, 12, 18, 25}  # These evaluations will fail
+
+        class FailureLeakTrackingClient:
+            """Track connections with some failures."""
+
+            def __init__(self, options: Any = None) -> None:
+                nonlocal client_counter
+                client_counter[0] += 1
+                self.client_id = f"fail-client-{client_counter[0]}"
+                self.eval_num = client_counter[0]
+                self.options = options
+                self.session_id = self.client_id
+
+            async def connect(self) -> None:
+                nonlocal total_connects
+                total_connects += 1
+                active_connections.add(self.client_id)
+                if self.eval_num in fail_on_eval:
+                    raise ConnectionError(f"Simulated failure for eval {self.eval_num}")
+
+            async def disconnect(self) -> None:
+                nonlocal total_disconnects
+                total_disconnects += 1
+                active_connections.discard(self.client_id)
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"{self.client_id} completed")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t708_failure_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        success_count = 0
+        failure_count = 0
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailureLeakTrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Run 30 sequential evaluations with some failures
+                for i in range(30):
+                    try:
+                        await worker.execute_query(f"Evaluation {i + 1}")
+                        await worker.clear_session()
+                        success_count += 1
+                    except ConnectionError:
+                        failure_count += 1
+
+                    # After each evaluation (success or failure), no connections should leak
+                    assert len(active_connections) == 0, (
+                        f"Eval {i + 1}: Expected 0 active connections, got {active_connections}"
+                    )
+
+        # VERIFY: Expected number of successes and failures
+        assert failure_count == len(fail_on_eval), (
+            f"Expected {len(fail_on_eval)} failures, got {failure_count}"
+        )
+        assert success_count == 30 - len(fail_on_eval), (
+            f"Expected {30 - len(fail_on_eval)} successes, got {success_count}"
+        )
+
+        # VERIFY: All connections were properly disconnected
+        assert len(active_connections) == 0, (
+            f"Connection leak after failures: {active_connections}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_tool_invocations_cleared_between_evaluations(self) -> None:
+        """Verify that tool_invocations list is cleared between evaluations.
+
+        This ensures no memory accumulation from tool invocation tracking.
+        """
+        class SimpleClient:
+            """Simple client for tool invocation test."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "tool-test-session"
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t708_tool_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", SimpleClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                for i in range(10):
+                    # Before query, add some tool invocations to simulate previous state
+                    from datetime import datetime
+                    worker.tool_invocations.append(
+                        ToolInvocation(
+                            timestamp=datetime.now(),
+                            tool_name="test_tool",
+                            tool_use_id=f"test-{i}",
+                            tool_input={"test": i},
+                            tool_output="test output",
+                            is_error=False,
+                        )
+                    )
+
+                    # Execute query - should clear tool_invocations
+                    await worker.execute_query(f"Eval {i + 1}")
+
+                    # VERIFY: tool_invocations is empty after query
+                    assert len(worker.tool_invocations) == 0, (
+                        f"Eval {i + 1}: tool_invocations should be cleared, "
+                        f"got {len(worker.tool_invocations)} items"
+                    )
+
+                    await worker.clear_session()
+
+    @pytest.mark.asyncio
+    async def test_question_attempt_counter_resets_between_evaluations(self) -> None:
+        """Verify that _question_attempt_counter resets between evaluations.
+
+        Each evaluation should start with a fresh attempt counter.
+        """
+        attempt_counts_at_question: list[int] = []
+
+        class CounterCheckClient:
+            """Client to check attempt counter."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "counter-test"
+                self._query_count = 0
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                self._query_count += 1
+
+            async def receive_response(self) -> Any:
+                if self._query_count == 1:
+                    # Ask a question on first query
+                    yield AssistantMessage(
+                        content=[AskUserQuestionBlock(questions=[{"question": "Test?"}])]
+                    )
+                else:
+                    yield ResultMessage(result="Done")
+
+        async def track_attempts(context: QuestionContext) -> str:
+            attempt_counts_at_question.append(context.attempt_number)
+            return "answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t708_counter_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=track_attempts,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", CounterCheckClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Run 5 sequential evaluations, each with a question
+                for i in range(5):
+                    await worker.execute_query(f"Eval {i + 1}")
+                    await worker.clear_session()
+
+        # VERIFY: Each question had attempt_number == 1 (counter reset)
+        assert len(attempt_counts_at_question) == 5
+        for i, attempt in enumerate(attempt_counts_at_question):
+            assert attempt == 1, (
+                f"Eval {i + 1}: Expected attempt_number 1, got {attempt}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t708_complete_verification(self) -> None:
+        """Complete verification of T708 acceptance criteria.
+
+        Acceptance Criteria Checklist (US-003):
+        [x] Running multiple evaluations sequentially does not accumulate connections
+        [x] Each evaluation properly cleans up after itself
+        [x] Memory/resources are properly released between evaluations
+        [x] The test verifies 50+ sequential evaluations work without leaks
+        """
+        verification_results: dict[str, bool] = {
+            "no_connection_accumulation": False,
+            "proper_cleanup_each_eval": False,
+            "resources_released_between_evals": False,
+            "fifty_plus_evals_no_leaks": False,
+        }
+
+        active_connections: set[str] = set()
+        max_concurrent = 0
+        cleanup_verified_count = 0
+        client_counter = [0]
+        all_client_ids: list[str] = []
+
+        class ComprehensiveT708Client:
+            """Client for complete T708 verification."""
+
+            def __init__(self, options: Any = None) -> None:
+                nonlocal client_counter
+                client_counter[0] += 1
+                self.client_id = f"t708-verify-{client_counter[0]}"
+                self.options = options
+                self.session_id = self.client_id
+                all_client_ids.append(self.client_id)
+
+            async def connect(self) -> None:
+                nonlocal max_concurrent
+                active_connections.add(self.client_id)
+                max_concurrent = max(max_concurrent, len(active_connections))
+
+            async def disconnect(self) -> None:
+                active_connections.discard(self.client_id)
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"{self.client_id} done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t708_complete_verify",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ComprehensiveT708Client):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Run 55 sequential evaluations (exceeding 50 requirement)
+                for i in range(55):
+                    await worker.execute_query(f"Verification eval {i + 1}")
+                    await worker.clear_session()
+
+                    # Track that cleanup happened properly
+                    if len(active_connections) == 0 and worker._client is None:
+                        cleanup_verified_count += 1
+
+        # CRITERION 1: No connection accumulation (max 1 concurrent)
+        verification_results["no_connection_accumulation"] = (max_concurrent == 1)
+
+        # CRITERION 2: Each evaluation properly cleaned up
+        verification_results["proper_cleanup_each_eval"] = (cleanup_verified_count == 55)
+
+        # CRITERION 3: Resources released (no active connections at end)
+        verification_results["resources_released_between_evals"] = (
+            len(active_connections) == 0 and worker._client is None
+        )
+
+        # CRITERION 4: 50+ evaluations completed without leaks
+        verification_results["fifty_plus_evals_no_leaks"] = (
+            len(all_client_ids) == 55 and len(active_connections) == 0
+        )
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, (
+                f"T708 criterion '{criterion}' failed. "
+                f"Max concurrent: {max_concurrent}, Cleanup count: {cleanup_verified_count}, "
+                f"Active connections: {active_connections}, Clients created: {len(all_client_ids)}"
             )
