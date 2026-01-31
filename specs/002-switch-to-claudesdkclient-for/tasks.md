@@ -53,8 +53,8 @@ Create new data model classes needed by multiple user stories.
 
 ### Enum Extension
 
-- [ ] T108 Add DeveloperState.answering_question to enums.py (src/claude_evaluator/models/enums.py)
-- [ ] T109 Update _VALID_TRANSITIONS in developer.py for new state
+- [x] T108 Add DeveloperState.answering_question to enums.py (src/claude_evaluator/models/enums.py)
+- [x] T109 Update _VALID_TRANSITIONS in developer.py for new state
 
 ### Unit Tests - Foundation
 
