@@ -128,27 +128,27 @@ DeveloperAgent generates LLM-powered answers.
 
 ### DeveloperAgent Extension
 
-- [ ] T400 [US1] Add developer_qa_model attribute to DeveloperAgent (src/claude_evaluator/agents/developer.py)
-- [ ] T401 [US1] Add context_window_size attribute (default: 10)
-- [ ] T402 [US1] Add max_answer_retries attribute (default: 1)
-- [ ] T403 [US1] Add _answer_retry_count internal counter
-- [ ] T404 [US1] Implement async answer_question(context: QuestionContext) method
-- [ ] T405 [US1] Build prompt with question + last N messages from context
-- [ ] T406 [US1] Call query() to generate answer (one-off, appropriate for this use case)
-- [ ] T407 [US1] Return AnswerResult with generation metrics
+- [x] T400 [US1] Add developer_qa_model attribute to DeveloperAgent (src/claude_evaluator/agents/developer.py)
+- [x] T401 [US1] Add context_window_size attribute (default: 10)
+- [x] T402 [US1] Add max_answer_retries attribute (default: 1)
+- [x] T403 [US1] Add _answer_retry_count internal counter
+- [x] T404 [US1] Implement async answer_question(context: QuestionContext) method
+- [x] T405 [US1] Build prompt with question + last N messages from context
+- [x] T406 [US1] Call query() to generate answer (one-off, appropriate for this use case)
+- [x] T407 [US1] Return AnswerResult with generation metrics
 
 ### Retry Logic
 
-- [ ] T408 [US1] Implement retry detection (Worker asks same question again)
-- [ ] T409 [US1] On retry: use full conversation history instead of last N messages
-- [ ] T410 [US1] After max_retries exceeded: fail evaluation with detailed error
+- [x] T408 [US1] Implement retry detection (Worker asks same question again)
+- [x] T409 [US1] On retry: use full conversation history instead of last N messages
+- [x] T410 [US1] After max_retries exceeded: fail evaluation with detailed error
 
 ### State Machine Update
 
-- [ ] T411 [US1] Add transition: awaiting_response -> answering_question
-- [ ] T412 [US1] Add transition: answering_question -> awaiting_response (success)
-- [ ] T413 [US1] Add transition: answering_question -> failed (timeout/max retries)
-- [ ] T414 [US1] Log decision when answering question
+- [x] T411 [US1] Add transition: awaiting_response -> answering_question
+- [x] T412 [US1] Add transition: answering_question -> awaiting_response (success)
+- [x] T413 [US1] Add transition: answering_question -> failed (timeout/max retries)
+- [x] T414 [US1] Log decision when answering question
 
 ### Unit Tests - Answer Generation
 
