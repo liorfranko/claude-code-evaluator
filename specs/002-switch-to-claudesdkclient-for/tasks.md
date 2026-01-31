@@ -72,11 +72,11 @@ Refactor WorkerAgent from query() to ClaudeSDKClient.
 
 ### WorkerAgent Refactoring
 
-- [ ] T200 [US1] Import ClaudeSDKClient from claude-agent-sdk (src/claude_evaluator/agents/worker.py)
-- [ ] T201 [US1] Add _client attribute to WorkerAgent dataclass (src/claude_evaluator/agents/worker.py)
-- [ ] T202 [US1] Remove _last_session_id attribute (no longer needed with client)
-- [ ] T203 [US1] Refactor execute_query() to use ClaudeSDKClient async context manager
-- [ ] T204 [US1] Replace _stream_sdk_messages() to use client.stream() API
+- [x] T200 [US1] Import ClaudeSDKClient from claude-agent-sdk (src/claude_evaluator/agents/worker.py)
+- [x] T201 [US1] Add _client attribute to WorkerAgent dataclass (src/claude_evaluator/agents/worker.py)
+- [x] T202 [US1] Remove _last_session_id attribute (no longer needed with client)
+- [x] T203 [US1] Refactor execute_query() to use ClaudeSDKClient async context manager
+- [x] T204 [US1] Replace _stream_sdk_messages() to use client.stream() API
 - [ ] T205 [US2] Ensure client maintains session context across multiple exchanges
 - [ ] T206 [US3] Implement proper client lifecycle with async context manager pattern
 - [ ] T207 [US3] Handle client cleanup on evaluation completion or failure

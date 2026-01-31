@@ -119,6 +119,10 @@ class WorkerAgent:
         is True and a client exists, the query continues in the same session context.
         Otherwise, a new client is created.
 
+        The method implements proper error handling to ensure client cleanup on failure
+        when not resuming a session. When resuming, the client is preserved for potential
+        recovery or continued use.
+
         Args:
             query: The prompt to send to Claude Code.
             phase: Current workflow phase for tracking.
@@ -128,7 +132,7 @@ class WorkerAgent:
             QueryMetrics with execution results.
 
         Raises:
-            RuntimeError: If SDK is not available.
+            RuntimeError: If SDK is not available or no result message is received.
         """
         if not SDK_AVAILABLE or ClaudeSDKClient is None:
             raise RuntimeError(
@@ -143,23 +147,36 @@ class WorkerAgent:
         # Determine if we should reuse existing client or create new one
         if resume_session and self._client is not None:
             # Continue conversation with existing client
+            # On error, preserve client for potential recovery
             result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
                 query, self._client
             )
         else:
-            # Clean up existing client if any
+            # Clean up existing client if any before creating new one
             if self._client is not None:
-                await self._client.disconnect()
-                self._client = None
+                await self._cleanup_client()
 
             # Build SDK options and create new client session
             options = self._build_sdk_options()
-            self._client = ClaudeSDKClient(options)
-            await self._client.connect()
+            new_client = ClaudeSDKClient(options)
 
-            result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
-                query, self._client
-            )
+            try:
+                await new_client.connect()
+                self._client = new_client
+
+                result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
+                    query, self._client
+                )
+            except Exception:
+                # Clean up the new client on connection or streaming failure
+                try:
+                    await new_client.disconnect()
+                except Exception:
+                    pass  # Ignore cleanup errors
+                # Clear the client reference if it was set
+                if self._client is new_client:
+                    self._client = None
+                raise
 
         # Build and return metrics
         return self._build_query_metrics(
@@ -187,6 +204,21 @@ class WorkerAgent:
             max_budget_usd=self.max_budget_usd,
             model=self.model or DEFAULT_MODEL,
         )
+
+    async def _cleanup_client(self) -> None:
+        """Disconnect and clear the current client.
+
+        Safely disconnects the current client, ignoring any errors that occur
+        during disconnection. This ensures cleanup always completes even if
+        the client is in an invalid state.
+        """
+        if self._client is not None:
+            try:
+                await self._client.disconnect()
+            except Exception:
+                pass  # Ignore disconnect errors during cleanup
+            finally:
+                self._client = None
 
     async def _stream_sdk_messages_with_client(
         self,
@@ -535,10 +567,13 @@ class WorkerAgent:
         return self._client is not None
 
     async def clear_session(self) -> None:
-        """Disconnect and clear the stored client to start a fresh session."""
-        if self._client is not None:
-            await self._client.disconnect()
-            self._client = None
+        """Disconnect and clear the stored client to start a fresh session.
+
+        This method safely disconnects the current client and clears the reference,
+        allowing a new session to be started on the next query. Any errors during
+        disconnection are silently ignored to ensure cleanup always completes.
+        """
+        await self._cleanup_client()
 
     def set_permission_mode(self, mode: PermissionMode) -> None:
         """Update the permission mode for subsequent executions.
