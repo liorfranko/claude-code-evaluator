@@ -21,7 +21,31 @@ defaults:
 
 evaluations:
   # Simple utility function - direct implementation
-  - id: utility-function-direct
+  # - id: utility-function-direct
+  #   name: Simple Utility Function (Direct)
+  #   description: >
+  #     Single-prompt direct implementation of a utility function.
+  #     Tests the most basic greenfield workflow without planning phases.
+  #   task: >
+  #     Create a Python module with a function that validates email addresses.
+  #     The function should:
+  #     1. Accept a string parameter
+  #     2. Return True if the email is valid, False otherwise
+  #     3. Handle edge cases like empty strings, missing @ symbol, invalid domains
+  #     4. Include type hints and docstrings
+  #     5. Create unit tests in a separate test file
+  #   tags:
+  #     - simple
+  #     - direct
+  #     - python
+  #     - utility
+  #   phases:
+  #     - name: implement
+  #       permission_mode: acceptEdits
+  #       prompt_template: "{task}"
+
+  # REST API project - plan then implement
+  - id: utility-function-plan-then-implement
     name: Simple Utility Function (Direct)
     description: >
       Single-prompt direct implementation of a utility function.
@@ -39,31 +63,7 @@ evaluations:
       - direct
       - python
       - utility
-    phases:
-      - name: implement
-        permission_mode: acceptEdits
-        prompt_template: "{task}"
-
-  # REST API project - plan then implement
-  - id: rest-api-plan-implement
-    name: REST API Project (Plan Then Implement)
-    description: >
-      Two-phase workflow: first create a plan in read-only mode,
-      then implement based on the plan. Tests plan-then-implement workflow.
-    task: >
-      Create a REST API for a bookstore inventory system with the following:
-      1. FastAPI or Flask framework
-      2. CRUD endpoints for books (GET, POST, PUT, DELETE)
-      3. Book model with: id, title, author, isbn, price, quantity
-      4. In-memory storage (no database required)
-      5. Input validation using Pydantic or similar
-      6. Proper HTTP status codes and error responses
-    tags:
-      - complex
-      - planning
-      - python
-      - api
-      - rest
+      - plan-then-implement
     max_budget_usd: 15.0
     timeout_seconds: 450
     phases:
@@ -79,115 +79,115 @@ evaluations:
           and ensure the code is functional and follows best practices.
         continue_session: true
 
-  # CLI tool - iterative build-test-refine
-  - id: cli-tool-iterative
-    name: CLI Calculator Tool (Iterative Refinement)
-    description: >
-      Multi-phase iterative workflow: build initial version, write tests,
-      then refine based on test results. Tests iterative development patterns.
-    task: >
-      Create a command-line calculator application in Python that:
-      1. Accepts mathematical expressions as command-line arguments
-      2. Supports basic operations: +, -, *, /, and parentheses
-      3. Supports advanced operations: power (^), modulo (%), square root
-      4. Handles errors gracefully with helpful messages
-      5. Includes a --help option with usage examples
-      6. Uses argparse or click for argument parsing
-    tags:
-      - iterative
-      - cli
-      - python
-      - tool
-    phases:
-      - name: initial-implementation
-        permission_mode: acceptEdits
-        prompt_template: "{task}"
-      - name: write-tests
-        permission_mode: acceptEdits
-        prompt: >
-          Write comprehensive unit tests for the calculator CLI you just created.
-          Cover edge cases, error handling, and all supported operations.
-          Use pytest as the testing framework.
-        continue_session: true
-      - name: run-and-refine
-        permission_mode: bypassPermissions
-        prompt: >
-          Run the tests you created and fix any failing tests.
-          Improve code quality based on test results.
-          Ensure all tests pass before completing.
-        continue_session: true
+  # # CLI tool - iterative build-test-refine
+  # - id: cli-tool-iterative
+  #   name: CLI Calculator Tool (Iterative Refinement)
+  #   description: >
+  #     Multi-phase iterative workflow: build initial version, write tests,
+  #     then refine based on test results. Tests iterative development patterns.
+  #   task: >
+  #     Create a command-line calculator application in Python that:
+  #     1. Accepts mathematical expressions as command-line arguments
+  #     2. Supports basic operations: +, -, *, /, and parentheses
+  #     3. Supports advanced operations: power (^), modulo (%), square root
+  #     4. Handles errors gracefully with helpful messages
+  #     5. Includes a --help option with usage examples
+  #     6. Uses argparse or click for argument parsing
+  #   tags:
+  #     - iterative
+  #     - cli
+  #     - python
+  #     - tool
+  #   phases:
+  #     - name: initial-implementation
+  #       permission_mode: acceptEdits
+  #       prompt_template: "{task}"
+  #     - name: write-tests
+  #       permission_mode: acceptEdits
+  #       prompt: >
+  #         Write comprehensive unit tests for the calculator CLI you just created.
+  #         Cover edge cases, error handling, and all supported operations.
+  #         Use pytest as the testing framework.
+  #       continue_session: true
+  #     - name: run-and-refine
+  #       permission_mode: bypassPermissions
+  #       prompt: >
+  #         Run the tests you created and fix any failing tests.
+  #         Improve code quality based on test results.
+  #         Ensure all tests pass before completing.
+  #       continue_session: true
 
-  # Full projspec workflow simulation
-  - id: projspec-full-workflow
-    name: Projspec Full Workflow Simulation
-    description: >
-      Simulates the complete projspec workflow: specify, plan, tasks, implement.
-      Tests multi-command sequential workflows for complex project development.
-    task: >
-      Build a task management CLI application with the following capabilities:
-      1. Add, list, update, and delete tasks
-      2. Mark tasks as complete/incomplete
-      3. Assign priorities (low, medium, high)
-      4. Filter and search tasks
-      5. Persist tasks to a JSON file
-      6. Support for due dates
-    tags:
-      - projspec
-      - complex
-      - multi-phase
-      - python
-      - cli
-    max_budget_usd: 20.0
-    timeout_seconds: 600
-    phases:
-      - name: specify
-        permission_mode: acceptEdits
-        prompt: >
-          /projspec:specify Build a task management CLI application that allows users to:
-          - Add, list, update, and delete tasks
-          - Mark tasks as complete/incomplete
-          - Assign priorities (low, medium, high)
-          - Filter and search tasks
-          - Persist tasks to a JSON file
-          - Support for due dates
-      - name: plan
-        permission_mode: acceptEdits
-        prompt: "/projspec:plan"
-        continue_session: true
-      - name: tasks
-        permission_mode: acceptEdits
-        prompt: "/projspec:tasks"
-        continue_session: true
-      - name: implement
-        permission_mode: bypassPermissions
-        prompt: "/projspec:implement"
-        continue_session: true
+  # # Full projspec workflow simulation
+  # - id: projspec-full-workflow
+  #   name: Projspec Full Workflow Simulation
+  #   description: >
+  #     Simulates the complete projspec workflow: specify, plan, tasks, implement.
+  #     Tests multi-command sequential workflows for complex project development.
+  #   task: >
+  #     Build a task management CLI application with the following capabilities:
+  #     1. Add, list, update, and delete tasks
+  #     2. Mark tasks as complete/incomplete
+  #     3. Assign priorities (low, medium, high)
+  #     4. Filter and search tasks
+  #     5. Persist tasks to a JSON file
+  #     6. Support for due dates
+  #   tags:
+  #     - projspec
+  #     - complex
+  #     - multi-phase
+  #     - python
+  #     - cli
+  #   max_budget_usd: 20.0
+  #   timeout_seconds: 600
+  #   phases:
+  #     - name: specify
+  #       permission_mode: acceptEdits
+  #       prompt: >
+  #         /projspec:specify Build a task management CLI application that allows users to:
+  #         - Add, list, update, and delete tasks
+  #         - Mark tasks as complete/incomplete
+  #         - Assign priorities (low, medium, high)
+  #         - Filter and search tasks
+  #         - Persist tasks to a JSON file
+  #         - Support for due dates
+  #     - name: plan
+  #       permission_mode: acceptEdits
+  #       prompt: "/projspec:plan"
+  #       continue_session: true
+  #     - name: tasks
+  #       permission_mode: acceptEdits
+  #       prompt: "/projspec:tasks"
+  #       continue_session: true
+  #     - name: implement
+  #       permission_mode: bypassPermissions
+  #       prompt: "/projspec:implement"
+  #       continue_session: true
 
-  # Bonus: TypeScript/Node.js project for language variety
-  - id: node-package-direct
-    name: Node.js Utility Package (Direct)
-    description: >
-      Direct implementation of a Node.js/TypeScript utility package.
-      Tests greenfield development in a different language ecosystem.
-    task: >
-      Create a TypeScript npm package that provides string manipulation utilities:
-      1. truncate(str, maxLength, suffix?) - truncate with ellipsis
-      2. slugify(str) - convert to URL-friendly slug
-      3. capitalize(str) - capitalize first letter of each word
-      4. reverse(str) - reverse string
-      5. countWords(str) - count words in string
-      Include:
-      - TypeScript configuration
-      - Package.json with proper metadata
-      - Unit tests with Jest
-      - Type definitions
-    tags:
-      - simple
-      - direct
-      - typescript
-      - nodejs
-      - npm
-    phases:
-      - name: implement
-        permission_mode: acceptEdits
-        prompt_template: "{task}"
+  # # Bonus: TypeScript/Node.js project for language variety
+  # - id: node-package-direct
+  #   name: Node.js Utility Package (Direct)
+  #   description: >
+  #     Direct implementation of a Node.js/TypeScript utility package.
+  #     Tests greenfield development in a different language ecosystem.
+  #   task: >
+  #     Create a TypeScript npm package that provides string manipulation utilities:
+  #     1. truncate(str, maxLength, suffix?) - truncate with ellipsis
+  #     2. slugify(str) - convert to URL-friendly slug
+  #     3. capitalize(str) - capitalize first letter of each word
+  #     4. reverse(str) - reverse string
+  #     5. countWords(str) - count words in string
+  #     Include:
+  #     - TypeScript configuration
+  #     - Package.json with proper metadata
+  #     - Unit tests with Jest
+  #     - Type definitions
+  #   tags:
+  #     - simple
+  #     - direct
+  #     - typescript
+  #     - nodejs
+  #     - npm
+  #   phases:
+  #     - name: implement
+  #       permission_mode: acceptEdits
+  #       prompt_template: "{task}"

@@ -301,24 +301,17 @@ class ReportGenerator:
         if metrics.cache_creation_tokens is not None:
             result["cache_creation_tokens"] = metrics.cache_creation_tokens
 
-        # Include tool invocations
-        result["tool_invocations"] = [
-            {
-                "timestamp": inv.timestamp.isoformat(),
-                "tool_name": inv.tool_name,
-                "tool_use_id": inv.tool_use_id,
-                "success": inv.success,
-                "phase": inv.phase,
-                "input_summary": inv.input_summary,
-            }
-            for inv in metrics.tool_invocations
-        ]
+        # Note: Tool invocations are now fully captured in query messages
+        # Keeping tool_counts for quick summary statistics
+        # Removing individual tool_invocations as they're redundant with messages
 
-        # Include queries
+        # Include queries with full prompt, response, and conversation messages
         result["queries"] = [
             {
                 "query_index": q.query_index,
                 "prompt": q.prompt,
+                "response": q.response,
+                "messages": q.messages,
                 "duration_ms": q.duration_ms,
                 "input_tokens": q.input_tokens,
                 "output_tokens": q.output_tokens,

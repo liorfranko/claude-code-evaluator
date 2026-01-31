@@ -232,11 +232,20 @@ async def run_evaluation(
     if verbose:
         print(f"Starting evaluation with {workflow_type.value} workflow...")
 
+    # Create timestamped folder for this evaluation
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    eval_folder = output_dir / timestamp
+    eval_folder.mkdir(parents=True, exist_ok=True)
+
+    # Create workspace subfolder inside the evaluation folder
+    workspace_path = eval_folder / "workspace"
+    workspace_path.mkdir(parents=True, exist_ok=True)
+
     # Create agents
     developer = DeveloperAgent()
     worker = WorkerAgent(
         execution_mode=ExecutionMode.sdk,
-        project_directory=str(output_dir),
+        project_directory=str(workspace_path),
         active_session=False,
         permission_mode=PermissionMode.acceptEdits,
     )
@@ -252,8 +261,8 @@ async def run_evaluation(
     # Create metrics collector
     collector = MetricsCollector()
 
-    # Start evaluation
-    evaluation.start()
+    # Start evaluation with the pre-created workspace
+    evaluation.start(workspace_path=str(workspace_path))
 
     # Update worker to use evaluation workspace
     worker.project_directory = str(evaluation.workspace_path)
@@ -310,9 +319,8 @@ async def run_evaluation(
     generator = ReportGenerator()
     report = generator.generate(evaluation)
 
-    # Save report
-    output_dir.mkdir(parents=True, exist_ok=True)
-    report_path = output_dir / f"{evaluation.id}.json"
+    # Save report in the timestamped evaluation folder
+    report_path = eval_folder / "evaluation.json"
     generator.save(report, report_path)
 
     if verbose:

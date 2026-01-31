@@ -305,7 +305,6 @@ class TestFormatResults:
                 total_cost_usd=total_cost,
                 prompt_count=1,
                 turn_count=3,
-                tool_invocations=[],
                 tokens_by_phase={},
             ),
             timeline=[],

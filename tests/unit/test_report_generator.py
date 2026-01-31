@@ -40,7 +40,6 @@ class TestReportGeneratorGenerate:
             total_cost_usd=0.01,
             prompt_count=1,
             turn_count=3,
-            tool_invocations=[],
             tokens_by_phase={},
         )
         mock.developer_agent = MagicMock()
@@ -252,7 +251,6 @@ class TestReportGeneratorSave:
                 total_cost_usd=0.01,
                 prompt_count=1,
                 turn_count=3,
-                tool_invocations=[],
                 tokens_by_phase={},
             ),
             timeline=[],
@@ -425,7 +423,6 @@ class TestReportGeneratorToJson:
                 total_cost_usd=0.01,
                 prompt_count=1,
                 turn_count=3,
-                tool_invocations=[],
                 tokens_by_phase={},
             ),
             timeline=[],

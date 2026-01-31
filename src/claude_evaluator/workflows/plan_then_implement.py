@@ -50,11 +50,18 @@ class PlanThenImplementWorkflow(BaseWorkflow):
     DEFAULT_PLANNING_PROMPT = (
         "Please analyze the following task and create a detailed implementation plan. "
         "Do not make any changes yet - just explore the codebase and outline your approach.\n\n"
+        "IMPORTANT: Include the full plan details in your response (do not just reference a file). "
+        "The implementation phase will need these details to proceed.\n\n"
+        "Do NOT ask the user for approval, feedback, or any input. "
+        "Just provide your complete plan directly without asking for permission to proceed.\n\n"
         "Task: {task_description}"
     )
 
     DEFAULT_IMPLEMENTATION_PROMPT = (
-        "Now implement the plan you created. Execute the implementation steps you outlined."
+        "Now implement the plan step by step using the plan details provided above. "
+        "You are in a restricted workspace environment. Create all files and make all changes directly in the current working directory. "
+        "Do not ask for project locations or user input - just proceed with the implementation based on the plan. "
+        "Do NOT ask the user any questions or request approval. Just implement the plan autonomously."
     )
 
     def __init__(
@@ -170,14 +177,8 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         self._planning_response = query_metrics.response
 
         # Collect metrics from the planning phase
+        # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)
-
-        # Add tool invocations from planning phase
-        for invocation in worker.get_tool_invocations():
-            self.metrics_collector.add_tool_invocation(invocation)
-
-        # Clear tool invocations for the next phase
-        worker.clear_tool_invocations()
 
     async def _execute_implementation_phase(self, evaluation: "Evaluation") -> None:
         """Execute the implementation phase.
@@ -195,15 +196,18 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         worker = evaluation.worker_agent
         worker.set_permission_mode(PermissionMode.acceptEdits)
 
+        # Build implementation prompt with the planning response
+        implementation_prompt = (
+            f"Based on the plan you created:\n\n{self._planning_response}\n\n"
+            f"Now {self._implementation_prompt_template}"
+        )
+
         # Execute implementation query
         query_metrics = await worker.execute_query(
-            query=self._implementation_prompt_template,
+            query=implementation_prompt,
             phase="implementation",
         )
 
         # Collect metrics from the implementation phase
+        # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)
-
-        # Add tool invocations from implementation phase
-        for invocation in worker.get_tool_invocations():
-            self.metrics_collector.add_tool_invocation(invocation)

@@ -349,15 +349,15 @@ class TestDirectWorkflowMockedWorker:
         call_args = mock_execute.call_args
         assert call_args.kwargs["phase"] == "implementation"
         assert "Implement a calculator function" in call_args.kwargs["query"]
-        assert "Working directory:" in call_args.kwargs["query"]
+        assert "current directory" in call_args.kwargs["query"]
         assert "relative paths" in call_args.kwargs["query"]
 
-    def test_execute_collects_tool_invocations(
+    def test_execute_collects_query_metrics(
         self,
         workflow: DirectWorkflow,
         evaluation: Evaluation,
     ) -> None:
-        """Test that execute() collects tool invocations from worker."""
+        """Test that execute() collects query metrics."""
         sample_metrics = QueryMetrics(
             query_index=1,
             prompt="Test",
@@ -366,34 +366,35 @@ class TestDirectWorkflowMockedWorker:
             output_tokens=50,
             cost_usd=0.01,
             num_turns=1,
+            messages=[
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "ToolUseBlock", "id": "inv-001", "name": "Read", "input": {}},
+                        {"type": "ToolUseBlock", "id": "inv-002", "name": "Edit", "input": {}},
+                    ],
+                },
+            ],
         )
-
-        tool_invocations = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="inv-001",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Edit",
-                tool_use_id="inv-002",
-                success=True,
-            ),
-        ]
 
         evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(
-            return_value=tool_invocations
-        )
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         result = asyncio.run(workflow.execute(evaluation))
 
-        # Tool invocations should be in the metrics
-        assert len(result.tool_invocations) == 2
-        assert result.tool_invocations[0].tool_name == "Read"
-        assert result.tool_invocations[1].tool_name == "Edit"
+        # Queries should be in the metrics with messages
+        assert len(result.queries) == 1
+        assert len(result.queries[0].messages) > 0
+        # Tool invocations are in the message content
+        messages = result.queries[0].messages
+        tools_in_messages = []
+        for msg in messages:
+            if msg.get("role") == "assistant":
+                for block in msg.get("content", []):
+                    if block.get("type") == "ToolUseBlock":
+                        tools_in_messages.append(block.get("name"))
+        assert "Read" in tools_in_messages
+        assert "Edit" in tools_in_messages
 
     def test_execute_transitions_evaluation_to_completed(
         self,
@@ -570,7 +571,7 @@ class TestDirectWorkflowToolCounts:
         self,
         evaluation: Evaluation,
     ) -> None:
-        """Test that execute() correctly aggregates tool counts."""
+        """Test that execute() correctly aggregates tool counts from messages."""
         collector = MetricsCollector()
         workflow = DirectWorkflow(collector)
 
@@ -582,39 +583,21 @@ class TestDirectWorkflowToolCounts:
             output_tokens=50,
             cost_usd=0.01,
             num_turns=1,
+            messages=[
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "ToolUseBlock", "id": "inv-001", "name": "Read", "input": {}},
+                        {"type": "ToolUseBlock", "id": "inv-002", "name": "Read", "input": {}},
+                        {"type": "ToolUseBlock", "id": "inv-003", "name": "Edit", "input": {}},
+                        {"type": "ToolUseBlock", "id": "inv-004", "name": "Bash", "input": {}},
+                    ],
+                },
+            ],
         )
-
-        tool_invocations = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="inv-001",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="inv-002",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Edit",
-                tool_use_id="inv-003",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Bash",
-                tool_use_id="inv-004",
-                success=True,
-            ),
-        ]
 
         evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(
-            return_value=tool_invocations
-        )
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -896,8 +879,8 @@ class TestPlanThenImplementWorkflowExecution:
 
         assert workflow.planning_response == planning_response
 
-    def test_execute_clears_tool_invocations_between_phases(self) -> None:
-        """Test that tool invocations are cleared between phases."""
+    def test_execute_runs_both_phases(self) -> None:
+        """Test that workflow runs both planning and implementation phases."""
         collector = MetricsCollector()
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_mock_evaluation()
@@ -916,13 +899,11 @@ class TestPlanThenImplementWorkflowExecution:
 
         evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
         evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        clear_mock = MagicMock()
-        evaluation.worker_agent.clear_tool_invocations = clear_mock
 
-        asyncio.run(workflow.execute(evaluation))
+        result = asyncio.run(workflow.execute(evaluation))
 
-        # clear_tool_invocations should be called once after planning phase
-        clear_mock.assert_called_once()
+        # Should have collected metrics from both phases
+        assert len(result.queries) == 2  # planning and implementation
 
 
 class TestPlanThenImplementWorkflowMetrics:
@@ -1018,65 +999,65 @@ class TestPlanThenImplementWorkflowMetrics:
 
         assert result.prompt_count == 2
 
-    def test_execute_aggregates_tool_invocations_from_both_phases(self) -> None:
-        """Test that tool invocations are aggregated from both phases."""
+    def test_execute_aggregates_tool_counts_from_messages(self) -> None:
+        """Test that tool counts are aggregated from message content."""
         collector = MetricsCollector()
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_mock_evaluation()
 
-        planning_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Read",
-                tool_use_id="inv-001",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Glob",
-                tool_use_id="inv-002",
-                success=True,
-            ),
-        ]
-        implementation_tools = [
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Edit",
-                tool_use_id="inv-003",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime.now(),
-                tool_name="Write",
-                tool_use_id="inv-004",
-                success=True,
-            ),
-        ]
-
-        sample_metrics = QueryMetrics(
+        planning_metrics = QueryMetrics(
             query_index=1,
-            prompt="test",
-            phase="test",
+            prompt="plan",
+            phase="planning",
             input_tokens=100,
             output_tokens=200,
             cost_usd=0.001,
             duration_ms=1000,
-            num_turns=3,
-            response="response",
+            num_turns=1,
+            response="plan response",
+            messages=[
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "ToolUseBlock", "id": "inv-001", "name": "Read", "input": {}},
+                        {"type": "ToolUseBlock", "id": "inv-002", "name": "Glob", "input": {}},
+                    ],
+                },
+            ],
+        )
+
+        implementation_metrics = QueryMetrics(
+            query_index=2,
+            prompt="implement",
+            phase="implementation",
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.001,
+            duration_ms=1000,
+            num_turns=2,
+            response="impl response",
+            messages=[
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "ToolUseBlock", "id": "inv-003", "name": "Edit", "input": {}},
+                        {"type": "ToolUseBlock", "id": "inv-004", "name": "Write", "input": {}},
+                    ],
+                },
+            ],
         )
 
         call_count = 0
 
-        def get_tools_by_phase() -> list[ToolInvocation]:
+        async def return_metrics(**kwargs) -> QueryMetrics:  # type: ignore
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return planning_tools
-            return implementation_tools
+                return planning_metrics
+            return implementation_metrics
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = get_tools_by_phase
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        evaluation.worker_agent.execute_query = AsyncMock(side_effect=return_metrics)
+        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         result = asyncio.run(workflow.execute(evaluation))
 

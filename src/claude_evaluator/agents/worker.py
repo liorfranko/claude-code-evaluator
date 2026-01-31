@@ -19,12 +19,18 @@ try:
         query as sdk_query,
         ClaudeAgentOptions,
         ResultMessage,
+        AssistantMessage,
+        ToolUseBlock,
+        ToolResultBlock,
     )
     SDK_AVAILABLE = True
 except ImportError:
     sdk_query = None  # type: ignore
     ClaudeAgentOptions = None  # type: ignore
     ResultMessage = None  # type: ignore
+    AssistantMessage = None  # type: ignore
+    ToolUseBlock = None  # type: ignore
+    ToolResultBlock = None  # type: ignore
     SDK_AVAILABLE = False
 
 __all__ = ["WorkerAgent", "SDK_AVAILABLE"]
@@ -130,27 +136,66 @@ class WorkerAgent:
             allowed_tools=self.allowed_tools if self.allowed_tools else [],
             max_turns=self.max_turns,
             max_budget_usd=self.max_budget_usd,
+            model="claude-haiku-4-5@20251001",
         )
 
         # Execute query and collect messages
         result_message = None
         response_content = None
+        # Track pending tool uses to match with results
+        pending_tool_uses: dict[str, ToolInvocation] = {}
+        # Capture all messages for full conversation history
+        all_messages: list[dict[str, Any]] = []
 
         async for message in sdk_query(prompt=query, options=options):
-            # Track tool uses from messages
-            if hasattr(message, "tool_use_id") and hasattr(message, "tool_name"):
-                self._on_pre_tool_use(
-                    message.tool_name,
-                    message.tool_use_id,
-                    getattr(message, "tool_input", {}),
-                )
+            message_type = type(message).__name__
 
-            # Capture content from assistant messages
-            if hasattr(message, "content"):
+            # Process AssistantMessage content blocks for tool uses
+            if message_type == "AssistantMessage" and hasattr(message, "content"):
+                msg_record = self._serialize_message(message, "assistant")
+                all_messages.append(msg_record)
+
+                for block in message.content:
+                    block_type = type(block).__name__
+
+                    # Capture tool use (input)
+                    if block_type == "ToolUseBlock":
+                        invocation = self._on_tool_use(
+                            tool_name=block.name,
+                            tool_use_id=block.id,
+                            tool_input=block.input,
+                        )
+                        pending_tool_uses[block.id] = invocation
+
+                # Capture text content from assistant messages
                 response_content = message.content
 
+            # Process UserMessage for tool results
+            elif message_type == "UserMessage" and hasattr(message, "content"):
+                msg_record = self._serialize_message(message, "user")
+                all_messages.append(msg_record)
+
+                # Check for tool results in content
+                if isinstance(message.content, list):
+                    for block in message.content:
+                        block_type = type(block).__name__
+                        if block_type == "ToolResultBlock":
+                            tool_use_id = getattr(block, "tool_use_id", None)
+                            if tool_use_id and tool_use_id in pending_tool_uses:
+                                invocation = pending_tool_uses[tool_use_id]
+                                invocation.tool_output = self._format_tool_output(
+                                    getattr(block, "content", None)
+                                )
+                                invocation.is_error = getattr(block, "is_error", False) or False
+                                invocation.success = not invocation.is_error
+
+            # Capture SystemMessage
+            elif message_type == "SystemMessage":
+                msg_record = self._serialize_message(message, "system")
+                all_messages.append(msg_record)
+
             # The last message should be the ResultMessage
-            if isinstance(message, ResultMessage):
+            elif message_type == "ResultMessage":
                 result_message = message
 
         if result_message is None:
@@ -175,15 +220,16 @@ class WorkerAgent:
             num_turns=result_message.num_turns,
             phase=phase,
             response=str(response_content) if response_content else None,
+            messages=all_messages,
         )
 
-    def _on_pre_tool_use(
+    def _on_tool_use(
         self,
         tool_name: str,
         tool_use_id: str,
         tool_input: dict[str, Any],
-    ) -> None:
-        """Hook called before each tool invocation.
+    ) -> ToolInvocation:
+        """Record a tool invocation.
 
         Tracks tool invocations for analysis and debugging.
 
@@ -191,19 +237,52 @@ class WorkerAgent:
             tool_name: Name of the tool being invoked.
             tool_use_id: Unique identifier for this invocation.
             tool_input: Input parameters for the tool.
-        """
-        # Create summary of input (truncate large inputs)
-        input_summary = self._summarize_tool_input(tool_input)
 
+        Returns:
+            The created ToolInvocation for later updates.
+        """
         invocation = ToolInvocation(
             timestamp=datetime.now(),
             tool_name=tool_name,
             tool_use_id=tool_use_id,
-            success=None,  # Unknown until tool completes - will be updated if post_tool_use hook is added
+            tool_input=tool_input,
+            success=None,  # Updated when tool result is received
             phase=None,  # Will be set by caller if needed
-            input_summary=input_summary,
+            input_summary=self._summarize_tool_input(tool_input),
         )
         self.tool_invocations.append(invocation)
+        return invocation
+
+    def _format_tool_output(
+        self,
+        content: str | list[dict[str, Any]] | None,
+    ) -> str:
+        """Format tool output content to string.
+
+        Args:
+            content: Tool result content (string, list of blocks, or None).
+
+        Returns:
+            Formatted string representation of the output.
+        """
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        # Handle list of content blocks
+        try:
+            parts = []
+            for block in content:
+                if isinstance(block, dict):
+                    if "text" in block:
+                        parts.append(block["text"])
+                    else:
+                        parts.append(str(block))
+                else:
+                    parts.append(str(block))
+            return "\n".join(parts)
+        except Exception:
+            return str(content)
 
     def _summarize_tool_input(
         self,
@@ -223,6 +302,88 @@ class WorkerAgent:
         if len(input_str) <= max_length:
             return input_str
         return input_str[:max_length - 3] + "..."
+
+    def _serialize_message(
+        self,
+        message: Any,
+        role: str,
+    ) -> dict[str, Any]:
+        """Serialize an SDK message to a dictionary for storage.
+
+        Args:
+            message: The SDK message object.
+            role: The role (assistant, user, system).
+
+        Returns:
+            A dictionary representation of the message.
+        """
+        result: dict[str, Any] = {"role": role}
+
+        # Handle content field
+        if hasattr(message, "content"):
+            content = message.content
+            if isinstance(content, str):
+                result["content"] = content
+            elif isinstance(content, list):
+                result["content"] = self._serialize_content_blocks(content)
+            else:
+                result["content"] = str(content)
+
+        # Handle SystemMessage data field
+        if hasattr(message, "subtype"):
+            result["subtype"] = message.subtype
+        if hasattr(message, "data"):
+            result["data"] = message.data
+
+        # Handle error field
+        if hasattr(message, "error") and message.error:
+            result["error"] = message.error
+
+        # Handle model field
+        if hasattr(message, "model"):
+            result["model"] = message.model
+
+        return result
+
+    def _serialize_content_blocks(
+        self,
+        blocks: list[Any],
+    ) -> list[dict[str, Any]]:
+        """Serialize content blocks to dictionaries.
+
+        Args:
+            blocks: List of content blocks from SDK message.
+
+        Returns:
+            List of dictionary representations.
+        """
+        result = []
+        for block in blocks:
+            block_type = type(block).__name__
+            block_dict: dict[str, Any] = {"type": block_type}
+
+            if block_type == "TextBlock":
+                block_dict["text"] = getattr(block, "text", "")
+            elif block_type == "ThinkingBlock":
+                block_dict["thinking"] = getattr(block, "thinking", "")
+            elif block_type == "ToolUseBlock":
+                block_dict["id"] = getattr(block, "id", "")
+                block_dict["name"] = getattr(block, "name", "")
+                block_dict["input"] = getattr(block, "input", {})
+            elif block_type == "ToolResultBlock":
+                block_dict["tool_use_id"] = getattr(block, "tool_use_id", "")
+                block_dict["content"] = self._format_tool_output(
+                    getattr(block, "content", None)
+                )
+                block_dict["is_error"] = getattr(block, "is_error", False)
+            elif block_type == "AskUserQuestionBlock":
+                block_dict["questions"] = getattr(block, "questions", [])
+            else:
+                # Fallback for unknown block types
+                block_dict["data"] = str(block)
+
+            result.append(block_dict)
+        return result
 
     def get_tool_invocations(self) -> list[ToolInvocation]:
         """Get all tool invocations tracked during the current query.

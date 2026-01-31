@@ -8,29 +8,27 @@ from typing import Optional
 
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
 
 __all__ = ["MetricsCollector"]
 
 
 class MetricsCollector:
-    """Aggregates metrics from multiple queries and tool invocations.
+    """Aggregates metrics from multiple queries.
 
     The MetricsCollector tracks all metrics during an evaluation run,
-    including token usage, costs, tool invocations, and per-phase breakdowns.
+    including token usage, costs, and per-phase breakdowns.
+    Tool invocations are now captured in query messages.
 
     Example:
         collector = MetricsCollector()
         collector.set_phase("planning")
         collector.add_query_metrics(query_metrics)
-        collector.add_tool_invocation(invocation)
         metrics = collector.get_metrics()
     """
 
     def __init__(self) -> None:
         """Initialize empty metrics collector."""
         self._queries: list[QueryMetrics] = []
-        self._tool_invocations: list[ToolInvocation] = []
         self._current_phase: Optional[str] = None
         self._start_time_ms: Optional[int] = None
         self._end_time_ms: Optional[int] = None
@@ -57,29 +55,9 @@ class MetricsCollector:
                 num_turns=query_metrics.num_turns,
                 phase=self._current_phase,
                 response=query_metrics.response,
+                messages=query_metrics.messages,
             )
         self._queries.append(query_metrics)
-
-    def add_tool_invocation(self, invocation: ToolInvocation) -> None:
-        """Add a tool invocation to the collector.
-
-        If no phase is set on the invocation but a current phase is set
-        on the collector, the current phase will be used.
-
-        Args:
-            invocation: The ToolInvocation object to add.
-        """
-        # If invocation doesn't have a phase but we have a current phase, use it
-        if invocation.phase is None and self._current_phase is not None:
-            invocation = ToolInvocation(
-                timestamp=invocation.timestamp,
-                tool_name=invocation.tool_name,
-                tool_use_id=invocation.tool_use_id,
-                success=invocation.success,
-                phase=self._current_phase,
-                input_summary=invocation.input_summary,
-            )
-        self._tool_invocations.append(invocation)
 
     def set_phase(self, phase: str) -> None:
         """Set the current phase for subsequent metrics.
@@ -131,12 +109,17 @@ class MetricsCollector:
                     tokens_by_phase.get(query.phase, 0) + phase_tokens
                 )
 
-        # Calculate tool counts
+        # Calculate tool counts from messages in queries
         tool_counts: dict[str, int] = {}
-        for invocation in self._tool_invocations:
-            tool_counts[invocation.tool_name] = (
-                tool_counts.get(invocation.tool_name, 0) + 1
-            )
+        for query in self._queries:
+            for message in query.messages:
+                if message.get("role") == "assistant":
+                    content = message.get("content", [])
+                    if isinstance(content, list):
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "ToolUseBlock":
+                                tool_name = block.get("name", "unknown")
+                                tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
 
         # Calculate total runtime
         total_runtime_ms = 0
@@ -159,7 +142,6 @@ class MetricsCollector:
             prompt_count=prompt_count,
             turn_count=turn_count,
             tokens_by_phase=tokens_by_phase,
-            tool_invocations=list(self._tool_invocations),
             tool_counts=tool_counts,
             queries=list(self._queries),
         )
@@ -167,7 +149,6 @@ class MetricsCollector:
     def reset(self) -> None:
         """Clear all collected metrics."""
         self._queries.clear()
-        self._tool_invocations.clear()
         self._current_phase = None
         self._start_time_ms = None
         self._end_time_ms = None

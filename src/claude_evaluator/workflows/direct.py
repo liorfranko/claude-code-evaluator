@@ -64,11 +64,9 @@ class DirectWorkflow(BaseWorkflow):
             worker = evaluation.worker_agent
             worker.set_permission_mode(PermissionMode.acceptEdits)
 
-            # Add workspace context to help Claude use relative paths
-            workspace_path = worker.project_directory
+            # Instruct Claude to use the current directory (cwd is already set by SDK)
             prompt = (
-                f"Working directory: {workspace_path}\n"
-                f"Use relative paths for all file operations.\n\n"
+                "Create all files in the current directory using relative paths.\n\n"
                 f"{evaluation.task_description}"
             )
 
@@ -79,11 +77,8 @@ class DirectWorkflow(BaseWorkflow):
             )
 
             # Collect metrics from the execution
+            # Note: Tool invocations are now captured in query_metrics.messages
             self.metrics_collector.add_query_metrics(query_metrics)
-
-            # Add tool invocations to the collector
-            for invocation in worker.get_tool_invocations():
-                self.metrics_collector.add_tool_invocation(invocation)
 
             # Complete and return aggregated metrics
             return self.on_execution_complete(evaluation)

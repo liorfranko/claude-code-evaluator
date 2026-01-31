@@ -583,11 +583,11 @@ class TestAllowedToolsHandling:
         assert len(agent.allowed_tools) == 2
 
 
-class TestPreToolUseHook:
-    """Tests for the _on_pre_tool_use internal hook method."""
+class TestOnToolUse:
+    """Tests for the _on_tool_use internal method."""
 
-    def test_on_pre_tool_use_creates_invocation(self) -> None:
-        """Test that _on_pre_tool_use creates a ToolInvocation."""
+    def test_on_tool_use_creates_invocation(self) -> None:
+        """Test that _on_tool_use creates a ToolInvocation."""
         agent = WorkerAgent(
             execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
@@ -595,7 +595,7 @@ class TestPreToolUseHook:
             permission_mode=PermissionMode.plan,
         )
 
-        agent._on_pre_tool_use(
+        agent._on_tool_use(
             tool_name="Read",
             tool_use_id="test-id-123",
             tool_input={"file_path": "/tmp/test.txt"},
@@ -605,10 +605,11 @@ class TestPreToolUseHook:
         invocation = agent.tool_invocations[0]
         assert invocation.tool_name == "Read"
         assert invocation.tool_use_id == "test-id-123"
-        assert invocation.success is None  # Success is unknown until tool completes
+        assert invocation.tool_input == {"file_path": "/tmp/test.txt"}
+        assert invocation.success is None  # Success is unknown until tool result
 
-    def test_on_pre_tool_use_multiple_calls(self) -> None:
-        """Test multiple _on_pre_tool_use calls accumulate invocations."""
+    def test_on_tool_use_multiple_calls(self) -> None:
+        """Test multiple _on_tool_use calls accumulate invocations."""
         agent = WorkerAgent(
             execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
@@ -616,9 +617,9 @@ class TestPreToolUseHook:
             permission_mode=PermissionMode.plan,
         )
 
-        agent._on_pre_tool_use("Read", "id-1", {"path": "/file1.txt"})
-        agent._on_pre_tool_use("Bash", "id-2", {"command": "ls -la"})
-        agent._on_pre_tool_use("Edit", "id-3", {"file": "/file2.txt"})
+        agent._on_tool_use("Read", "id-1", {"path": "/file1.txt"})
+        agent._on_tool_use("Bash", "id-2", {"command": "ls -la"})
+        agent._on_tool_use("Edit", "id-3", {"file": "/file2.txt"})
 
         assert len(agent.tool_invocations) == 3
         assert agent.tool_invocations[0].tool_name == "Read"

@@ -175,11 +175,8 @@ class MultiCommandWorkflow(BaseWorkflow):
         )
 
         # Collect metrics from this phase
+        # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)
-
-        # Add tool invocations from this phase
-        for invocation in worker.get_tool_invocations():
-            self.metrics_collector.add_tool_invocation(invocation)
 
         # Clear tool invocations for the next phase (if not continuing session)
         if not phase.continue_session:

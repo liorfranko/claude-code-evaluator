@@ -240,6 +240,49 @@ class TestEvaluationStart:
 
         assert "current status is failed" in str(exc_info.value)
 
+    def test_start_with_custom_workspace_path(
+        self, evaluation: Evaluation, tmp_path: Path
+    ) -> None:
+        """Test that start() uses provided workspace path instead of creating temp."""
+        custom_workspace = tmp_path / "custom_workspace"
+        custom_workspace.mkdir()
+
+        evaluation.start(workspace_path=str(custom_workspace))
+
+        assert evaluation.workspace_path == str(custom_workspace)
+        assert evaluation.status == EvaluationStatus.running
+
+    def test_start_with_custom_workspace_does_not_cleanup(
+        self, evaluation: Evaluation, tmp_path: Path
+    ) -> None:
+        """Test that cleanup() does not delete externally-provided workspace."""
+        custom_workspace = tmp_path / "custom_workspace"
+        custom_workspace.mkdir()
+        # Create a file in the workspace
+        (custom_workspace / "test_file.txt").write_text("test content")
+
+        evaluation.start(workspace_path=str(custom_workspace))
+        evaluation.cleanup()
+
+        # Workspace should still exist (not cleaned up)
+        assert custom_workspace.exists()
+        assert (custom_workspace / "test_file.txt").exists()
+
+    def test_start_without_workspace_path_creates_temp_and_cleans_up(
+        self, evaluation: Evaluation
+    ) -> None:
+        """Test that start() without workspace creates temp dir that gets cleaned up."""
+        evaluation.start()
+
+        workspace = Path(evaluation.workspace_path)
+        assert workspace.exists()
+
+        evaluation.cleanup()
+
+        # Temp workspace should be cleaned up
+        assert not workspace.exists()
+        assert evaluation.workspace_path is None
+
 
 class TestEvaluationComplete:
     """Tests for the complete() method and running -> completed transition."""

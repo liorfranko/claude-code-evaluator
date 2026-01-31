@@ -4,8 +4,8 @@ This module defines the QueryMetrics dataclass which contains metrics
 for a single query/response exchange with Claude Code.
 """
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
 __all__ = ["QueryMetrics"]
 
@@ -26,7 +26,8 @@ class QueryMetrics:
         cost_usd: Cost for this query in USD.
         num_turns: Number of agentic turns in this query.
         phase: Workflow phase (planning, implementation, etc.).
-        response: The response received from Claude Code.
+        response: The final response text from Claude Code.
+        messages: Full conversation history with all message details.
     """
 
     query_index: int
@@ -38,3 +39,4 @@ class QueryMetrics:
     num_turns: int
     phase: Optional[str] = None
     response: Optional[str] = None
+    messages: list[dict[str, Any]] = field(default_factory=list)

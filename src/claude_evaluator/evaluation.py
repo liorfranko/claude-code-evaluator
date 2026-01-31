@@ -83,12 +83,17 @@ class Evaluation:
     workspace_path: Optional[str] = field(default=None)
     metrics: Optional[Metrics] = field(default=None)
     error: Optional[str] = field(default=None)
+    _owns_workspace: bool = field(default=True, repr=False)
 
-    def start(self) -> None:
+    def start(self, workspace_path: Optional[str] = None) -> None:
         """Start the evaluation, transitioning from pending to running.
 
-        Creates a temporary workspace directory and transitions the evaluation
-        status to running.
+        Creates a temporary workspace directory (or uses provided path) and
+        transitions the evaluation status to running.
+
+        Args:
+            workspace_path: Optional path to use as workspace. If not provided,
+                a temporary directory will be created.
 
         Raises:
             InvalidEvaluationStateError: If not in pending state.
@@ -99,8 +104,13 @@ class Evaluation:
                 "expected 'pending'"
             )
 
-        # Create temporary workspace directory
-        self.workspace_path = tempfile.mkdtemp(prefix=f"eval_{self.id[:8]}_")
+        # Use provided workspace path or create temporary directory
+        if workspace_path:
+            self.workspace_path = workspace_path
+            self._owns_workspace = False  # Don't cleanup externally-provided workspace
+        else:
+            self.workspace_path = tempfile.mkdtemp(prefix=f"eval_{self.id[:8]}_")
+            self._owns_workspace = True
         self.status = EvaluationStatus.running
         self.start_time = datetime.now()
 
@@ -158,8 +168,11 @@ class Evaluation:
 
         Cleanup failures are logged as warnings but don't raise exceptions,
         since cleanup is best-effort and shouldn't mask the original result.
+
+        Note: If a workspace path was provided externally (not created by start()),
+        it will NOT be deleted to preserve the evaluation output.
         """
-        if self.workspace_path is not None:
+        if self.workspace_path is not None and self._owns_workspace:
             workspace = Path(self.workspace_path)
             if workspace.exists():
                 try:

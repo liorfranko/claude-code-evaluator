@@ -26,11 +26,12 @@ class TestMetricsCollectorInitialization:
         assert metrics.input_tokens == 0
         assert metrics.output_tokens == 0
         assert metrics.total_cost_usd == 0.0
+        assert metrics.tool_counts == {}
+        assert len(metrics.queries) == 0
         assert metrics.prompt_count == 0
         assert metrics.turn_count == 0
         assert metrics.tokens_by_phase == {}
         assert metrics.tool_counts == {}
-        assert metrics.tool_invocations == []
         assert metrics.queries == []
 
     def test_init_no_current_phase(self) -> None:
@@ -190,143 +191,6 @@ class TestAddQueryMetrics:
 
         assert metrics.queries[0].phase == "planning"
         assert metrics.tokens_by_phase == {"planning": 150}
-
-
-class TestAddToolInvocation:
-    """Tests for adding tool invocations to the collector."""
-
-    def test_add_single_tool_invocation(self) -> None:
-        """Test adding a single tool invocation."""
-        collector = MetricsCollector()
-        invocation = ToolInvocation(
-            timestamp=datetime(2025, 1, 15, 10, 30, 0),
-            tool_name="Read",
-            tool_use_id="tool_123",
-            success=True,
-        )
-
-        collector.add_tool_invocation(invocation)
-        metrics = collector.get_metrics()
-
-        assert len(metrics.tool_invocations) == 1
-        assert metrics.tool_invocations[0].tool_name == "Read"
-        assert metrics.tool_counts == {"Read": 1}
-
-    def test_add_multiple_tool_invocations(self) -> None:
-        """Test adding multiple tool invocations."""
-        collector = MetricsCollector()
-
-        invocations = [
-            ToolInvocation(
-                timestamp=datetime(2025, 1, 15, 10, 30, 0),
-                tool_name="Read",
-                tool_use_id="tool_1",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime(2025, 1, 15, 10, 30, 1),
-                tool_name="Edit",
-                tool_use_id="tool_2",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime(2025, 1, 15, 10, 30, 2),
-                tool_name="Read",
-                tool_use_id="tool_3",
-                success=True,
-            ),
-        ]
-
-        for inv in invocations:
-            collector.add_tool_invocation(inv)
-
-        metrics = collector.get_metrics()
-
-        assert len(metrics.tool_invocations) == 3
-        assert metrics.tool_counts == {"Read": 2, "Edit": 1}
-
-    def test_add_tool_invocation_with_phase(self) -> None:
-        """Test adding a tool invocation that already has a phase set."""
-        collector = MetricsCollector()
-        invocation = ToolInvocation(
-            timestamp=datetime(2025, 1, 15, 10, 30, 0),
-            tool_name="Bash",
-            tool_use_id="tool_123",
-            success=True,
-            phase="testing",
-        )
-
-        collector.add_tool_invocation(invocation)
-        metrics = collector.get_metrics()
-
-        assert metrics.tool_invocations[0].phase == "testing"
-
-    def test_add_tool_invocation_inherits_current_phase(self) -> None:
-        """Test that tool invocation without phase inherits the collector's current phase."""
-        collector = MetricsCollector()
-        collector.set_phase("implementation")
-
-        invocation = ToolInvocation(
-            timestamp=datetime(2025, 1, 15, 10, 30, 0),
-            tool_name="Write",
-            tool_use_id="tool_123",
-            success=True,
-        )
-
-        collector.add_tool_invocation(invocation)
-        metrics = collector.get_metrics()
-
-        assert metrics.tool_invocations[0].phase == "implementation"
-
-    def test_add_tool_invocation_with_phase_not_overridden(self) -> None:
-        """Test that tool invocation with its own phase is not overridden."""
-        collector = MetricsCollector()
-        collector.set_phase("implementation")
-
-        invocation = ToolInvocation(
-            timestamp=datetime(2025, 1, 15, 10, 30, 0),
-            tool_name="Bash",
-            tool_use_id="tool_123",
-            success=True,
-            phase="testing",
-        )
-
-        collector.add_tool_invocation(invocation)
-        metrics = collector.get_metrics()
-
-        assert metrics.tool_invocations[0].phase == "testing"
-
-    def test_add_tool_invocation_with_input_summary(self) -> None:
-        """Test adding a tool invocation with input summary."""
-        collector = MetricsCollector()
-        invocation = ToolInvocation(
-            timestamp=datetime(2025, 1, 15, 10, 30, 0),
-            tool_name="Read",
-            tool_use_id="tool_123",
-            success=True,
-            input_summary="/path/to/file.py",
-        )
-
-        collector.add_tool_invocation(invocation)
-        metrics = collector.get_metrics()
-
-        assert metrics.tool_invocations[0].input_summary == "/path/to/file.py"
-
-    def test_add_failed_tool_invocation(self) -> None:
-        """Test adding a failed tool invocation."""
-        collector = MetricsCollector()
-        invocation = ToolInvocation(
-            timestamp=datetime(2025, 1, 15, 10, 30, 0),
-            tool_name="Bash",
-            tool_use_id="tool_123",
-            success=False,
-        )
-
-        collector.add_tool_invocation(invocation)
-        metrics = collector.get_metrics()
-
-        assert metrics.tool_invocations[0].success is False
-        assert metrics.tool_counts == {"Bash": 1}
 
 
 class TestPhaseTracking:
@@ -551,23 +415,13 @@ class TestGetMetricsAggregation:
         )
         collector.add_query_metrics(query)
 
-        invocation = ToolInvocation(
-            timestamp=datetime(2025, 1, 15, 10, 30, 0),
-            tool_name="Read",
-            tool_use_id="tool_1",
-            success=True,
-        )
-        collector.add_tool_invocation(invocation)
-
         metrics = collector.get_metrics()
 
         # Modifying returned lists should not affect collector
         metrics.queries.clear()
-        metrics.tool_invocations.clear()
 
         new_metrics = collector.get_metrics()
         assert len(new_metrics.queries) == 1
-        assert len(new_metrics.tool_invocations) == 1
 
 
 class TestReset:
@@ -596,23 +450,26 @@ class TestReset:
         assert metrics.prompt_count == 0
         assert metrics.total_tokens == 0
 
-    def test_reset_clears_tool_invocations(self) -> None:
-        """Test that reset clears all tool invocations."""
+    def test_reset_clears_queries(self) -> None:
+        """Test that reset clears all queries."""
         collector = MetricsCollector()
 
         for i in range(3):
-            invocation = ToolInvocation(
-                timestamp=datetime(2025, 1, 15, 10, 30, i),
-                tool_name="Read",
-                tool_use_id=f"tool_{i}",
-                success=True,
+            query = QueryMetrics(
+                query_index=i,
+                prompt=f"Query{i}",
+                duration_ms=100,
+                input_tokens=50,
+                output_tokens=100,
+                cost_usd=0.01,
+                num_turns=1,
             )
-            collector.add_tool_invocation(invocation)
+            collector.add_query_metrics(query)
 
         collector.reset()
         metrics = collector.get_metrics()
 
-        assert len(metrics.tool_invocations) == 0
+        assert len(metrics.queries) == 0
         assert metrics.tool_counts == {}
 
     def test_reset_clears_current_phase(self) -> None:
@@ -872,71 +729,38 @@ class TestToolCountsAggregation:
         metrics = collector.get_metrics()
         assert metrics.tool_counts == {}
 
-    def test_tool_counts_single_tool(self) -> None:
-        """Test tool_counts with a single tool type."""
+    def test_tool_counts_from_messages(self) -> None:
+        """Test tool_counts aggregated from query messages."""
         collector = MetricsCollector()
 
-        for i in range(5):
-            collector.add_tool_invocation(
-                ToolInvocation(
-                    timestamp=datetime(2025, 1, 15, 10, 30, i),
-                    tool_name="Read",
-                    tool_use_id=f"tool_{i}",
-                    success=True,
-                )
-            )
+        query = QueryMetrics(
+            query_index=1,
+            prompt="test",
+            duration_ms=1000,
+            input_tokens=100,
+            output_tokens=200,
+            cost_usd=0.01,
+            num_turns=1,
+            messages=[
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "ToolUseBlock", "id": "1", "name": "Read", "input": {}},
+                        {"type": "ToolUseBlock", "id": "2", "name": "Read", "input": {}},
+                        {"type": "ToolUseBlock", "id": "3", "name": "Edit", "input": {}},
+                        {"type": "ToolUseBlock", "id": "4", "name": "Bash", "input": {}},
+                        {"type": "ToolUseBlock", "id": "5", "name": "Read", "input": {}},
+                        {"type": "ToolUseBlock", "id": "6", "name": "Write", "input": {}},
+                        {"type": "ToolUseBlock", "id": "7", "name": "Bash", "input": {}},
+                    ],
+                },
+            ],
+        )
 
-        metrics = collector.get_metrics()
-        assert metrics.tool_counts == {"Read": 5}
-
-    def test_tool_counts_multiple_tools(self) -> None:
-        """Test tool_counts with multiple tool types."""
-        collector = MetricsCollector()
-
-        tools = ["Read", "Read", "Edit", "Bash", "Read", "Write", "Bash"]
-        for i, tool_name in enumerate(tools):
-            collector.add_tool_invocation(
-                ToolInvocation(
-                    timestamp=datetime(2025, 1, 15, 10, 30, i),
-                    tool_name=tool_name,
-                    tool_use_id=f"tool_{i}",
-                    success=True,
-                )
-            )
+        collector.add_query_metrics(query)
 
         metrics = collector.get_metrics()
         assert metrics.tool_counts == {"Read": 3, "Edit": 1, "Bash": 2, "Write": 1}
-
-    def test_tool_counts_includes_failed_invocations(self) -> None:
-        """Test that tool_counts includes both successful and failed invocations."""
-        collector = MetricsCollector()
-
-        invocations = [
-            ToolInvocation(
-                timestamp=datetime(2025, 1, 15, 10, 30, 0),
-                tool_name="Bash",
-                tool_use_id="tool_1",
-                success=True,
-            ),
-            ToolInvocation(
-                timestamp=datetime(2025, 1, 15, 10, 30, 1),
-                tool_name="Bash",
-                tool_use_id="tool_2",
-                success=False,
-            ),
-            ToolInvocation(
-                timestamp=datetime(2025, 1, 15, 10, 30, 2),
-                tool_name="Bash",
-                tool_use_id="tool_3",
-                success=True,
-            ),
-        ]
-
-        for inv in invocations:
-            collector.add_tool_invocation(inv)
-
-        metrics = collector.get_metrics()
-        assert metrics.tool_counts == {"Bash": 3}
 
 
 class TestSetStartEndTime:
