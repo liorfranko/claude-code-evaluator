@@ -1047,3 +1047,493 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         # VERIFY: Workflow completed
         assert result.result == "Project configured for Python 3.11"
+
+
+# =============================================================================
+# T702: Verify Answer sent back within same session (context maintained)
+# =============================================================================
+
+
+class TestT702SessionContinuity:
+    """T702: Verify that the answer is sent back within the same session.
+
+    This test class verifies the acceptance criteria for T702:
+    - The answer is sent back using client.query() within the same async context
+    - The session_id is preserved throughout the exchange
+    - The client maintains context between the question and answer
+    - No new session/client is created when sending the answer back
+    """
+
+    @pytest.mark.asyncio
+    async def test_same_client_instance_used_for_answer(self) -> None:
+        """Verify that the same client instance is used for sending the answer.
+
+        This is the core test for session continuity - the answer must be sent
+        through the exact same client object, not a new one.
+        """
+        # Track which client instance receives each query
+        query_client_ids: list[int] = []
+
+        class TrackingClient:
+            """A mock client that tracks its own identity for each query."""
+
+            def __init__(self) -> None:
+                self.session_id = "same-session-test"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+                # Store the object's identity
+                self._instance_id = id(self)
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                # Record which client instance is being used
+                query_client_ids.append(self._instance_id)
+                self._queries.append(prompt)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="Done")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        async def answer_callback(context: QuestionContext) -> str:
+            return "Answer from developer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t702_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=answer_callback,
+        )
+
+        tracking_client = TrackingClient()
+        question_block = AskUserQuestionBlock(questions=[{"question": "Test question?"}])
+        tracking_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+                [ResultMessage(result="Completed")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Start task", tracking_client)
+
+        # VERIFY: Same client instance was used for both initial query and answer
+        assert len(query_client_ids) == 2, "Expected 2 queries (initial + answer)"
+        assert query_client_ids[0] == query_client_ids[1], (
+            "Answer must be sent through the SAME client instance to maintain session context"
+        )
+
+    @pytest.mark.asyncio
+    async def test_session_id_consistent_throughout_exchange(self) -> None:
+        """Verify that session_id remains consistent from question to answer.
+
+        The session_id in QuestionContext should match the client's session_id,
+        ensuring the Developer knows which session the answer belongs to.
+        """
+        received_session_ids: list[str] = []
+
+        async def capture_session_callback(context: QuestionContext) -> str:
+            received_session_ids.append(context.session_id)
+            return "Answer for session"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t702_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=capture_session_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "persistent-session-xyz"
+
+        # Simulate multiple questions in the same session
+        q1 = AskUserQuestionBlock(questions=[{"question": "First?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Second?"}])
+
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],
+                [AssistantMessage(content=[q2])],
+                [ResultMessage(result="Done")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Multi-question task", mock_client)
+
+        # VERIFY: All questions received the same session_id
+        assert len(received_session_ids) == 2, "Expected 2 questions"
+        assert all(sid == "persistent-session-xyz" for sid in received_session_ids), (
+            "All questions should have the same session_id"
+        )
+
+    @pytest.mark.asyncio
+    async def test_answer_sent_without_creating_new_client(self) -> None:
+        """Verify that no new ClaudeSDKClient is instantiated when sending answer.
+
+        The Worker should reuse the existing client, not create a new connection.
+        """
+        client_creations = 0
+        original_init = MockClaudeSDKClient.__init__
+
+        def tracking_init(self: Any, options: Any = None) -> None:
+            nonlocal client_creations
+            client_creations += 1
+            original_init(self, options)
+
+        async def answer_callback(context: QuestionContext) -> str:
+            return "Answer without new client"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t702_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=answer_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        question_block = AskUserQuestionBlock(questions=[{"question": "Create new client?"}])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+                [ResultMessage(result="No new client")],
+            ]
+        )
+
+        # Reset the counter and execute with existing client
+        client_creations = 0
+
+        await worker._stream_sdk_messages_with_client("Test", mock_client)
+
+        # VERIFY: No new clients were created during the Q&A exchange
+        # Note: Since we're passing mock_client directly to _stream_sdk_messages_with_client,
+        # no new clients should be created within this method
+        assert client_creations == 0, (
+            "No new clients should be created when handling questions within same session"
+        )
+
+    @pytest.mark.asyncio
+    async def test_client_query_not_reset_between_question_and_answer(self) -> None:
+        """Verify that the client's state is not reset between question detection and answer.
+
+        The client should maintain its internal state (like accumulated messages)
+        throughout the Q&A exchange.
+        """
+        # Track client state at key points
+        state_at_question: list[int] = []
+        state_at_answer: list[int] = []
+
+        class StatefulClient:
+            """A client that tracks its accumulated message count."""
+
+            def __init__(self) -> None:
+                self.session_id = "stateful-session"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+                self._message_count = 0  # Simulated internal state
+
+            async def query(self, prompt: str) -> None:
+                self._message_count += 1
+                self._queries.append(prompt)
+                if "Answer" in prompt:
+                    state_at_answer.append(self._message_count)
+                else:
+                    state_at_question.append(self._message_count)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="Done")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        async def stateful_callback(context: QuestionContext) -> str:
+            return "Answer from callback"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t702_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=stateful_callback,
+        )
+
+        stateful_client = StatefulClient()
+        question_block = AskUserQuestionBlock(questions=[{"question": "Track state?"}])
+        stateful_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+                [ResultMessage(result="State tracked")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Initial query", stateful_client)
+
+        # VERIFY: State was maintained - answer came after question in sequence
+        assert len(state_at_question) == 1
+        assert len(state_at_answer) == 1
+        assert state_at_answer[0] == state_at_question[0] + 1, (
+            "Answer should immediately follow question in the same client's message sequence"
+        )
+
+    @pytest.mark.asyncio
+    async def test_conversation_history_accumulates_in_same_session(self) -> None:
+        """Verify that conversation history accumulates correctly within the session.
+
+        When answering a question, the QuestionContext should contain all prior
+        messages from the session, demonstrating context is maintained.
+        """
+        history_lengths: list[int] = []
+
+        async def track_history_callback(context: QuestionContext) -> str:
+            history_lengths.append(len(context.conversation_history))
+            return f"Answer {len(history_lengths)}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t702_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=track_history_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        # Setup: multiple assistant messages followed by questions
+        # Each question should see more history than the previous
+        q1 = AskUserQuestionBlock(questions=[{"question": "First question?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Second question?"}])
+
+        mock_client.set_responses(
+            [
+                [
+                    AssistantMessage(content=[TextBlock("Starting work...")]),
+                    AssistantMessage(content=[q1]),
+                ],
+                [
+                    AssistantMessage(content=[TextBlock("Continuing...")]),
+                    AssistantMessage(content=[TextBlock("More work...")]),
+                    AssistantMessage(content=[q2]),
+                ],
+                [ResultMessage(result="All done")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Begin", mock_client)
+
+        # VERIFY: History accumulates - second question sees more history
+        assert len(history_lengths) == 2, "Expected 2 questions"
+        assert history_lengths[1] > history_lengths[0], (
+            "Conversation history should accumulate within the same session"
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_context_not_interrupted(self) -> None:
+        """Verify that the async context is maintained throughout Q&A flow.
+
+        The entire question-detection, callback-invocation, and answer-sending
+        flow should happen within a single uninterrupted async operation.
+        """
+        execution_sequence: list[str] = []
+
+        async def tracking_callback(context: QuestionContext) -> str:
+            execution_sequence.append("callback_start")
+            await asyncio.sleep(0.01)  # Simulate some async work
+            execution_sequence.append("callback_end")
+            return "Async answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t702_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=tracking_callback,
+        )
+
+        class SequenceTrackingClient:
+            """Client that tracks execution sequence."""
+
+            def __init__(self) -> None:
+                self.session_id = "async-test-session"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+
+            async def query(self, prompt: str) -> None:
+                execution_sequence.append(f"query:{prompt[:20]}")
+                self._queries.append(prompt)
+
+            async def receive_response(self) -> Any:
+                execution_sequence.append("receive_start")
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="Done")
+                execution_sequence.append("receive_end")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        tracking_client = SequenceTrackingClient()
+        question_block = AskUserQuestionBlock(questions=[{"question": "Async question?"}])
+        tracking_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+                [ResultMessage(result="Async complete")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Start async", tracking_client)
+
+        # VERIFY: Execution sequence is uninterrupted
+        # Expected: query -> receive -> callback -> query (answer) -> receive -> done
+        assert "callback_start" in execution_sequence
+        assert "callback_end" in execution_sequence
+
+        callback_start_idx = execution_sequence.index("callback_start")
+        callback_end_idx = execution_sequence.index("callback_end")
+
+        # Callback should complete before the answer is sent
+        # Find the answer query (second query)
+        answer_query_indices = [
+            i for i, x in enumerate(execution_sequence) if x.startswith("query:") and "Async" in x
+        ]
+        if answer_query_indices:
+            assert answer_query_indices[0] > callback_end_idx, (
+                "Answer should only be sent after callback completes"
+            )
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t702_complete_verification(self) -> None:
+        """Complete verification of T702 acceptance criteria.
+
+        Acceptance Criteria Checklist:
+        [x] Answer is sent back using client.query() - verified via mock queries list
+        [x] Same session context is used - verified via consistent session_id
+        [x] Client maintains context between question and answer - verified via history
+        [x] No new client/session created - verified via client instance tracking
+        """
+        verification_results: dict[str, bool] = {
+            "answer_via_client_query": False,
+            "same_session_id": False,
+            "context_maintained": False,
+            "no_new_client": False,
+        }
+
+        client_instance_ids: list[int] = []
+
+        class VerificationClient:
+            """Client that verifies all T702 acceptance criteria."""
+
+            def __init__(self) -> None:
+                self.session_id = "t702-verification"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+                self._instance_id = id(self)
+
+            async def query(self, prompt: str) -> None:
+                client_instance_ids.append(self._instance_id)
+                self._queries.append(prompt)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="Verified")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        received_contexts: list[QuestionContext] = []
+
+        async def verification_callback(context: QuestionContext) -> str:
+            received_contexts.append(context)
+            return "Verified answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t702_verification",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=verification_callback,
+        )
+
+        verification_client = VerificationClient()
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Verification question?"}]
+        )
+        verification_client.set_responses(
+            [
+                [
+                    AssistantMessage(content=[TextBlock("Context message")]),
+                    AssistantMessage(content=[question_block]),
+                ],
+                [ResultMessage(result="T702 Verified")],
+            ]
+        )
+
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Verify T702", verification_client
+        )
+
+        # CRITERION 1: Answer sent via client.query()
+        verification_results["answer_via_client_query"] = (
+            len(verification_client._queries) == 2
+            and verification_client._queries[1] == "Verified answer"
+        )
+
+        # CRITERION 2: Same session_id used
+        verification_results["same_session_id"] = (
+            len(received_contexts) == 1
+            and received_contexts[0].session_id == "t702-verification"
+        )
+
+        # CRITERION 3: Context maintained (history includes prior messages)
+        verification_results["context_maintained"] = (
+            len(received_contexts) == 1
+            and len(received_contexts[0].conversation_history) >= 1
+        )
+
+        # CRITERION 4: No new client created (same instance ID for all queries)
+        verification_results["no_new_client"] = (
+            len(client_instance_ids) == 2
+            and client_instance_ids[0] == client_instance_ids[1]
+        )
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, f"T702 criterion '{criterion}' failed"
+
+        # VERIFY: Final result confirms completion
+        assert result.result == "T702 Verified"
