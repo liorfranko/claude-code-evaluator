@@ -19,7 +19,7 @@ from claude_evaluator.models.enums import (
     ExecutionMode,
     PermissionMode,
 )
-from claude_evaluator.models.question import QuestionContext, QuestionItem
+from claude_evaluator.models.question import QuestionContext, QuestionItem, QuestionOption
 
 
 # =============================================================================
@@ -636,3 +636,414 @@ class TestT700AcceptanceCriteriaVerification:
 
         # 7. Worker continued execution and completed
         assert result.result == "Successfully configured pytest"
+
+
+# =============================================================================
+# T701: Verify Developer uses LLM to formulate contextually appropriate answer
+# =============================================================================
+
+
+class TestT701DeveloperLLMAnswerGeneration:
+    """T701: Verify that Developer uses LLM to formulate contextually appropriate answer.
+
+    This test class verifies the acceptance criteria for T701:
+    - Developer uses the developer_qa_model when specified
+    - Developer builds a prompt with question context and conversation history
+    - Developer calls query() to generate an LLM-powered answer
+    - Developer returns an AnswerResult with the generated answer
+    """
+
+    @pytest.mark.asyncio
+    async def test_developer_uses_specified_qa_model(self) -> None:
+        """Verify Developer uses the specified developer_qa_model.
+
+        Acceptance Criteria:
+        - When developer_qa_model is specified, it is used for answer generation
+        - The model_used field in AnswerResult reflects the specified model
+        """
+        from claude_evaluator.models.answer import AnswerResult
+
+        # Create Developer with custom model
+        developer = DeveloperAgent(
+            developer_qa_model="claude-sonnet-4-5@20251001",
+            context_window_size=5,
+            max_answer_retries=1,
+        )
+
+        # Track which model was used
+        used_model: list[str] = []
+
+        async def capture_model_call(prompt: str, model: str) -> str:
+            used_model.append(model)
+            return "LLM-generated contextual answer"
+
+        question_context = QuestionContext(
+            questions=[QuestionItem(question="Which approach is best?")],
+            conversation_history=[
+                {"role": "user", "content": "Build a REST API"},
+                {"role": "assistant", "content": "I'll help build the API."},
+            ],
+            session_id="t701-model-test",
+            attempt_number=1,
+        )
+
+        with patch("claude_evaluator.agents.developer.sdk_query", capture_model_call):
+            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+                developer.transition_to(DeveloperState.prompting)
+                developer.transition_to(DeveloperState.awaiting_response)
+
+                result = await developer.answer_question(question_context)
+
+                # VERIFY: Specified model was used
+                assert len(used_model) == 1
+                assert used_model[0] == "claude-sonnet-4-5@20251001"
+                assert result.model_used == "claude-sonnet-4-5@20251001"
+
+    @pytest.mark.asyncio
+    async def test_developer_builds_prompt_with_context(self) -> None:
+        """Verify Developer builds a prompt with question context and conversation history.
+
+        Acceptance Criteria:
+        - The prompt sent to the LLM includes the question text
+        - The prompt includes conversation history for context
+        - Options are included in the prompt when present
+        """
+        captured_prompts: list[str] = []
+
+        async def capture_prompt(prompt: str, model: str) -> str:
+            captured_prompts.append(prompt)
+            return "Answer based on full context"
+
+        developer = DeveloperAgent(
+            context_window_size=10,
+        )
+
+        question_context = QuestionContext(
+            questions=[
+                QuestionItem(
+                    question="Should I use PostgreSQL or MongoDB?",
+                    options=[
+                        QuestionOption(label="PostgreSQL", description="Relational database"),
+                        QuestionOption(label="MongoDB", description="Document database"),
+                    ],
+                    header="Database Selection",
+                )
+            ],
+            conversation_history=[
+                {"role": "user", "content": "Create a user management system"},
+                {"role": "assistant", "content": "I'll set up user management with authentication."},
+                {"role": "user", "content": "We need to support complex queries"},
+            ],
+            session_id="t701-context-test",
+            attempt_number=1,
+        )
+
+        with patch("claude_evaluator.agents.developer.sdk_query", capture_prompt):
+            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+                developer.transition_to(DeveloperState.prompting)
+                developer.transition_to(DeveloperState.awaiting_response)
+
+                await developer.answer_question(question_context)
+
+                # VERIFY: Prompt was captured
+                assert len(captured_prompts) == 1
+                prompt = captured_prompts[0]
+
+                # VERIFY: Question is in the prompt
+                assert "Should I use PostgreSQL or MongoDB?" in prompt
+
+                # VERIFY: Options are in the prompt
+                assert "PostgreSQL" in prompt
+                assert "MongoDB" in prompt
+                assert "Relational database" in prompt
+                assert "Document database" in prompt
+
+                # VERIFY: Conversation history is in the prompt
+                assert "user management" in prompt.lower()
+                assert "complex queries" in prompt.lower()
+
+                # VERIFY: Header is in the prompt
+                assert "Database Selection" in prompt
+
+    @pytest.mark.asyncio
+    async def test_developer_calls_query_for_llm_answer(self) -> None:
+        """Verify Developer calls query() to generate an LLM-powered answer.
+
+        Acceptance Criteria:
+        - sdk_query is called with the constructed prompt
+        - sdk_query is called with the appropriate model
+        - The call is awaited properly (async)
+        """
+        query_called = False
+        query_kwargs: dict[str, Any] = {}
+
+        async def track_query_call(prompt: str, model: str) -> str:
+            nonlocal query_called, query_kwargs
+            query_called = True
+            query_kwargs = {"prompt": prompt, "model": model}
+            return "Generated LLM answer"
+
+        developer = DeveloperAgent()
+
+        question_context = QuestionContext(
+            questions=[QuestionItem(question="Test question?")],
+            conversation_history=[],
+            session_id="t701-query-test",
+            attempt_number=1,
+        )
+
+        with patch("claude_evaluator.agents.developer.sdk_query", track_query_call):
+            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+                developer.transition_to(DeveloperState.prompting)
+                developer.transition_to(DeveloperState.awaiting_response)
+
+                await developer.answer_question(question_context)
+
+                # VERIFY: query was called
+                assert query_called is True
+
+                # VERIFY: query received a prompt string
+                assert "prompt" in query_kwargs
+                assert isinstance(query_kwargs["prompt"], str)
+                assert len(query_kwargs["prompt"]) > 0
+
+                # VERIFY: query received a model
+                assert "model" in query_kwargs
+                assert query_kwargs["model"] == "claude-haiku-4-5@20251001"  # DEFAULT_QA_MODEL
+
+    @pytest.mark.asyncio
+    async def test_developer_returns_answer_result_with_answer(self) -> None:
+        """Verify Developer returns an AnswerResult with the generated answer.
+
+        Acceptance Criteria:
+        - AnswerResult.answer contains the LLM-generated text
+        - AnswerResult.model_used reflects the model used
+        - AnswerResult.context_size reflects the context provided
+        - AnswerResult.generation_time_ms is recorded
+        - AnswerResult.attempt_number matches the request
+        """
+        from claude_evaluator.models.answer import AnswerResult
+
+        llm_answer = "Based on the context, I recommend using FastAPI for its async support and automatic API documentation."
+
+        async def return_answer(prompt: str, model: str) -> str:
+            return llm_answer
+
+        developer = DeveloperAgent(
+            developer_qa_model="custom-model-123",
+            context_window_size=10,
+        )
+
+        question_context = QuestionContext(
+            questions=[QuestionItem(question="Which web framework?")],
+            conversation_history=[
+                {"role": "user", "content": "Message 1"},
+                {"role": "assistant", "content": "Message 2"},
+                {"role": "user", "content": "Message 3"},
+            ],
+            session_id="t701-result-test",
+            attempt_number=1,
+        )
+
+        with patch("claude_evaluator.agents.developer.sdk_query", return_answer):
+            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+                developer.transition_to(DeveloperState.prompting)
+                developer.transition_to(DeveloperState.awaiting_response)
+
+                result = await developer.answer_question(question_context)
+
+                # VERIFY: Result is AnswerResult
+                assert isinstance(result, AnswerResult)
+
+                # VERIFY: Answer contains LLM response
+                assert result.answer == llm_answer
+                assert "FastAPI" in result.answer
+                assert "async support" in result.answer
+
+                # VERIFY: Model used is recorded
+                assert result.model_used == "custom-model-123"
+
+                # VERIFY: Context size is recorded
+                assert result.context_size == 3  # 3 messages in history
+
+                # VERIFY: Generation time is recorded
+                assert result.generation_time_ms >= 0
+
+                # VERIFY: Attempt number matches
+                assert result.attempt_number == 1
+
+    @pytest.mark.asyncio
+    async def test_developer_contextual_answer_uses_conversation_history(self) -> None:
+        """Verify Developer formulates contextually appropriate answers.
+
+        This test verifies that the Developer properly uses conversation history
+        to provide contextually relevant answers, not just generic responses.
+
+        Acceptance Criteria:
+        - Developer includes recent conversation in the prompt
+        - The prompt structure allows the LLM to understand the context
+        - Different contexts would lead to different prompts being sent
+        """
+        prompts_by_context: dict[str, str] = {}
+
+        async def capture_contextual_prompt(prompt: str, model: str) -> str:
+            # Determine context from prompt content
+            if "machine learning" in prompt.lower():
+                prompts_by_context["ml"] = prompt
+                return "Use scikit-learn for ML"
+            elif "web scraping" in prompt.lower():
+                prompts_by_context["scraping"] = prompt
+                return "Use BeautifulSoup for scraping"
+            else:
+                prompts_by_context["unknown"] = prompt
+                return "Generic answer"
+
+        developer = DeveloperAgent(context_window_size=10)
+
+        # Context 1: Machine Learning project
+        ml_context = QuestionContext(
+            questions=[QuestionItem(question="Which library should I use?")],
+            conversation_history=[
+                {"role": "user", "content": "I'm building a machine learning model"},
+                {"role": "assistant", "content": "I'll help with the ML implementation."},
+            ],
+            session_id="ml-session",
+            attempt_number=1,
+        )
+
+        # Context 2: Web scraping project
+        scraping_context = QuestionContext(
+            questions=[QuestionItem(question="Which library should I use?")],
+            conversation_history=[
+                {"role": "user", "content": "I need to do web scraping"},
+                {"role": "assistant", "content": "I'll set up the scraper."},
+            ],
+            session_id="scraping-session",
+            attempt_number=1,
+        )
+
+        with patch("claude_evaluator.agents.developer.sdk_query", capture_contextual_prompt):
+            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+                # Test ML context
+                developer.reset()
+                developer.transition_to(DeveloperState.prompting)
+                developer.transition_to(DeveloperState.awaiting_response)
+                ml_result = await developer.answer_question(ml_context)
+
+                # Test scraping context
+                developer.reset()
+                developer.transition_to(DeveloperState.prompting)
+                developer.transition_to(DeveloperState.awaiting_response)
+                scraping_result = await developer.answer_question(scraping_context)
+
+                # VERIFY: Different contexts produced different prompts
+                assert "ml" in prompts_by_context
+                assert "scraping" in prompts_by_context
+
+                # VERIFY: ML context included ML conversation
+                assert "machine learning" in prompts_by_context["ml"].lower()
+
+                # VERIFY: Scraping context included scraping conversation
+                assert "web scraping" in prompts_by_context["scraping"].lower()
+
+                # VERIFY: Answers reflect the context
+                assert "scikit-learn" in ml_result.answer
+                assert "BeautifulSoup" in scraping_result.answer
+
+    @pytest.mark.asyncio
+    async def test_developer_llm_answer_e2e_integration(self) -> None:
+        """End-to-end integration test for T701 acceptance criteria.
+
+        This test verifies the complete flow:
+        1. Worker sends question to Developer via callback
+        2. Developer uses LLM (mocked) to formulate answer
+        3. Answer is contextually appropriate
+        4. Answer flows back to Worker
+        """
+        # Track the full flow
+        flow_events: list[str] = []
+
+        developer = DeveloperAgent(
+            developer_qa_model="test-model-t701",
+            context_window_size=10,
+        )
+
+        # Mock LLM that logs and responds
+        async def mock_llm_call(prompt: str, model: str) -> str:
+            flow_events.append(f"LLM called with model {model}")
+            # Formulate contextual response based on prompt
+            if "python version" in prompt.lower():
+                return "I recommend Python 3.11 for its improved performance and new features."
+            return "Generic answer"
+
+        async def developer_callback(context: QuestionContext) -> str:
+            flow_events.append("Developer callback invoked")
+            with patch("claude_evaluator.agents.developer.sdk_query", mock_llm_call):
+                with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+                    # Need to transition Developer to the right state
+                    if developer.current_state == DeveloperState.initializing:
+                        developer.transition_to(DeveloperState.prompting)
+                        developer.transition_to(DeveloperState.awaiting_response)
+                    result = await developer.answer_question(context)
+                    flow_events.append(f"Developer generated answer: {result.answer[:50]}...")
+                    return result.answer
+
+        # Create Worker with Developer callback
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t701_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=developer_callback,
+        )
+
+        # Mock SDK client
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "t701-e2e-session"
+
+        # Setup question about Python version
+        question_block = AskUserQuestionBlock(
+            questions=[
+                {
+                    "question": "Which Python version should I target?",
+                    "options": [
+                        {"label": "Python 3.10"},
+                        {"label": "Python 3.11"},
+                        {"label": "Python 3.12"},
+                    ],
+                }
+            ]
+        )
+
+        mock_client.set_responses(
+            [
+                [
+                    AssistantMessage(content=[TextBlock("Setting up the project...")]),
+                    AssistantMessage(content=[question_block]),
+                ],
+                [ResultMessage(result="Project configured for Python 3.11")],
+            ]
+        )
+
+        flow_events.append("Starting Worker execution")
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Create a new Python project", mock_client
+        )
+        flow_events.append("Worker execution completed")
+
+        # VERIFY: Complete flow occurred
+        assert "Starting Worker execution" in flow_events
+        assert "Developer callback invoked" in flow_events
+        assert any("LLM called with model test-model-t701" in e for e in flow_events)
+        assert any("Developer generated answer" in e for e in flow_events)
+        assert "Worker execution completed" in flow_events
+
+        # VERIFY: Answer was contextually appropriate
+        assert any("Python 3.11" in e for e in flow_events)
+
+        # VERIFY: Answer reached Worker
+        assert len(mock_client._queries) >= 2
+        assert any("Python 3.11" in q for q in mock_client._queries)
+
+        # VERIFY: Workflow completed
+        assert result.result == "Project configured for Python 3.11"
