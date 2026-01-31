@@ -27,6 +27,11 @@ _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
     DeveloperState.awaiting_response: {
         DeveloperState.reviewing_plan,
         DeveloperState.evaluating_completion,
+        DeveloperState.answering_question,
+        DeveloperState.failed,
+    },
+    DeveloperState.answering_question: {
+        DeveloperState.awaiting_response,
         DeveloperState.failed,
     },
     DeveloperState.reviewing_plan: {

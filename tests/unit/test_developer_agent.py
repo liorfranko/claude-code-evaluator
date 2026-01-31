@@ -450,8 +450,9 @@ class TestGetValidTransitions:
 
         assert DeveloperState.reviewing_plan in valid
         assert DeveloperState.evaluating_completion in valid
+        assert DeveloperState.answering_question in valid
         assert DeveloperState.failed in valid
-        assert len(valid) == 3
+        assert len(valid) == 4
 
     def test_valid_transitions_from_completed(self) -> None:
         """Test no valid transitions from completed state."""
