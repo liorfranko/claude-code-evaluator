@@ -60,7 +60,7 @@ Create new data model classes needed by multiple user stories.
 
 - [x] T110 [P] Write unit tests for QuestionContext, QuestionItem, QuestionOption (tests/unit/models/test_question.py)
 - [x] T111 [P] Write unit tests for AnswerResult (tests/unit/models/test_answer.py)
-- [ ] T112 Write unit tests for DeveloperState.answering_question transitions
+- [x] T112 Write unit tests for DeveloperState.answering_question transitions
 
 - [ ] T113 CHECKPOINT: Verify all foundation data models pass tests
 
