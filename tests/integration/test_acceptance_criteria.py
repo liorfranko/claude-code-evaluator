@@ -3431,3 +3431,467 @@ class TestT705WorkerRemembersPreviousMessages:
         # VERIFY: All criteria pass
         for criterion, passed in verification_results.items():
             assert passed, f"T705 criterion '{criterion}' failed"
+
+
+# =============================================================================
+# T706: Verify Client connection established at evaluation start
+# =============================================================================
+
+
+class TestT706ClientConnectionEstablishedAtEvaluationStart:
+    """T706: Verify that ClaudeSDKClient connection is established at evaluation start.
+
+    This test class verifies the acceptance criteria for T706 (US-003):
+    - The ClaudeSDKClient is instantiated when an evaluation starts
+    - The async context manager pattern is used correctly (connect/disconnect)
+    - The connection is properly established before any queries are sent
+
+    This is about CLIENT LIFECYCLE - verifying the connection is established
+    at the right time (start of evaluation).
+    """
+
+    @pytest.mark.asyncio
+    async def test_client_created_at_evaluation_start(self) -> None:
+        """Verify that ClaudeSDKClient is created when execute_query is called.
+
+        When a new evaluation starts (execute_query with resume_session=False),
+        a new ClaudeSDKClient should be created.
+        """
+        # Track client creation
+        clients_created: list[Any] = []
+        original_client_class = None
+
+        # Create a tracking mock for ClaudeSDKClient
+        class TrackingClaudeSDKClient:
+            """Track when ClaudeSDKClient instances are created."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "tracking-session"
+                self._connected = False
+                clients_created.append(self)
+
+            async def connect(self) -> None:
+                self._connected = True
+
+            async def disconnect(self) -> None:
+                self._connected = False
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Tracked completion")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        # Patch the SDK client class
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", TrackingClaudeSDKClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Execute query - this should create a new client
+                await worker.execute_query("Test client creation")
+
+        # VERIFY: A client was created at evaluation start
+        assert len(clients_created) == 1, (
+            f"Expected exactly 1 client to be created, got {len(clients_created)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_connect_called_before_any_queries(self) -> None:
+        """Verify that connect() is called before any queries are sent.
+
+        The sequence should be:
+        1. Create ClaudeSDKClient
+        2. Call connect()
+        3. Only then call query()
+        """
+        call_sequence: list[str] = []
+
+        class SequenceTrackingClient:
+            """Track the sequence of method calls."""
+
+            def __init__(self, options: Any = None) -> None:
+                call_sequence.append("__init__")
+                self.options = options
+                self.session_id = "sequence-session"
+
+            async def connect(self) -> None:
+                call_sequence.append("connect")
+
+            async def disconnect(self) -> None:
+                call_sequence.append("disconnect")
+
+            async def query(self, prompt: str) -> None:
+                call_sequence.append(f"query:{prompt[:20]}")
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Sequence test done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", SequenceTrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                await worker.execute_query("Sequence test query")
+
+        # VERIFY: Correct sequence
+        assert len(call_sequence) >= 3, f"Expected at least 3 calls, got {call_sequence}"
+
+        # VERIFY: __init__ comes first
+        assert call_sequence[0] == "__init__", (
+            f"Expected __init__ first, got sequence: {call_sequence}"
+        )
+
+        # VERIFY: connect comes before any query
+        connect_index = call_sequence.index("connect")
+        query_indices = [i for i, c in enumerate(call_sequence) if c.startswith("query:")]
+
+        assert len(query_indices) > 0, "Expected at least one query call"
+        assert all(connect_index < qi for qi in query_indices), (
+            f"connect must come before all queries. Sequence: {call_sequence}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_client_stored_after_connection(self) -> None:
+        """Verify that the client is stored in _client after successful connection.
+
+        After connect() succeeds, the worker._client should reference the client.
+        """
+        class StorageTestClient:
+            """Client for testing storage."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "storage-test-session"
+                self.unique_id = "unique-client-12345"
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Storage test done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        # Before evaluation, no client should exist
+        assert worker._client is None, "Client should be None before evaluation"
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", StorageTestClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                await worker.execute_query("Storage test query")
+
+        # VERIFY: After evaluation, client is stored
+        assert worker._client is not None, "Client should be stored after evaluation"
+        assert worker._client.unique_id == "unique-client-12345", (
+            "Stored client should be the one we created"
+        )
+
+    @pytest.mark.asyncio
+    async def test_connection_established_before_streaming_starts(self) -> None:
+        """Verify that connection is fully established before streaming begins.
+
+        The streaming phase (_stream_sdk_messages_with_client) should only
+        start after connect() has completed.
+        """
+        connection_state_at_stream_start: list[bool] = []
+
+        class ConnectionStateClient:
+            """Track connection state at streaming start."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "conn-state-session"
+                self._connected = False
+
+            async def connect(self) -> None:
+                self._connected = True
+
+            async def disconnect(self) -> None:
+                self._connected = False
+
+            async def query(self, prompt: str) -> None:
+                # This is called at the start of streaming
+                connection_state_at_stream_start.append(self._connected)
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Connection state test done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ConnectionStateClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                await worker.execute_query("Connection state test")
+
+        # VERIFY: When streaming started (query called), connection was already established
+        assert len(connection_state_at_stream_start) > 0, (
+            "Expected at least one query call"
+        )
+        assert all(connection_state_at_stream_start), (
+            f"Connection should be True when streaming starts, got: {connection_state_at_stream_start}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_new_client_created_for_new_evaluation(self) -> None:
+        """Verify that each new evaluation (resume_session=False) creates a new client.
+
+        When resume_session is False, the old client should be cleaned up
+        and a new one created.
+        """
+        clients_created: list[str] = []
+        creation_counter = [0]
+
+        class CountingClient:
+            """Count client creations."""
+
+            def __init__(self, options: Any = None) -> None:
+                creation_counter[0] += 1
+                self.client_number = creation_counter[0]
+                self.options = options
+                self.session_id = f"counting-session-{self.client_number}"
+                clients_created.append(self.session_id)
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"Client {self.client_number} done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", CountingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # First evaluation
+                await worker.execute_query("First evaluation", resume_session=False)
+
+                # Second evaluation (not resuming)
+                await worker.execute_query("Second evaluation", resume_session=False)
+
+                # Third evaluation (not resuming)
+                await worker.execute_query("Third evaluation", resume_session=False)
+
+        # VERIFY: A new client was created for each evaluation
+        assert len(clients_created) == 3, (
+            f"Expected 3 clients for 3 evaluations, got {len(clients_created)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_client_reused_when_resuming_session(self) -> None:
+        """Verify that client is reused when resume_session=True.
+
+        When resume_session is True and a client exists, no new client
+        should be created - the existing one should be reused.
+        """
+        clients_created: list[str] = []
+        creation_counter = [0]
+
+        class ReuseTrackingClient:
+            """Track client reuse."""
+
+            def __init__(self, options: Any = None) -> None:
+                creation_counter[0] += 1
+                self.client_number = creation_counter[0]
+                self.options = options
+                self.session_id = f"reuse-session-{self.client_number}"
+                clients_created.append(self.session_id)
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"Client {self.client_number} response")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ReuseTrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # First query creates a client
+                await worker.execute_query("First query", resume_session=False)
+
+                # Second query reuses client
+                await worker.execute_query("Second query (resume)", resume_session=True)
+
+                # Third query reuses client
+                await worker.execute_query("Third query (resume)", resume_session=True)
+
+        # VERIFY: Only one client was created (for first query)
+        assert len(clients_created) == 1, (
+            f"Expected 1 client (reused), got {len(clients_created)}: {clients_created}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_client_connection_failure_handled_properly(self) -> None:
+        """Verify that connection failures are handled properly.
+
+        If connect() raises an exception, the client should not be stored
+        and the exception should propagate.
+        """
+        connection_attempts: list[str] = []
+
+        class FailingConnectClient:
+            """Client that fails to connect."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "failing-session"
+
+            async def connect(self) -> None:
+                connection_attempts.append("connect_called")
+                raise ConnectionError("Simulated connection failure")
+
+            async def disconnect(self) -> None:
+                connection_attempts.append("disconnect_called")
+
+            async def query(self, prompt: str) -> None:
+                connection_attempts.append("query_called")
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Should not reach here")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailingConnectClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                with pytest.raises(ConnectionError, match="Simulated connection failure"):
+                    await worker.execute_query("Should fail to connect")
+
+        # VERIFY: Connect was called but query was not (connection failed first)
+        assert "connect_called" in connection_attempts, "connect() should be called"
+        assert "query_called" not in connection_attempts, (
+            "query() should not be called if connect() fails"
+        )
+
+        # VERIFY: Client was not stored after connection failure
+        assert worker._client is None, (
+            "Client should not be stored after connection failure"
+        )
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t706_complete_verification(self) -> None:
+        """Complete verification of T706 acceptance criteria.
+
+        Acceptance Criteria Checklist (US-003):
+        [x] ClaudeSDKClient is instantiated when an evaluation starts
+        [x] The async context manager pattern is used correctly (connect/disconnect)
+        [x] The connection is properly established before any queries are sent
+        """
+        verification_results: dict[str, bool] = {
+            "client_instantiated_at_start": False,
+            "connect_pattern_used_correctly": False,
+            "connection_before_queries": False,
+        }
+
+        lifecycle_events: list[str] = []
+
+        class VerificationClient:
+            """Client for complete T706 verification."""
+
+            def __init__(self, options: Any = None) -> None:
+                lifecycle_events.append("INSTANTIATED")
+                self.options = options
+                self.session_id = "verification-session"
+                self._connected = False
+
+            async def connect(self) -> None:
+                lifecycle_events.append("CONNECTED")
+                self._connected = True
+
+            async def disconnect(self) -> None:
+                lifecycle_events.append("DISCONNECTED")
+                self._connected = False
+
+            async def query(self, prompt: str) -> None:
+                lifecycle_events.append(f"QUERY:{self._connected}")
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="T706 verification complete")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t706_verification",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", VerificationClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                await worker.execute_query("T706 verification query")
+
+        # CRITERION 1: Client is instantiated when evaluation starts
+        # Verified by: INSTANTIATED appears in lifecycle events
+        verification_results["client_instantiated_at_start"] = (
+            "INSTANTIATED" in lifecycle_events
+        )
+
+        # CRITERION 2: Async context manager pattern used correctly
+        # Verified by: CONNECTED appears after INSTANTIATED
+        instantiated_idx = lifecycle_events.index("INSTANTIATED") if "INSTANTIATED" in lifecycle_events else -1
+        connected_idx = lifecycle_events.index("CONNECTED") if "CONNECTED" in lifecycle_events else -1
+        verification_results["connect_pattern_used_correctly"] = (
+            instantiated_idx >= 0 and
+            connected_idx >= 0 and
+            instantiated_idx < connected_idx
+        )
+
+        # CRITERION 3: Connection established before queries
+        # Verified by: QUERY:True means query was called with connected=True
+        query_events = [e for e in lifecycle_events if e.startswith("QUERY:")]
+        verification_results["connection_before_queries"] = (
+            len(query_events) > 0 and
+            all(e == "QUERY:True" for e in query_events)
+        )
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, f"T706 criterion '{criterion}' failed. Events: {lifecycle_events}"
