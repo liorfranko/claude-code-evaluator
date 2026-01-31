@@ -2,7 +2,20 @@
 
 This module contains data models including:
 - Enums: WorkflowType, EvaluationStatus, ExecutionMode, PermissionMode, Outcome, DeveloperState
-- Dataclasses: Decision, ToolInvocation, QueryMetrics, Metrics, TimelineEvent
+- Dataclasses: Decision, ToolInvocation, QueryMetrics, Metrics, TimelineEvent,
+               QuestionOption, QuestionItem, QuestionContext
 
 Entities will be imported as they are created in subsequent tasks.
 """
+
+from claude_evaluator.models.question import (
+    QuestionContext,
+    QuestionItem,
+    QuestionOption,
+)
+
+__all__ = [
+    "QuestionContext",
+    "QuestionItem",
+    "QuestionOption",
+]

@@ -29,7 +29,7 @@ Initial project setup and validation.
 - [x] T002 [P] Study ClaudeSDKClient API documentation and examples
 - [x] T003 [P] Create spike/POC to validate ClaudeSDKClient async context manager pattern
 - [x] T004 Validate ClaudeSDKClient supports interrupt/continue for mid-conversation input
-- [ ] T005 Document ClaudeSDKClient API findings in research.md
+- [x] T005 Document ClaudeSDKClient API findings in research.md
 
 ---
 
