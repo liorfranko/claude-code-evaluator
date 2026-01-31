@@ -113,12 +113,12 @@ Detect AskUserQuestionBlock and invoke callback within client session.
 
 ### Unit Tests - Question Detection
 
-- [ ] T307 [P] [US1] Write unit test: AskUserQuestionBlock detected in message stream
-- [ ] T308 [P] [US1] Write unit test: callback invoked with correct QuestionContext
-- [ ] T309 [US1] Write unit test: answer sent back via client continuation
-- [ ] T310 [US1] Write unit test: timeout triggers graceful failure
+- [x] T307 [P] [US1] Write unit test: AskUserQuestionBlock detected in message stream
+- [x] T308 [P] [US1] Write unit test: callback invoked with correct QuestionContext
+- [x] T309 [US1] Write unit test: answer sent back via client continuation
+- [x] T310 [US1] Write unit test: timeout triggers graceful failure
 
-- [ ] T311 CHECKPOINT: Verify question detection and callback mechanism works
+- [x] T311 CHECKPOINT: Verify question detection and callback mechanism works
 
 ---
 
