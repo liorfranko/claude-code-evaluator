@@ -228,7 +228,7 @@ Final verification and documentation updates.
 - [x] T709 Write test: Worker asks multiple questions in sequence
 - [x] T710 Write test: 60-second timeout triggers graceful failure
 - [x] T711 Write test: Answer rejection triggers retry with full history
-- [ ] T712 Write test: Empty/invalid question gets sensible default response
+- [x] T712 Write test: Empty/invalid question gets sensible default response
 
 ### Documentation
 
