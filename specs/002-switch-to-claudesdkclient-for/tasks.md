@@ -39,11 +39,11 @@ Create new data model classes needed by multiple user stories.
 
 ### Entity: QuestionContext, QuestionItem, QuestionOption
 
-- [ ] T100 Create models/question.py with QuestionContext dataclass (src/claude_evaluator/models/question.py)
-- [ ] T101 Add QuestionItem dataclass to models/question.py (src/claude_evaluator/models/question.py)
-- [ ] T102 Add QuestionOption dataclass to models/question.py (src/claude_evaluator/models/question.py)
-- [ ] T103 Add validation rules to QuestionContext (questions non-empty, attempt_number in {1,2})
-- [ ] T104 Add __all__ export in models/__init__.py for question models
+- [x] T100 Create models/question.py with QuestionContext dataclass (src/claude_evaluator/models/question.py)
+- [x] T101 Add QuestionItem dataclass to models/question.py (src/claude_evaluator/models/question.py)
+- [x] T102 Add QuestionOption dataclass to models/question.py (src/claude_evaluator/models/question.py)
+- [x] T103 Add validation rules to QuestionContext (questions non-empty, attempt_number in {1,2})
+- [x] T104 Add __all__ export in models/__init__.py for question models
 
 ### Entity: AnswerResult
 
