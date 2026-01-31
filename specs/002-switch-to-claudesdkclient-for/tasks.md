@@ -152,12 +152,12 @@ DeveloperAgent generates LLM-powered answers.
 
 ### Unit Tests - Answer Generation
 
-- [ ] T415 [P] [US1] Write unit test: answer_question generates response with context
-- [ ] T416 [P] [US1] Write unit test: developer_qa_model is used when specified
-- [ ] T417 [US1] Write unit test: retry uses full history
-- [ ] T418 [US1] Write unit test: max retries exceeded fails evaluation
+- [x] T415 [P] [US1] Write unit test: answer_question generates response with context
+- [x] T416 [P] [US1] Write unit test: developer_qa_model is used when specified
+- [x] T417 [US1] Write unit test: retry uses full history
+- [x] T418 [US1] Write unit test: max retries exceeded fails evaluation
 
-- [ ] T419 CHECKPOINT: Verify DeveloperAgent answer generation works correctly
+- [x] T419 CHECKPOINT: Verify DeveloperAgent answer generation works correctly
 
 ---
 

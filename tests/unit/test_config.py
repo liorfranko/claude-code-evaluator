@@ -740,3 +740,255 @@ evaluations:
         assert suite.evaluations[1].max_turns == 30
         assert suite.evaluations[1].max_budget_usd == 8.0
         assert suite.evaluations[1].timeout_seconds == 450
+
+
+class TestQAConfigurationFields:
+    """Tests for Q&A configuration fields in EvalDefaults and EvaluationConfig."""
+
+    def test_eval_defaults_qa_fields_have_correct_defaults(self) -> None:
+        """Test that Q&A fields in EvalDefaults have correct default values."""
+        defaults = EvalDefaults()
+
+        assert defaults.developer_qa_model is None
+        assert defaults.question_timeout_seconds == 60
+        assert defaults.context_window_size == 10
+
+    def test_eval_defaults_qa_fields_can_be_set(self) -> None:
+        """Test that Q&A fields in EvalDefaults can be explicitly set."""
+        defaults = EvalDefaults(
+            developer_qa_model="claude-3-haiku-20240307",
+            question_timeout_seconds=120,
+            context_window_size=20,
+        )
+
+        assert defaults.developer_qa_model == "claude-3-haiku-20240307"
+        assert defaults.question_timeout_seconds == 120
+        assert defaults.context_window_size == 20
+
+    def test_evaluation_config_developer_qa_model_defaults_to_none(self) -> None:
+        """Test that developer_qa_model in EvaluationConfig defaults to None."""
+        phase = Phase(name="test", permission_mode=PermissionMode.plan)
+        evaluation = EvaluationConfig(
+            id="eval-001",
+            name="Test",
+            task="Test task",
+            phases=[phase],
+        )
+
+        assert evaluation.developer_qa_model is None
+
+    def test_evaluation_config_developer_qa_model_can_be_set(self) -> None:
+        """Test that developer_qa_model in EvaluationConfig can be set."""
+        phase = Phase(name="test", permission_mode=PermissionMode.plan)
+        evaluation = EvaluationConfig(
+            id="eval-001",
+            name="Test",
+            task="Test task",
+            phases=[phase],
+            developer_qa_model="claude-3-opus-20240229",
+        )
+
+        assert evaluation.developer_qa_model == "claude-3-opus-20240229"
+
+    def test_load_suite_parses_qa_fields_in_defaults(self, tmp_path: Path) -> None:
+        """Test that Q&A fields are correctly parsed from YAML defaults."""
+        suite_content = """
+name: qa-config-suite
+defaults:
+  developer_qa_model: claude-3-haiku-20240307
+  question_timeout_seconds: 90
+  context_window_size: 15
+evaluations:
+  - id: eval-001
+    name: Test
+    task: Test task
+    phases:
+      - name: run
+        permission_mode: plan
+"""
+        suite_file = tmp_path / "qa-config.yaml"
+        suite_file.write_text(suite_content)
+
+        suite = load_suite(suite_file)
+
+        assert suite.defaults is not None
+        assert suite.defaults.developer_qa_model == "claude-3-haiku-20240307"
+        assert suite.defaults.question_timeout_seconds == 90
+        assert suite.defaults.context_window_size == 15
+
+    def test_load_suite_parses_developer_qa_model_in_evaluation(self, tmp_path: Path) -> None:
+        """Test that developer_qa_model is correctly parsed from YAML evaluation."""
+        suite_content = """
+name: qa-eval-suite
+evaluations:
+  - id: eval-001
+    name: Test
+    task: Test task
+    developer_qa_model: claude-3-sonnet-20240229
+    phases:
+      - name: run
+        permission_mode: plan
+"""
+        suite_file = tmp_path / "qa-eval.yaml"
+        suite_file.write_text(suite_content)
+
+        suite = load_suite(suite_file)
+
+        assert suite.evaluations[0].developer_qa_model == "claude-3-sonnet-20240229"
+
+    def test_load_suite_uses_default_values_for_qa_fields(self, tmp_path: Path) -> None:
+        """Test that Q&A fields use defaults when not specified in YAML."""
+        suite_content = """
+name: qa-defaults-suite
+defaults:
+  max_turns: 10
+evaluations:
+  - id: eval-001
+    name: Test
+    task: Test task
+    phases:
+      - name: run
+        permission_mode: plan
+"""
+        suite_file = tmp_path / "qa-defaults.yaml"
+        suite_file.write_text(suite_content)
+
+        suite = load_suite(suite_file)
+
+        assert suite.defaults is not None
+        assert suite.defaults.developer_qa_model is None
+        assert suite.defaults.question_timeout_seconds == 60
+        assert suite.defaults.context_window_size == 10
+
+    def test_apply_defaults_developer_qa_model(self) -> None:
+        """Test that developer_qa_model default is applied to evaluations."""
+        phase = Phase(name="test", permission_mode=PermissionMode.plan)
+        evaluation = EvaluationConfig(
+            id="eval-001",
+            name="Test",
+            task="Test task",
+            phases=[phase],
+            developer_qa_model=None,  # Not set
+        )
+        defaults = EvalDefaults(developer_qa_model="claude-3-haiku-20240307")
+        suite = EvaluationSuite(
+            name="test-suite",
+            evaluations=[evaluation],
+            defaults=defaults,
+        )
+
+        result = apply_defaults(suite)
+
+        assert result.evaluations[0].developer_qa_model == "claude-3-haiku-20240307"
+
+    def test_apply_defaults_does_not_override_explicit_developer_qa_model(self) -> None:
+        """Test that explicit developer_qa_model is not overridden by defaults."""
+        phase = Phase(name="test", permission_mode=PermissionMode.plan)
+        evaluation = EvaluationConfig(
+            id="eval-001",
+            name="Test",
+            task="Test task",
+            phases=[phase],
+            developer_qa_model="claude-3-opus-20240229",  # Explicitly set
+        )
+        defaults = EvalDefaults(developer_qa_model="claude-3-haiku-20240307")
+        suite = EvaluationSuite(
+            name="test-suite",
+            evaluations=[evaluation],
+            defaults=defaults,
+        )
+
+        result = apply_defaults(suite)
+
+        assert result.evaluations[0].developer_qa_model == "claude-3-opus-20240229"
+
+    def test_backward_compatibility_without_qa_fields(self, tmp_path: Path) -> None:
+        """Test that old YAML configs without Q&A fields still work."""
+        suite_content = """
+name: old-style-suite
+defaults:
+  max_turns: 10
+  max_budget_usd: 5.0
+evaluations:
+  - id: eval-001
+    name: Test
+    task: Test task
+    phases:
+      - name: run
+        permission_mode: plan
+"""
+        suite_file = tmp_path / "old-style.yaml"
+        suite_file.write_text(suite_content)
+
+        # Should not raise any errors
+        suite = load_suite(suite_file)
+
+        assert suite.defaults is not None
+        assert suite.defaults.max_turns == 10
+        assert suite.defaults.max_budget_usd == 5.0
+        # Q&A fields should have defaults
+        assert suite.defaults.developer_qa_model is None
+        assert suite.defaults.question_timeout_seconds == 60
+        assert suite.defaults.context_window_size == 10
+        # Evaluation should not have developer_qa_model set
+        assert suite.evaluations[0].developer_qa_model is None
+
+    def test_invalid_question_timeout_seconds_type(self, tmp_path: Path) -> None:
+        """Test that ValueError is raised when question_timeout_seconds is not an integer."""
+        suite_content = """
+name: test-suite
+defaults:
+  question_timeout_seconds: "not-a-number"
+evaluations:
+  - id: eval-001
+    name: Test
+    task: Test task
+    phases:
+      - name: run
+        permission_mode: plan
+"""
+        suite_file = tmp_path / "invalid-qa-timeout.yaml"
+        suite_file.write_text(suite_content)
+
+        with pytest.raises(ValueError, match="Invalid 'question_timeout_seconds'"):
+            load_suite(suite_file)
+
+    def test_invalid_context_window_size_type(self, tmp_path: Path) -> None:
+        """Test that ValueError is raised when context_window_size is not an integer."""
+        suite_content = """
+name: test-suite
+defaults:
+  context_window_size: "not-a-number"
+evaluations:
+  - id: eval-001
+    name: Test
+    task: Test task
+    phases:
+      - name: run
+        permission_mode: plan
+"""
+        suite_file = tmp_path / "invalid-context-window.yaml"
+        suite_file.write_text(suite_content)
+
+        with pytest.raises(ValueError, match="Invalid 'context_window_size'"):
+            load_suite(suite_file)
+
+    def test_invalid_developer_qa_model_type(self, tmp_path: Path) -> None:
+        """Test that ValueError is raised when developer_qa_model is not a string."""
+        suite_content = """
+name: test-suite
+defaults:
+  developer_qa_model: 123
+evaluations:
+  - id: eval-001
+    name: Test
+    task: Test task
+    phases:
+      - name: run
+        permission_mode: plan
+"""
+        suite_file = tmp_path / "invalid-qa-model.yaml"
+        suite_file.write_text(suite_content)
+
+        with pytest.raises(ValueError, match="Invalid 'developer_qa_model'"):
+            load_suite(suite_file)

@@ -244,6 +244,10 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
         if evaluation.timeout_seconds is None and defaults.timeout_seconds is not None:
             evaluation.timeout_seconds = defaults.timeout_seconds
 
+        # Apply developer_qa_model default if not overridden
+        if evaluation.developer_qa_model is None and defaults.developer_qa_model is not None:
+            evaluation.developer_qa_model = defaults.developer_qa_model
+
     return suite
 
 
@@ -347,12 +351,25 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> EvalDefaults:
     context = f"defaults in {source_path}"
     _require_mapping(data, context)
 
+    # Parse question_timeout_seconds with default of 60
+    question_timeout = _optional_int(data, "question_timeout_seconds", context)
+    if question_timeout is None:
+        question_timeout = 60
+
+    # Parse context_window_size with default of 10
+    context_window = _optional_int(data, "context_window_size", context)
+    if context_window is None:
+        context_window = 10
+
     return EvalDefaults(
         max_turns=_optional_int(data, "max_turns", context),
         max_budget_usd=_optional_number(data, "max_budget_usd", context),
         allowed_tools=_optional_string_list(data, "allowed_tools", context),
         model=_optional_string(data, "model", context),
         timeout_seconds=_optional_int(data, "timeout_seconds", context),
+        developer_qa_model=_optional_string(data, "developer_qa_model", context),
+        question_timeout_seconds=question_timeout,
+        context_window_size=context_window,
     )
 
 
@@ -398,6 +415,7 @@ def _parse_evaluation(
         max_turns=_optional_int(data, "max_turns", context),
         max_budget_usd=_optional_number(data, "max_budget_usd", context),
         timeout_seconds=_optional_int(data, "timeout_seconds", context),
+        developer_qa_model=_optional_string(data, "developer_qa_model", context),
     )
 
 
