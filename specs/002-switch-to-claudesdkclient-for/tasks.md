@@ -77,14 +77,14 @@ Refactor WorkerAgent from query() to ClaudeSDKClient.
 - [x] T202 [US1] Remove _last_session_id attribute (no longer needed with client)
 - [x] T203 [US1] Refactor execute_query() to use ClaudeSDKClient async context manager
 - [x] T204 [US1] Replace _stream_sdk_messages() to use client.stream() API
-- [ ] T205 [US2] Ensure client maintains session context across multiple exchanges
-- [ ] T206 [US3] Implement proper client lifecycle with async context manager pattern
-- [ ] T207 [US3] Handle client cleanup on evaluation completion or failure
+- [x] T205 [US2] Ensure client maintains session context across multiple exchanges
+- [x] T206 [US3] Implement proper client lifecycle with async context manager pattern
+- [x] T207 [US3] Handle client cleanup on evaluation completion or failure
 
 ### Backward Compatibility
 
-- [ ] T208 [US1] Ensure existing workflows continue to function with new client
-- [ ] T209 [US1] Maintain SDK_AVAILABLE check for graceful degradation
+- [x] T208 [US1] Ensure existing workflows continue to function with new client
+- [x] T209 [US1] Maintain SDK_AVAILABLE check for graceful degradation
 
 ### Unit Tests - ClaudeSDKClient Integration
 
