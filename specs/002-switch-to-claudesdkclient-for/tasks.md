@@ -47,9 +47,9 @@ Create new data model classes needed by multiple user stories.
 
 ### Entity: AnswerResult
 
-- [ ] T105 [P] Create models/answer.py with AnswerResult dataclass (src/claude_evaluator/models/answer.py)
-- [ ] T106 [P] Add validation rules to AnswerResult (answer non-empty, generation_time_ms >= 0)
-- [ ] T107 Add __all__ export in models/__init__.py for answer model
+- [x] T105 [P] Create models/answer.py with AnswerResult dataclass (src/claude_evaluator/models/answer.py)
+- [x] T106 [P] Add validation rules to AnswerResult (answer non-empty, generation_time_ms >= 0)
+- [x] T107 Add __all__ export in models/__init__.py for answer model
 
 ### Enum Extension
 
