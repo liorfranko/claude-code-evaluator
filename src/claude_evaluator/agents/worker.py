@@ -51,6 +51,7 @@ class WorkerAgent:
         session_id: Current Claude Code session ID (optional).
         permission_mode: Current permission mode for tool execution.
         allowed_tools: List of tools that are auto-approved for execution.
+        additional_dirs: Additional directories Claude can access beyond project_directory.
         max_turns: Maximum number of conversation turns per query.
         max_budget_usd: Maximum spend limit per query in USD (optional).
         tool_invocations: List of tool invocations tracked during current query.
@@ -62,6 +63,7 @@ class WorkerAgent:
     active_session: bool
     permission_mode: PermissionMode
     allowed_tools: list[str] = field(default_factory=list)
+    additional_dirs: list[str] = field(default_factory=list)
     max_turns: int = 10
     session_id: Optional[str] = None
     max_budget_usd: Optional[float] = None
@@ -132,6 +134,7 @@ class WorkerAgent:
         # Configure agent options
         options = ClaudeAgentOptions(
             cwd=self.project_directory,
+            add_dirs=self.additional_dirs if self.additional_dirs else [],
             permission_mode=permission_map.get(self.permission_mode, "plan"),
             allowed_tools=self.allowed_tools if self.allowed_tools else [],
             max_turns=self.max_turns,

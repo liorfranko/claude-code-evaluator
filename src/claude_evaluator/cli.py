@@ -243,11 +243,14 @@ async def run_evaluation(
 
     # Create agents
     developer = DeveloperAgent()
+    # Include ~/.claude/plans so Claude can read plan files it creates during planning phase
+    claude_plans_dir = str(Path.home() / ".claude" / "plans")
     worker = WorkerAgent(
         execution_mode=ExecutionMode.sdk,
         project_directory=str(workspace_path),
         active_session=False,
         permission_mode=PermissionMode.acceptEdits,
+        additional_dirs=[claude_plans_dir],
     )
 
     # Create evaluation
