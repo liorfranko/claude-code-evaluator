@@ -2881,3 +2881,553 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         # VERIFY: All criteria pass
         for criterion, passed in verification_results.items():
             assert passed, f"T704 criterion '{criterion}' failed"
+
+
+# =============================================================================
+# T705: Verify Worker remembers previous messages after Developer answers
+# =============================================================================
+
+
+class TestT705WorkerRemembersPreviousMessages:
+    """T705: Verify that Worker remembers previous messages after Developer answers.
+
+    This test class verifies the acceptance criteria for T705 (US-002):
+    - The Worker maintains a list of all messages exchanged
+    - After Developer answers, the Worker can access previous conversation context
+    - The message history includes both questions and answers
+    - The Worker uses this history for subsequent work
+
+    This is about MEMORY - verifying that the Worker has access to the full
+    conversation history after Q&A exchanges.
+    """
+
+    @pytest.mark.asyncio
+    async def test_all_messages_list_maintained_throughout_execution(self) -> None:
+        """Verify that Worker maintains a complete list of all exchanged messages.
+
+        The `all_messages` list in `_stream_sdk_messages_with_client` should
+        accumulate all AssistantMessage, UserMessage, and SystemMessage objects
+        throughout the entire execution, including those before and after Q&A.
+        """
+        async def simple_callback(context: QuestionContext) -> str:
+            return "Memory test answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t705_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=simple_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "memory-test-session"
+
+        q1 = AskUserQuestionBlock(questions=[{"question": "Memory test question?"}])
+
+        # Each batch is yielded per receive_response call
+        # Question triggers another query, so structure must have question at end of batch
+        mock_client.set_responses(
+            [
+                # First batch: Pre-question context + question
+                [
+                    AssistantMessage(content=[TextBlock("Starting work on task...")]),
+                    AssistantMessage(content=[TextBlock("Analyzing requirements...")]),
+                    AssistantMessage(content=[q1]),
+                ],
+                # After answer: Post-answer continuation + final result
+                [
+                    AssistantMessage(content=[TextBlock("Processing answer...")]),
+                    AssistantMessage(content=[TextBlock("Completing task...")]),
+                    ResultMessage(result="Task completed with memory intact"),
+                ],
+            ]
+        )
+
+        result, response_content, all_messages = await worker._stream_sdk_messages_with_client(
+            "Test memory", mock_client
+        )
+
+        # VERIFY: all_messages contains messages from all phases
+        assert len(all_messages) >= 4, (
+            f"Expected at least 4 messages (pre-Q, Q, post-A), got {len(all_messages)}"
+        )
+
+        # VERIFY: Messages are in chronological order
+        text_contents = []
+        for msg in all_messages:
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "TextBlock":
+                        text_contents.append(block.get("text", ""))
+
+        # Pre-question messages should come before post-answer messages
+        starting_idx = next(
+            (i for i, t in enumerate(text_contents) if "Starting" in t), -1
+        )
+        completing_idx = next(
+            (i for i, t in enumerate(text_contents) if "Completing" in t), -1
+        )
+        assert starting_idx < completing_idx, (
+            "Pre-question messages should appear before post-answer messages"
+        )
+
+    @pytest.mark.asyncio
+    async def test_previous_context_accessible_after_developer_answers(self) -> None:
+        """Verify that after Developer answers, Worker has access to prior context.
+
+        When a question is answered and execution continues, the subsequent
+        questions should see ALL prior messages including those from before
+        the first question was asked.
+        """
+        context_snapshots: list[list[str]] = []
+
+        async def snapshot_context_callback(context: QuestionContext) -> str:
+            # Capture text from all messages in history
+            texts = []
+            for msg in context.conversation_history:
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "TextBlock":
+                            texts.append(block.get("text", ""))
+            context_snapshots.append(texts)
+            return f"Answer #{len(context_snapshots)}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t705_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=snapshot_context_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "context-access-session"
+
+        q1 = AskUserQuestionBlock(questions=[{"question": "First question?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Second question?"}])
+
+        # Each batch is processed per receive_response call
+        # Questions trigger another query, so each question should be at end of batch
+        mock_client.set_responses(
+            [
+                # Batch 1: Initial context + first question
+                [
+                    AssistantMessage(content=[TextBlock("INITIAL_CONTEXT_MARKER")]),
+                    AssistantMessage(content=[q1]),
+                ],
+                # Batch 2: Work after first answer + second question
+                [
+                    AssistantMessage(content=[TextBlock("POST_FIRST_ANSWER_WORK")]),
+                    AssistantMessage(content=[q2]),
+                ],
+                # Batch 3: Completion
+                [ResultMessage(result="Done")],
+            ]
+        )
+
+        await worker._stream_sdk_messages_with_client("Context access test", mock_client)
+
+        # VERIFY: Two questions were asked
+        assert len(context_snapshots) == 2, f"Expected 2 questions, got {len(context_snapshots)}"
+
+        # VERIFY: First question sees initial context
+        first_context = " ".join(context_snapshots[0])
+        assert "INITIAL_CONTEXT_MARKER" in first_context, (
+            "First question should see initial context"
+        )
+
+        # VERIFY: Second question sees BOTH initial context AND post-first-answer work
+        second_context = " ".join(context_snapshots[1])
+        assert "INITIAL_CONTEXT_MARKER" in second_context, (
+            "Second question should still see initial context from before first Q&A"
+        )
+        assert "POST_FIRST_ANSWER_WORK" in second_context, (
+            "Second question should see work done after first answer"
+        )
+
+    @pytest.mark.asyncio
+    async def test_message_history_includes_questions_and_answers(self) -> None:
+        """Verify that message history includes both questions and answer indicators.
+
+        The conversation history should include:
+        - AssistantMessages with AskUserQuestionBlock (questions)
+        - Evidence of the answer flow (via client.query() calls)
+        """
+        queries_sent_to_client: list[str] = []
+
+        class QueryTrackingClient:
+            """Client that tracks all queries sent to it."""
+
+            def __init__(self) -> None:
+                self.session_id = "history-test-session"
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+
+            async def query(self, prompt: str) -> None:
+                queries_sent_to_client.append(prompt)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="History test done")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        async def unique_answer_callback(context: QuestionContext) -> str:
+            question_text = context.questions[0].question if context.questions else "unknown"
+            return f"ANSWER_FOR_[{question_text}]"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t705_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=unique_answer_callback,
+        )
+
+        tracking_client = QueryTrackingClient()
+
+        q1 = AskUserQuestionBlock(questions=[{"question": "Config question?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Permission question?"}])
+
+        tracking_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],
+                [AssistantMessage(content=[q2])],
+                [ResultMessage(result="Both questions answered")],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "History includes Q&A test", tracking_client
+        )
+
+        # VERIFY: Initial query + 2 answers = 3 queries
+        assert len(queries_sent_to_client) == 3, (
+            f"Expected 3 queries (initial + 2 answers), got {len(queries_sent_to_client)}"
+        )
+
+        # VERIFY: Answers were sent to client
+        assert "ANSWER_FOR_[Config question?]" in queries_sent_to_client, (
+            "First answer should be sent to client"
+        )
+        assert "ANSWER_FOR_[Permission question?]" in queries_sent_to_client, (
+            "Second answer should be sent to client"
+        )
+
+        # VERIFY: Message history contains question blocks
+        question_blocks_found = 0
+        for msg in all_messages:
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "AskUserQuestionBlock":
+                        question_blocks_found += 1
+
+        assert question_blocks_found >= 2, (
+            f"Expected at least 2 question blocks in history, found {question_blocks_found}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_worker_uses_history_for_subsequent_work(self) -> None:
+        """Verify that Worker uses accumulated history for subsequent work.
+
+        The message history is returned in QueryMetrics.messages and should
+        be available for analysis and debugging of the evaluation.
+        """
+        async def tracking_callback(context: QuestionContext) -> str:
+            return "Tracked answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t705_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=tracking_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "metrics-test-session"
+
+        q1 = AskUserQuestionBlock(questions=[{"question": "Metrics test question?"}])
+
+        # Each batch is processed per receive_response call
+        # Questions trigger another query, so each question should be at end of batch
+        mock_client.set_responses(
+            [
+                # Batch 1: Work before question + question
+                [
+                    AssistantMessage(content=[TextBlock("Work before question")]),
+                    AssistantMessage(content=[q1]),
+                ],
+                # Batch 2: Work after answer + result
+                [
+                    AssistantMessage(content=[TextBlock("Work after answer")]),
+                    ResultMessage(result="Metrics test complete"),
+                ],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "Metrics test", mock_client
+        )
+
+        # VERIFY: all_messages is populated with full history
+        assert len(all_messages) >= 3, (
+            f"Expected at least 3 messages in history, got {len(all_messages)}"
+        )
+
+        # VERIFY: History includes messages from different phases
+        all_text_content = []
+        for msg in all_messages:
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "TextBlock":
+                        all_text_content.append(block.get("text", ""))
+
+        assert any("before question" in t for t in all_text_content), (
+            "History should include pre-question work"
+        )
+        assert any("after answer" in t for t in all_text_content), (
+            "History should include post-answer work"
+        )
+
+    @pytest.mark.asyncio
+    async def test_memory_persists_through_multiple_qa_exchanges(self) -> None:
+        """Verify that memory persists correctly through multiple Q&A exchanges.
+
+        After several questions and answers, the Worker should have a complete
+        record of all exchanges in its message history.
+        """
+        exchange_count = 0
+        histories_at_each_exchange: list[int] = []
+
+        async def memory_tracking_callback(context: QuestionContext) -> str:
+            nonlocal exchange_count
+            exchange_count += 1
+            histories_at_each_exchange.append(len(context.conversation_history))
+            return f"Memory answer {exchange_count}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t705_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=memory_tracking_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "multi-exchange-memory-session"
+
+        # Create a chain of 5 questions with work between each
+        questions = [
+            AskUserQuestionBlock(questions=[{"question": f"Exchange {i} question?"}])
+            for i in range(1, 6)
+        ]
+
+        # Structure: work -> Q1 -> work -> Q2 -> work -> Q3 -> work -> Q4 -> work -> Q5 -> result
+        responses = []
+        for i, q in enumerate(questions):
+            responses.append([
+                AssistantMessage(content=[TextBlock(f"Work before exchange {i + 1}")]),
+                AssistantMessage(content=[q]),
+            ])
+        responses.append([ResultMessage(result="5 exchanges completed with memory")])
+
+        mock_client.set_responses(responses)
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "Multi-exchange memory test", mock_client
+        )
+
+        # VERIFY: All 5 exchanges happened
+        assert exchange_count == 5, f"Expected 5 exchanges, got {exchange_count}"
+
+        # VERIFY: Memory grew with each exchange
+        for i in range(1, len(histories_at_each_exchange)):
+            assert histories_at_each_exchange[i] > histories_at_each_exchange[i - 1], (
+                f"History should grow between exchanges: {histories_at_each_exchange}"
+            )
+
+        # VERIFY: Final message list contains all exchanges
+        assert len(all_messages) >= 10, (
+            f"Expected at least 10 messages (5 work + 5 Q), got {len(all_messages)}"
+        )
+
+        # VERIFY: Task completed
+        assert result.result == "5 exchanges completed with memory"
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t705_complete_verification(self) -> None:
+        """Complete verification of T705 acceptance criteria.
+
+        Acceptance Criteria Checklist (US-002):
+        [x] Worker maintains a list of all messages exchanged
+        [x] After Developer answers, Worker can access previous conversation context
+        [x] Message history includes both questions and answers
+        [x] Worker uses this history for subsequent work
+        """
+        verification_results: dict[str, bool] = {
+            "maintains_message_list": False,
+            "accesses_previous_context": False,
+            "includes_questions_and_answers": False,
+            "uses_history_for_work": False,
+        }
+
+        context_at_q2: list[str] = []
+        question_blocks_in_history = 0
+        answer_queries_sent: list[str] = []
+
+        class VerificationClient:
+            """Client for T705 acceptance verification."""
+
+            def __init__(self) -> None:
+                self.session_id = "t705-verification-session"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+
+            async def query(self, prompt: str) -> None:
+                self._queries.append(prompt)
+                if "T705_ANSWER" in prompt:
+                    answer_queries_sent.append(prompt)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="T705 Verified")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        question_number = 0
+
+        async def verification_callback(context: QuestionContext) -> str:
+            nonlocal question_number, question_blocks_in_history, context_at_q2
+            question_number += 1
+
+            # Count question blocks in history
+            for msg in context.conversation_history:
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "AskUserQuestionBlock":
+                            question_blocks_in_history += 1
+
+            # Capture context at Q2 to verify it includes Q1's context
+            if question_number == 2:
+                for msg in context.conversation_history:
+                    content = msg.get("content", [])
+                    if isinstance(content, list):
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "TextBlock":
+                                context_at_q2.append(block.get("text", ""))
+
+            return f"T705_ANSWER_{question_number}"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t705_verification",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=verification_callback,
+        )
+
+        verification_client = VerificationClient()
+
+        q1 = AskUserQuestionBlock(questions=[{"question": "T705 Q1?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "T705 Q2?"}])
+
+        # Each batch is processed per receive_response call
+        # Questions trigger another query, so each question should be at end of batch
+        verification_client.set_responses(
+            [
+                # Batch 1: Initial context + Q1
+                [
+                    AssistantMessage(content=[TextBlock("BEFORE_Q1_CONTEXT")]),
+                    AssistantMessage(content=[q1]),
+                ],
+                # Batch 2: Work after A1 + Q2
+                [
+                    AssistantMessage(content=[TextBlock("AFTER_A1_WORK")]),
+                    AssistantMessage(content=[q2]),
+                ],
+                # Batch 3: Final work + result
+                [
+                    AssistantMessage(content=[TextBlock("FINAL_WORK")]),
+                    ResultMessage(result="T705 Complete"),
+                ],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "T705 verification", verification_client
+        )
+
+        # CRITERION 1: Worker maintains a list of all messages exchanged
+        # Verified by: all_messages contains messages from all phases
+        text_contents = []
+        for msg in all_messages:
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "TextBlock":
+                        text_contents.append(block.get("text", ""))
+
+        verification_results["maintains_message_list"] = (
+            "BEFORE_Q1_CONTEXT" in text_contents and
+            "AFTER_A1_WORK" in text_contents and
+            "FINAL_WORK" in text_contents
+        )
+
+        # CRITERION 2: After Developer answers, Worker can access previous context
+        # Verified by: Q2 sees context from before Q1 AND after A1
+        context_at_q2_joined = " ".join(context_at_q2)
+        verification_results["accesses_previous_context"] = (
+            "BEFORE_Q1_CONTEXT" in context_at_q2_joined and
+            "AFTER_A1_WORK" in context_at_q2_joined
+        )
+
+        # CRITERION 3: Message history includes both questions and answers
+        # Verified by: Question blocks in history + answer queries sent to client
+        verification_results["includes_questions_and_answers"] = (
+            question_blocks_in_history >= 1 and
+            len(answer_queries_sent) == 2 and
+            "T705_ANSWER_1" in answer_queries_sent[0] and
+            "T705_ANSWER_2" in answer_queries_sent[1]
+        )
+
+        # CRITERION 4: Worker uses this history for subsequent work
+        # Verified by: Final all_messages contains complete exchange record
+        final_question_blocks = 0
+        for msg in all_messages:
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "AskUserQuestionBlock":
+                        final_question_blocks += 1
+
+        verification_results["uses_history_for_work"] = (
+            final_question_blocks >= 2 and
+            len(all_messages) >= 5 and
+            result.result == "T705 Complete"
+        )
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, f"T705 criterion '{criterion}' failed"
