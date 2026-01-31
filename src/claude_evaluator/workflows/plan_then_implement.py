@@ -5,13 +5,15 @@ two-phase workflow: first planning in read-only mode, then implementation
 with edit permissions. This mirrors Claude Code's plan mode workflow.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
+    from claude_evaluator.config.models import EvalDefaults
     from claude_evaluator.evaluation import Evaluation
+    from claude_evaluator.metrics.collector import MetricsCollector
     from claude_evaluator.models.metrics import Metrics
 
 __all__ = ["PlanThenImplementWorkflow"]
@@ -30,6 +32,11 @@ class PlanThenImplementWorkflow(BaseWorkflow):
        acceptEdits permission mode and implements the plan. The session
        continues from the planning phase to maintain context.
 
+    This workflow supports question handling by connecting the WorkerAgent to
+    the DeveloperAgent. When Claude asks a question during either phase, the
+    DeveloperAgent generates an LLM-powered answer. Session context is maintained
+    across both phases for coherent question handling.
+
     This workflow is useful for:
     - Evaluating plan quality before implementation
     - Comparing planning vs implementation token usage
@@ -39,6 +46,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
     Attributes:
         planning_prompt_template: Template for the planning phase prompt.
         implementation_prompt_template: Template for the implementation phase prompt.
+        enable_question_handling: Whether to configure question handling (default True).
 
     Example:
         collector = MetricsCollector()
@@ -68,9 +76,11 @@ class PlanThenImplementWorkflow(BaseWorkflow):
 
     def __init__(
         self,
-        metrics_collector: "MetricsCollector",  # type: ignore[name-defined]
-        planning_prompt_template: str | None = None,
-        implementation_prompt_template: str | None = None,
+        metrics_collector: "MetricsCollector",
+        planning_prompt_template: Optional[str] = None,
+        implementation_prompt_template: Optional[str] = None,
+        defaults: Optional["EvalDefaults"] = None,
+        enable_question_handling: bool = True,
     ) -> None:
         """Initialize the workflow with optional custom prompt templates.
 
@@ -80,15 +90,27 @@ class PlanThenImplementWorkflow(BaseWorkflow):
                 {task_description} placeholder. Defaults to DEFAULT_PLANNING_PROMPT.
             implementation_prompt_template: Custom template for implementation phase.
                 Defaults to DEFAULT_IMPLEMENTATION_PROMPT.
+            defaults: Optional EvalDefaults containing configuration for
+                question handling (developer_qa_model, question_timeout_seconds,
+                context_window_size). If not provided, defaults are used.
+            enable_question_handling: Whether to configure the WorkerAgent
+                with a question callback. Set to False for tests or when
+                questions are not expected. Defaults to True.
         """
-        super().__init__(metrics_collector)
+        super().__init__(metrics_collector, defaults)
         self._planning_prompt_template = (
             planning_prompt_template or self.DEFAULT_PLANNING_PROMPT
         )
         self._implementation_prompt_template = (
             implementation_prompt_template or self.DEFAULT_IMPLEMENTATION_PROMPT
         )
-        self._planning_response: str | None = None
+        self._planning_response: Optional[str] = None
+        self._enable_question_handling = enable_question_handling
+
+    @property
+    def enable_question_handling(self) -> bool:
+        """Whether question handling is enabled."""
+        return self._enable_question_handling
 
     @property
     def planning_prompt_template(self) -> str:
@@ -101,7 +123,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         return self._implementation_prompt_template
 
     @property
-    def planning_response(self) -> str | None:
+    def planning_response(self) -> Optional[str]:
         """Get the response from the planning phase, if available."""
         return self._planning_response
 
@@ -111,6 +133,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         Performs execution in two phases:
 
         1. **Planning Phase**:
+           - Configures question handling (if enabled)
            - Sets permission mode to plan (read-only)
            - Sends planning prompt with task description
            - Collects planning phase metrics
@@ -118,10 +141,12 @@ class PlanThenImplementWorkflow(BaseWorkflow):
 
         2. **Implementation Phase**:
            - Switches permission mode to acceptEdits
-           - Sends implementation prompt (session continues)
+           - Sends implementation prompt (session continues with context)
            - Collects implementation phase metrics
 
         The session continues between phases, maintaining context from planning.
+        Question handling uses the same callback across both phases, providing
+        coherent answers based on the accumulated conversation history.
 
         Args:
             evaluation: The Evaluation instance containing the task and agents.
@@ -131,10 +156,15 @@ class PlanThenImplementWorkflow(BaseWorkflow):
 
         Raises:
             Exception: If either phase fails.
+            QuestionHandlingError: If question handling fails during execution.
         """
         self.on_execution_start(evaluation)
 
         try:
+            # Configure question handling if enabled (once for both phases)
+            if self._enable_question_handling:
+                self.configure_worker_for_questions(evaluation)
+
             # Phase 1: Planning
             await self._execute_planning_phase(evaluation)
 
@@ -147,6 +177,9 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         except Exception as e:
             self.on_execution_error(evaluation, e)
             raise
+        finally:
+            # Ensure cleanup happens even on error
+            await self.cleanup_worker(evaluation)
 
     async def _execute_planning_phase(self, evaluation: "Evaluation") -> None:
         """Execute the planning phase.

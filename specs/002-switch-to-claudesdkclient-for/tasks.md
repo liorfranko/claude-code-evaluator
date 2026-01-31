@@ -167,19 +167,19 @@ Make Q&A settings configurable.
 
 ### Config Model Extension
 
-- [ ] T500 [US1] Add developer_qa_model to EvalDefaults (src/claude_evaluator/config/models.py)
-- [ ] T501 [US1] Add question_timeout_seconds to EvalDefaults
-- [ ] T502 [US1] Add context_window_size to EvalDefaults
-- [ ] T503 [US1] Add developer_qa_model to EvaluationConfig for per-eval override
-- [ ] T504 [US1] Update YAML loader to parse new configuration fields
+- [x] T500 [US1] Add developer_qa_model to EvalDefaults (src/claude_evaluator/config/models.py)
+- [x] T501 [US1] Add question_timeout_seconds to EvalDefaults
+- [x] T502 [US1] Add context_window_size to EvalDefaults
+- [x] T503 [US1] Add developer_qa_model to EvaluationConfig for per-eval override
+- [x] T504 [US1] Update YAML loader to parse new configuration fields
 
 ### Unit Tests - Configuration
 
-- [ ] T505 [P] [US1] Write unit test: YAML with developer_qa_model loads correctly
-- [ ] T506 [P] [US1] Write unit test: per-evaluation override works
-- [ ] T507 [US1] Write unit test: defaults applied when not specified
+- [x] T505 [P] [US1] Write unit test: YAML with developer_qa_model loads correctly
+- [x] T506 [P] [US1] Write unit test: per-evaluation override works
+- [x] T507 [US1] Write unit test: defaults applied when not specified
 
-- [ ] T508 CHECKPOINT: Verify configuration system handles new fields
+- [x] T508 CHECKPOINT: Verify configuration system handles new fields
 
 ---
 
