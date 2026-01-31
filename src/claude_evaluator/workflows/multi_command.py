@@ -169,9 +169,12 @@ class MultiCommandWorkflow(BaseWorkflow):
         )
 
         # Execute the phase query
+        # Resume session if continue_session is True and not the first phase
+        should_resume = phase.continue_session and self._current_phase_index > 0
         query_metrics = await worker.execute_query(
             query=prompt,
             phase=phase.name,
+            resume_session=should_resume,
         )
 
         # Collect metrics from this phase

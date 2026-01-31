@@ -69,11 +69,13 @@ class WorkerAgent:
     max_budget_usd: Optional[float] = None
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
     _query_counter: int = field(default=0, repr=False)
+    _last_session_id: Optional[str] = field(default=None, repr=False)
 
     async def execute_query(
         self,
         query: str,
         phase: Optional[str] = None,
+        resume_session: bool = False,
     ) -> QueryMetrics:
         """Execute a query through Claude Code.
 
@@ -83,6 +85,7 @@ class WorkerAgent:
         Args:
             query: The prompt or query to send to Claude Code.
             phase: Current workflow phase for tracking purposes.
+            resume_session: If True, resume the previous session for continuity.
 
         Returns:
             QueryMetrics containing execution results and performance data.
@@ -92,7 +95,7 @@ class WorkerAgent:
             NotImplementedError: If CLI mode is requested (not yet implemented).
         """
         if self.execution_mode == ExecutionMode.sdk:
-            return await self._execute_via_sdk(query, phase)
+            return await self._execute_via_sdk(query, phase, resume_session)
         else:
             # CLI fallback not yet implemented
             raise NotImplementedError("CLI execution mode not yet implemented")
@@ -101,12 +104,14 @@ class WorkerAgent:
         self,
         query: str,
         phase: Optional[str] = None,
+        resume_session: bool = False,
     ) -> QueryMetrics:
         """Execute a query using the Claude SDK.
 
         Args:
             query: The prompt to send to Claude Code.
             phase: Current workflow phase for tracking.
+            resume_session: If True, resume the previous session for continuity.
 
         Returns:
             QueryMetrics with execution results.
@@ -140,6 +145,8 @@ class WorkerAgent:
             max_turns=self.max_turns,
             max_budget_usd=self.max_budget_usd,
             model="claude-haiku-4-5@20251001",
+            # Resume previous session for continuity (like Claude Code CLI)
+            resume=self._last_session_id if resume_session and self._last_session_id else None,
         )
 
         # Execute query and collect messages
@@ -192,10 +199,14 @@ class WorkerAgent:
                                 invocation.is_error = getattr(block, "is_error", False) or False
                                 invocation.success = not invocation.is_error
 
-            # Capture SystemMessage
+            # Capture SystemMessage and extract session_id
             elif message_type == "SystemMessage":
                 msg_record = self._serialize_message(message, "system")
                 all_messages.append(msg_record)
+                # Capture session_id from init message for session resumption
+                if hasattr(message, "subtype") and message.subtype == "init":
+                    if hasattr(message, "data") and isinstance(message.data, dict):
+                        self._last_session_id = message.data.get("session_id")
 
             # The last message should be the ResultMessage
             elif message_type == "ResultMessage":
@@ -399,6 +410,18 @@ class WorkerAgent:
     def clear_tool_invocations(self) -> None:
         """Clear the list of tracked tool invocations."""
         self.tool_invocations = []
+
+    def get_last_session_id(self) -> Optional[str]:
+        """Get the session ID from the last query execution.
+
+        Returns:
+            The session ID if available, None otherwise.
+        """
+        return self._last_session_id
+
+    def clear_session(self) -> None:
+        """Clear the stored session ID to start fresh."""
+        self._last_session_id = None
 
     def set_permission_mode(self, mode: PermissionMode) -> None:
         """Update the permission mode for subsequent executions.

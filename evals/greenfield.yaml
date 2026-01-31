@@ -15,7 +15,6 @@ defaults:
     - Bash
     - Glob
     - Grep
-    - LSP
   model: sonnet
   timeout_seconds: 300
 
@@ -70,14 +69,33 @@ evaluations:
       - name: planning
         permission_mode: plan
         prompt_template: >
+          You are starting a NEW greenfield project in an EMPTY workspace directory.
+          There is no existing codebase to explore - you will create everything from scratch.
+
           Create a detailed implementation plan for the following task.
-          Include file structure, code organization, and implementation steps: {task}
+          Include: file structure, code organization, implementation steps, and test strategy.
+
+          IMPORTANT:
+          - Do NOT use ExitPlanMode or EnterPlanMode tools
+          - Do NOT use Task tool to explore - the workspace is empty
+          - Just output your plan as text in your response
+          - The workspace is empty and ready for you to create new files
+
+          Task: {task}
       - name: implementation
         permission_mode: acceptEdits
         prompt_template: >
-          Now implement the plan from the previous phase. Create all necessary files
-          and ensure the code is functional and follows best practices.
-        continue_session: true
+          Now implement the following plan. Create all necessary files
+          in the current working directory.
+
+          PLAN FROM PREVIOUS PHASE:
+          {previous_result}
+
+          IMPORTANT:
+          - Create all files directly in the current workspace directory
+          - Do NOT ask for user input or approval - just implement autonomously
+          - Ensure the code is functional and follows best practices
+          - Run tests if applicable to verify your implementation
 
   # # CLI tool - iterative build-test-refine
   # - id: cli-tool-iterative

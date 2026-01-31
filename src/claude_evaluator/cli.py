@@ -448,13 +448,10 @@ def _determine_workflow_type(config: EvaluationConfig) -> WorkflowType:
     """
     if len(config.phases) == 1:
         return WorkflowType.direct
-    elif len(config.phases) == 2:
-        # Check if first phase is plan mode
-        first_phase = config.phases[0]
-        if first_phase.permission_mode == PermissionMode.plan:
-            return WorkflowType.plan_then_implement
-        return WorkflowType.multi_command
     else:
+        # Use multi_command for all multi-phase workflows to respect custom prompts
+        # from the YAML config. PlanThenImplementWorkflow has hardcoded prompts
+        # that don't use the phase prompts from config.
         return WorkflowType.multi_command
 
 

@@ -1303,7 +1303,7 @@ class TestMultiCommandWorkflowExecution:
 
         executed_phases: list[str] = []
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             executed_phases.append(phase)
             return QueryMetrics(
                 query_index=len(executed_phases),
@@ -1358,7 +1358,7 @@ class TestMultiCommandWorkflowExecution:
             response="Response",
         )
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -1383,7 +1383,7 @@ class TestMultiCommandWorkflowExecution:
         workflow = MultiCommandWorkflow(collector, phases)
         evaluation = self.create_mock_evaluation()
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=1,
                 prompt=query,
@@ -1447,7 +1447,7 @@ class TestMultiCommandWorkflowContextPassing:
 
         received_prompts: list[str] = []
 
-        async def capture_query(query: str, phase: str) -> QueryMetrics:
+        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             received_prompts.append(query)
             return QueryMetrics(
                 query_index=len(received_prompts),
@@ -1485,7 +1485,7 @@ class TestMultiCommandWorkflowContextPassing:
 
         received_query: str | None = None
 
-        async def capture_query(query: str, phase: str) -> QueryMetrics:
+        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             nonlocal received_query
             received_query = query
             return QueryMetrics(
@@ -1525,7 +1525,7 @@ class TestMultiCommandWorkflowContextPassing:
 
         received_query: str | None = None
 
-        async def capture_query(query: str, phase: str) -> QueryMetrics:
+        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
             nonlocal received_query
             received_query = query
             return QueryMetrics(
@@ -1583,7 +1583,7 @@ class TestMultiCommandWorkflowMetrics:
 
         phase_tokens = {"phase1": 100, "phase2": 200, "phase3": 300}
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             tokens = phase_tokens[phase]
             return QueryMetrics(
                 query_index=1,
@@ -1620,7 +1620,7 @@ class TestMultiCommandWorkflowMetrics:
         workflow = MultiCommandWorkflow(collector, phases)
         evaluation = self.create_mock_evaluation()
 
-        async def mock_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
             if phase == "design":
                 return QueryMetrics(
                     query_index=1,
