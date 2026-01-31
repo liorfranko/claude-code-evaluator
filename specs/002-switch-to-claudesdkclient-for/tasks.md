@@ -28,7 +28,7 @@ Initial project setup and validation.
 - [x] T001 [P] Verify claude-agent-sdk includes ClaudeSDKClient class
 - [x] T002 [P] Study ClaudeSDKClient API documentation and examples
 - [x] T003 [P] Create spike/POC to validate ClaudeSDKClient async context manager pattern
-- [ ] T004 Validate ClaudeSDKClient supports interrupt/continue for mid-conversation input
+- [x] T004 Validate ClaudeSDKClient supports interrupt/continue for mid-conversation input
 - [ ] T005 Document ClaudeSDKClient API findings in research.md
 
 ---

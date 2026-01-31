@@ -230,3 +230,140 @@ Our feature requires:
 | Answer quality insufficient | Configurable model + context window + retry logic |
 | Timeout too short/long | Make timeout configurable (default 60s) |
 | Resource leaks on failure | Use async context managers and try/finally |
+
+---
+
+## Phase 1 Findings: ClaudeSDKClient API Validation
+
+This section documents validated findings from the implementation investigation phase (Tasks T001-T004).
+
+### Validated API Availability
+
+**ClaudeSDKClient exists and is accessible in claude-agent-sdk v0.1.26.**
+
+The client is importable from the SDK:
+```python
+from claude_agent_sdk import ClaudeSDKClient
+```
+
+### Confirmed API Patterns
+
+#### 1. Async Context Manager Pattern (Validated)
+
+ClaudeSDKClient supports the async context manager pattern for proper lifecycle management:
+
+```python
+async with ClaudeSDKClient(...) as client:
+    # Use client for queries
+    await client.query("prompt")
+```
+
+This ensures proper connect/disconnect handling and resource cleanup.
+
+#### 2. Key Methods (Validated)
+
+| Method | Purpose | Use Case |
+|--------|---------|----------|
+| `query(prompt)` | Send a message/prompt to Claude | Initial prompts and follow-up answers |
+| `receive_response()` | Async generator yielding response blocks | Streaming message processing |
+| `interrupt()` | Abort the current operation | Timeout/abort scenarios only |
+| `disconnect()` | Clean up resources | Called automatically by context manager |
+
+#### 3. Session Context Preservation (Validated)
+
+**Critical finding**: Session context is preserved across multiple `query()` calls within the same ClaudeSDKClient instance.
+
+This means:
+- First `query()` starts the conversation
+- Subsequent `query()` calls continue the same conversation
+- Worker's full context is maintained without manual history management
+
+### Validated Mid-Conversation Q&A Pattern
+
+The following pattern has been validated for handling `AskUserQuestionBlock` during Worker execution:
+
+```python
+async with ClaudeSDKClient(...) as client:
+    # 1. Send initial prompt
+    await client.query(initial_prompt)
+
+    # 2. Process streaming response
+    async for block in client.receive_response():
+        if isinstance(block, AskUserQuestionBlock):
+            # 3. Detected a question - pause and get answer
+            question = block.question
+            answer = await developer_callback(question)
+
+            # 4. Send answer as follow-up query (continues same session)
+            await client.query(answer)
+
+            # 5. Continue processing response from resumed session
+            async for resumed_block in client.receive_response():
+                process_block(resumed_block)
+        else:
+            process_block(block)
+```
+
+**Key insight**: The `query()` method is used to send the Developer's answer. This naturally continues the conversation within the same session context - no special "inject" or "interrupt" method is needed for the Q&A flow.
+
+### Clarifications on interrupt() Usage
+
+**interrupt() is NOT for normal Q&A flow.**
+
+The `interrupt()` method is specifically for:
+- Aborting an operation due to timeout
+- Cancelling a long-running task
+- Emergency stop scenarios
+
+For normal question-answer flow, simply:
+1. Detect `AskUserQuestionBlock` in the response stream
+2. Obtain the answer from Developer (via callback)
+3. Call `query(answer)` to send the answer
+4. Continue with `receive_response()` for the resumed output
+
+### Developer Answer Generation Pattern
+
+The Developer agent can use a separate, isolated `query()` call (not ClaudeSDKClient) for answer generation:
+
+```python
+# Developer uses one-off query() for answer generation
+async def answer_question(question: str, context: list[dict]) -> str:
+    response = await sdk_query(
+        prompt=build_answer_prompt(question, context),
+        model=self.developer_qa_model,
+        # No tools needed, simple completion
+    )
+    return extract_answer(response)
+```
+
+This is appropriate because:
+- Answer generation is a one-off task
+- No session continuity needed
+- Keeps Developer's LLM call isolated from Worker's session
+
+### Caveats and Limitations
+
+1. **Error Handling Required**: If `receive_response()` encounters an error after sending an answer via `query()`, proper cleanup is needed to avoid resource leaks.
+
+2. **Timeout Coordination**: When implementing the 60-second timeout, care must be taken to:
+   - Wrap the Developer callback with `asyncio.wait_for()`
+   - Handle `asyncio.TimeoutError` appropriately
+   - Use `interrupt()` only if aborting the Worker's session entirely
+
+3. **Nested receive_response() Calls**: The pattern requires handling nested async generators. Ensure proper iteration and cleanup of both the outer and inner response streams.
+
+4. **SDK Version Dependency**: These findings are validated against `claude-agent-sdk v0.1.26`. API changes in future versions may affect compatibility.
+
+5. **Block Type Detection**: `AskUserQuestionBlock` detection must be implemented in the response processing loop. The exact import and type checking pattern should follow SDK conventions.
+
+### Summary
+
+The investigation confirms that the recommended approach from the research phase is correct:
+
+- **ClaudeSDKClient** is the right tool for Worker's multi-turn conversations
+- Session context is naturally preserved across `query()` calls
+- `interrupt()` is for abort scenarios, not Q&A flow
+- Developer can use separate `query()` for isolated answer generation
+- The callback pattern will work as designed
+
+This validates the architecture decisions and provides a clear implementation path forward.
