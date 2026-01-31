@@ -3895,3 +3895,594 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         # VERIFY: All criteria pass
         for criterion, passed in verification_results.items():
             assert passed, f"T706 criterion '{criterion}' failed. Events: {lifecycle_events}"
+
+
+# =============================================================================
+# T707: Verify Connection properly closed on completion or failure
+# =============================================================================
+
+
+class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
+    """T707: Verify that connections are properly closed on completion or failure.
+
+    This test class verifies the acceptance criteria for T707 (US-003):
+    - The client.disconnect() is called on successful completion (via clear_session)
+    - The client.disconnect() is called on exceptions/failures
+    - Resources are properly cleaned up in finally blocks
+    - No connection leaks occur
+
+    This is about CLEANUP - verifying connections are ALWAYS closed,
+    whether success or failure.
+    """
+
+    @pytest.mark.asyncio
+    async def test_disconnect_called_on_explicit_cleanup(self) -> None:
+        """Verify that disconnect() is called when clear_session() is invoked.
+
+        After successful evaluation completion, the caller should invoke
+        clear_session() to properly close the connection.
+        """
+        disconnect_called: list[bool] = []
+
+        class DisconnectTrackingClient:
+            """Track disconnect calls."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "disconnect-tracking-session"
+                self._connected = False
+
+            async def connect(self) -> None:
+                self._connected = True
+
+            async def disconnect(self) -> None:
+                disconnect_called.append(True)
+                self._connected = False
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Disconnect test done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", DisconnectTrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Execute a successful query
+                await worker.execute_query("Success query")
+
+                # Verify client is stored after success
+                assert worker._client is not None, "Client should exist after success"
+
+                # Explicitly close the connection
+                await worker.clear_session()
+
+        # VERIFY: disconnect was called during cleanup
+        assert len(disconnect_called) == 1, (
+            f"Expected 1 disconnect call, got {len(disconnect_called)}"
+        )
+
+        # VERIFY: client reference is cleared
+        assert worker._client is None, "Client should be None after clear_session"
+
+    @pytest.mark.asyncio
+    async def test_disconnect_called_on_connection_failure(self) -> None:
+        """Verify that disconnect() is called when connect() fails.
+
+        Even if connection fails, disconnect should be called to ensure
+        proper cleanup of any partially initialized resources.
+        """
+        cleanup_sequence: list[str] = []
+
+        class FailingConnectClient:
+            """Client that fails to connect."""
+
+            def __init__(self, options: Any = None) -> None:
+                cleanup_sequence.append("init")
+                self.options = options
+                self.session_id = "failing-connect-session"
+
+            async def connect(self) -> None:
+                cleanup_sequence.append("connect_attempted")
+                raise ConnectionError("T707: Connection failed")
+
+            async def disconnect(self) -> None:
+                cleanup_sequence.append("disconnect_called")
+
+            async def query(self, prompt: str) -> None:
+                cleanup_sequence.append("query_called")
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Should not reach")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailingConnectClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                with pytest.raises(ConnectionError, match="T707: Connection failed"):
+                    await worker.execute_query("Should fail")
+
+        # VERIFY: disconnect was called after connection failure
+        assert "disconnect_called" in cleanup_sequence, (
+            f"disconnect should be called on connect failure. Sequence: {cleanup_sequence}"
+        )
+
+        # VERIFY: query was NOT called (failed before reaching query)
+        assert "query_called" not in cleanup_sequence, (
+            f"query should not be called if connect fails. Sequence: {cleanup_sequence}"
+        )
+
+        # VERIFY: client reference is cleared
+        assert worker._client is None, "Client should be None after connection failure"
+
+    @pytest.mark.asyncio
+    async def test_disconnect_called_on_streaming_failure(self) -> None:
+        """Verify that disconnect() is called when streaming fails.
+
+        If an error occurs during receive_response(), the client should
+        still be cleaned up properly.
+        """
+        cleanup_sequence: list[str] = []
+
+        class FailingStreamClient:
+            """Client that fails during streaming."""
+
+            def __init__(self, options: Any = None) -> None:
+                cleanup_sequence.append("init")
+                self.options = options
+                self.session_id = "failing-stream-session"
+
+            async def connect(self) -> None:
+                cleanup_sequence.append("connected")
+
+            async def disconnect(self) -> None:
+                cleanup_sequence.append("disconnected")
+
+            async def query(self, prompt: str) -> None:
+                cleanup_sequence.append("query_sent")
+
+            async def receive_response(self) -> Any:
+                cleanup_sequence.append("streaming_started")
+                if False:
+                    yield  # Make it an async generator
+                raise RuntimeError("T707: Streaming failed")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailingStreamClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                with pytest.raises(RuntimeError, match="T707: Streaming failed"):
+                    await worker.execute_query("Should fail during streaming")
+
+        # VERIFY: Sequence shows connect -> query -> stream -> disconnect
+        assert "connected" in cleanup_sequence, "Should have connected"
+        assert "query_sent" in cleanup_sequence, "Should have sent query"
+        assert "streaming_started" in cleanup_sequence, "Should have started streaming"
+
+        # VERIFY: disconnect is called on streaming failure
+        assert "disconnected" in cleanup_sequence, (
+            f"disconnect should be called on streaming failure. Sequence: {cleanup_sequence}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_disconnect_errors_silently_ignored_during_cleanup(self) -> None:
+        """Verify that disconnect errors are silently ignored during cleanup.
+
+        If disconnect() itself raises an error, it should not mask the
+        original error and should not prevent cleanup from completing.
+        """
+        cleanup_sequence: list[str] = []
+        original_error_caught: list[bool] = []
+
+        class DoubleFailureClient:
+            """Client that fails on both connect and disconnect."""
+
+            def __init__(self, options: Any = None) -> None:
+                cleanup_sequence.append("init")
+                self.options = options
+                self.session_id = "double-failure-session"
+
+            async def connect(self) -> None:
+                cleanup_sequence.append("connect_failed")
+                raise ValueError("T707: Original connect error")
+
+            async def disconnect(self) -> None:
+                cleanup_sequence.append("disconnect_failed")
+                raise RuntimeError("T707: Disconnect error (should be ignored)")
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Should not reach")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", DoubleFailureClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                try:
+                    await worker.execute_query("Should fail")
+                except ValueError as e:
+                    if "Original connect error" in str(e):
+                        original_error_caught.append(True)
+                    else:
+                        raise
+
+        # VERIFY: Original error is raised (not masked by disconnect error)
+        assert len(original_error_caught) == 1, (
+            "Original error should be raised, not the disconnect error"
+        )
+
+        # VERIFY: disconnect was still attempted
+        assert "disconnect_failed" in cleanup_sequence, (
+            f"disconnect should be attempted even if it fails. Sequence: {cleanup_sequence}"
+        )
+
+        # VERIFY: client is cleaned up
+        assert worker._client is None, "Client should be None after failure"
+
+    @pytest.mark.asyncio
+    async def test_old_client_disconnected_when_starting_new_session(self) -> None:
+        """Verify that old client is disconnected when starting a new session.
+
+        When execute_query is called with resume_session=False and a client
+        already exists, the old client should be disconnected before
+        creating a new one.
+        """
+        clients: list[dict[str, Any]] = []
+        client_counter = [0]
+
+        class TrackingClient:
+            """Track multiple clients."""
+
+            def __init__(self, options: Any = None) -> None:
+                client_counter[0] += 1
+                self.client_id = client_counter[0]
+                self.options = options
+                self.session_id = f"tracking-session-{self.client_id}"
+                self._connected = False
+                self._disconnected = False
+                clients.append({
+                    "id": self.client_id,
+                    "client": self,
+                    "connected": False,
+                    "disconnected": False,
+                })
+
+            async def connect(self) -> None:
+                self._connected = True
+                for c in clients:
+                    if c["id"] == self.client_id:
+                        c["connected"] = True
+
+            async def disconnect(self) -> None:
+                self._disconnected = True
+                self._connected = False
+                for c in clients:
+                    if c["id"] == self.client_id:
+                        c["disconnected"] = True
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"Client {self.client_id} done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", TrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # First query - creates client 1
+                await worker.execute_query("First query", resume_session=False)
+                assert len(clients) == 1
+                assert clients[0]["connected"] is True
+                assert clients[0]["disconnected"] is False
+
+                # Second query without resume - should disconnect client 1, create client 2
+                await worker.execute_query("Second query", resume_session=False)
+                assert len(clients) == 2
+
+        # VERIFY: First client was disconnected when second was created
+        assert clients[0]["disconnected"] is True, (
+            "First client should be disconnected when new session starts"
+        )
+
+        # VERIFY: Second client was connected
+        assert clients[1]["connected"] is True, (
+            "Second client should be connected"
+        )
+
+    @pytest.mark.asyncio
+    async def test_no_connection_leaks_after_multiple_evaluations(self) -> None:
+        """Verify that no connection leaks occur after multiple evaluations.
+
+        Run multiple evaluations with explicit cleanup after each one
+        to verify no connections are left open.
+        """
+        active_connections: list[str] = []
+        all_operations: list[str] = []
+
+        class LeakTrackingClient:
+            """Track connection state for leak detection."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.client_id = f"client-{len(all_operations) + 1}"
+                self.options = options
+                self.session_id = self.client_id
+                all_operations.append(f"{self.client_id}:created")
+
+            async def connect(self) -> None:
+                active_connections.append(self.client_id)
+                all_operations.append(f"{self.client_id}:connected")
+
+            async def disconnect(self) -> None:
+                if self.client_id in active_connections:
+                    active_connections.remove(self.client_id)
+                all_operations.append(f"{self.client_id}:disconnected")
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result=f"{self.client_id} done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", LeakTrackingClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # Run 5 sequential evaluations with cleanup
+                for i in range(5):
+                    await worker.execute_query(f"Evaluation {i + 1}")
+                    await worker.clear_session()
+
+                    # After each cleanup, no connections should be active
+                    assert len(active_connections) == 0, (
+                        f"Evaluation {i + 1}: Expected no active connections, "
+                        f"got {active_connections}"
+                    )
+
+        # VERIFY: All operations show proper connect/disconnect pairs
+        connect_count = sum(1 for op in all_operations if "connected" in op and "disconnected" not in op)
+        disconnect_count = sum(1 for op in all_operations if "disconnected" in op)
+
+        assert connect_count == disconnect_count, (
+            f"Mismatch: {connect_count} connects vs {disconnect_count} disconnects. "
+            f"Operations: {all_operations}"
+        )
+
+        # VERIFY: No leaked connections
+        assert len(active_connections) == 0, (
+            f"Connection leak detected: {active_connections}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_cleanup_client_method_is_idempotent(self) -> None:
+        """Verify that _cleanup_client can be called multiple times safely.
+
+        Calling cleanup multiple times should not raise errors and should
+        leave the client in a clean state.
+        """
+        disconnect_calls: list[int] = []
+
+        class IdempotentTestClient:
+            """Test idempotent cleanup."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "idempotent-session"
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                disconnect_calls.append(1)
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="Idempotent test done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", IdempotentTestClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                await worker.execute_query("Test query")
+
+                # Call clear_session multiple times
+                await worker.clear_session()
+                await worker.clear_session()  # Should not error
+                await worker.clear_session()  # Should not error
+
+        # VERIFY: disconnect was only called once (first clear_session)
+        assert len(disconnect_calls) == 1, (
+            f"disconnect should only be called once, got {len(disconnect_calls)} calls"
+        )
+
+        # VERIFY: client is None
+        assert worker._client is None
+
+    @pytest.mark.asyncio
+    async def test_has_active_client_reflects_connection_state(self) -> None:
+        """Verify that has_active_client() accurately reflects connection state.
+
+        The method should return True when a client exists, False after cleanup.
+        """
+        class StateTestClient:
+            """Test has_active_client state."""
+
+            def __init__(self, options: Any = None) -> None:
+                self.options = options
+                self.session_id = "state-test-session"
+
+            async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
+                pass
+
+            async def query(self, prompt: str) -> None:
+                pass
+
+            async def receive_response(self) -> Any:
+                yield ResultMessage(result="State test done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        # Before any query
+        assert worker.has_active_client() is False, "No client before query"
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", StateTestClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                await worker.execute_query("Test query")
+
+        # After query
+        assert worker.has_active_client() is True, "Client should exist after query"
+
+        # After cleanup
+        await worker.clear_session()
+        assert worker.has_active_client() is False, "No client after cleanup"
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t707_complete_verification(self) -> None:
+        """Complete verification of T707 acceptance criteria.
+
+        Acceptance Criteria Checklist (US-003):
+        [x] client.disconnect() is called on successful completion (via clear_session)
+        [x] client.disconnect() is called on exceptions/failures
+        [x] Resources are properly cleaned up in finally blocks
+        [x] No connection leaks occur
+        """
+        verification_results: dict[str, bool] = {
+            "disconnect_on_success_via_clear_session": False,
+            "disconnect_on_failure": False,
+            "cleanup_in_exception_path": False,
+            "no_connection_leaks": False,
+        }
+
+        lifecycle_events: list[str] = []
+        active_connections: list[str] = []
+        fail_on_next_connect = [False]
+        client_counter = [0]
+
+        class ComprehensiveVerificationClient:
+            """Client for complete T707 verification."""
+
+            def __init__(self, options: Any = None) -> None:
+                client_counter[0] += 1
+                self.client_id = f"verify-{client_counter[0]}"
+                self.options = options
+                self.session_id = self.client_id
+                lifecycle_events.append(f"{self.client_id}:CREATED")
+
+            async def connect(self) -> None:
+                if fail_on_next_connect[0]:
+                    lifecycle_events.append(f"{self.client_id}:CONNECT_FAILED")
+                    raise ConnectionError("T707 verification: forced failure")
+                active_connections.append(self.client_id)
+                lifecycle_events.append(f"{self.client_id}:CONNECTED")
+
+            async def disconnect(self) -> None:
+                if self.client_id in active_connections:
+                    active_connections.remove(self.client_id)
+                lifecycle_events.append(f"{self.client_id}:DISCONNECTED")
+
+            async def query(self, prompt: str) -> None:
+                lifecycle_events.append(f"{self.client_id}:QUERY")
+
+            async def receive_response(self) -> Any:
+                lifecycle_events.append(f"{self.client_id}:RESPONSE")
+                yield ResultMessage(result="T707 verification done")
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t707_verification",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+        )
+
+        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ComprehensiveVerificationClient):
+            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+                # SCENARIO 1: Successful query with explicit cleanup
+                await worker.execute_query("T707 success query")
+                await worker.clear_session()
+
+                # CRITERION 1: disconnect called on success via clear_session
+                verification_results["disconnect_on_success_via_clear_session"] = (
+                    any("DISCONNECTED" in e for e in lifecycle_events)
+                )
+
+                # Reset for failure scenario
+                lifecycle_events.clear()
+                active_connections.clear()
+                fail_on_next_connect[0] = True
+
+                # SCENARIO 2: Failed connection with cleanup
+                try:
+                    await worker.execute_query("T707 failure query")
+                except ConnectionError:
+                    pass  # Expected
+
+                # CRITERION 2: disconnect called on failure
+                verification_results["disconnect_on_failure"] = (
+                    any("DISCONNECTED" in e for e in lifecycle_events)
+                )
+
+                # CRITERION 3: cleanup happens in exception path
+                # Verified by: client is None after failure
+                verification_results["cleanup_in_exception_path"] = (
+                    worker._client is None
+                )
+
+        # CRITERION 4: No connection leaks
+        verification_results["no_connection_leaks"] = (
+            len(active_connections) == 0
+        )
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, (
+                f"T707 criterion '{criterion}' failed. "
+                f"Events: {lifecycle_events}, Active: {active_connections}"
+            )

@@ -220,7 +220,7 @@ Final verification and documentation updates.
 - [x] T704 [US2] Verify: Session context preserved across multiple exchanges
 - [x] T705 [US2] Verify: Worker remembers previous messages after Developer answers
 - [x] T706 [US3] Verify: Client connection established at evaluation start
-- [ ] T707 [US3] Verify: Connection properly closed on completion or failure
+- [x] T707 [US3] Verify: Connection properly closed on completion or failure
 - [ ] T708 [US3] Verify: Multiple evaluations run sequentially without leaks
 
 ### Edge Case Testing
