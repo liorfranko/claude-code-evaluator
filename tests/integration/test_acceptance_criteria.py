@@ -1537,3 +1537,646 @@ class TestT702SessionContinuity:
 
         # VERIFY: Final result confirms completion
         assert result.result == "T702 Verified"
+
+
+# =============================================================================
+# T703: Verify Worker continues execution based on Developer's answer
+# =============================================================================
+
+
+class ToolUseBlock:
+    """Mock for ToolUseBlock from claude-agent-sdk."""
+
+    def __init__(
+        self,
+        block_id: str = "tool-use-1",
+        name: str = "Read",
+        tool_input: dict[str, Any] | None = None,
+    ) -> None:
+        self.id = block_id
+        self.name = name
+        self.input = tool_input or {}
+
+
+class ToolResultBlock:
+    """Mock for ToolResultBlock from claude-agent-sdk."""
+
+    def __init__(
+        self,
+        tool_use_id: str = "tool-use-1",
+        content: str = "Tool result",
+        is_error: bool = False,
+    ) -> None:
+        self.tool_use_id = tool_use_id
+        self.content = content
+        self.is_error = is_error
+
+
+class UserMessage:
+    """Mock for UserMessage from claude-agent-sdk."""
+
+    def __init__(self, content: list[Any] | str | None = None) -> None:
+        self.content = content or []
+
+
+class TestT703WorkerContinuesAfterAnswer:
+    """T703: Verify that Worker continues execution based on Developer's answer.
+
+    This test class verifies the acceptance criteria for T703:
+    - After client.query(answer) is called, the Worker continues streaming
+    - The Worker processes subsequent messages from the stream
+    - The Worker can complete its task after receiving the answer
+    - The Worker does not stop but keeps working after receiving the answer
+    """
+
+    @pytest.mark.asyncio
+    async def test_worker_continues_streaming_after_answer(self) -> None:
+        """Test that Worker continues receiving and processing messages after answer.
+
+        Acceptance Criteria:
+        - Worker receives messages after answer is sent
+        - Worker processes all messages until ResultMessage
+        - Worker does not exit early after answer
+        """
+        messages_processed_after_answer: list[str] = []
+
+        async def answer_callback(context: QuestionContext) -> str:
+            return "Use pytest"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t703_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=answer_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+        mock_client.session_id = "t703-continue-session"
+
+        # Setup: Question, then multiple assistant messages after answer, then result
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Which testing framework?"}]
+        )
+
+        mock_client.set_responses(
+            [
+                # First response: question
+                [AssistantMessage(content=[question_block])],
+                # Second response after answer: multiple work messages
+                [
+                    AssistantMessage(content=[TextBlock("Setting up pytest...")]),
+                    AssistantMessage(content=[TextBlock("Creating test files...")]),
+                    AssistantMessage(content=[TextBlock("Writing unit tests...")]),
+                    ResultMessage(result="Tests created successfully"),
+                ],
+            ]
+        )
+
+        result, response_content, all_messages = await worker._stream_sdk_messages_with_client(
+            "Create tests", mock_client
+        )
+
+        # VERIFY: Worker processed messages after the answer
+        # All messages should be in the history
+        text_messages = [
+            msg for msg in all_messages
+            if msg.get("role") == "assistant" and isinstance(msg.get("content"), list)
+        ]
+        text_contents = []
+        for msg in text_messages:
+            for block in msg.get("content", []):
+                if isinstance(block, dict) and block.get("type") == "TextBlock":
+                    text_contents.append(block.get("text", ""))
+
+        assert "Setting up pytest..." in text_contents, (
+            "Worker should have processed 'Setting up pytest...' message after answer"
+        )
+        assert "Creating test files..." in text_contents, (
+            "Worker should have processed 'Creating test files...' message after answer"
+        )
+        assert "Writing unit tests..." in text_contents, (
+            "Worker should have processed 'Writing unit tests...' message after answer"
+        )
+
+        # VERIFY: Final result confirms completion
+        assert result.result == "Tests created successfully"
+
+    @pytest.mark.asyncio
+    async def test_worker_processes_tool_invocations_after_answer(self) -> None:
+        """Test that Worker processes tool invocations after receiving answer.
+
+        This verifies that the Worker continues to track tool usage after
+        the Developer provides an answer, demonstrating actual work is happening.
+        """
+        async def answer_callback(context: QuestionContext) -> str:
+            return "Yes, create the file"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t703_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=answer_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        # Setup: Question, then tool usage after answer
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Should I create the file?"}]
+        )
+
+        # Tool use after the answer
+        tool_use_after_answer = ToolUseBlock(
+            block_id="tool-after-answer-1",
+            name="Write",
+            tool_input={"file_path": "/tmp/test.py", "content": "# Test file"},
+        )
+        tool_result = ToolResultBlock(
+            tool_use_id="tool-after-answer-1",
+            content="File written successfully",
+        )
+
+        mock_client.set_responses(
+            [
+                # First: question
+                [AssistantMessage(content=[question_block])],
+                # After answer: tool use, user message with result, final result
+                [
+                    AssistantMessage(content=[tool_use_after_answer]),
+                    UserMessage(content=[tool_result]),
+                    ResultMessage(result="File created"),
+                ],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "Create a test file", mock_client
+        )
+
+        # VERIFY: Tool invocation was tracked after the answer
+        tool_invocations = worker.get_tool_invocations()
+        assert len(tool_invocations) >= 1, "Worker should have tracked tool invocations after answer"
+
+        write_tool = next(
+            (t for t in tool_invocations if t.tool_name == "Write"),
+            None
+        )
+        assert write_tool is not None, "Write tool invocation should be tracked after answer"
+        assert write_tool.tool_use_id == "tool-after-answer-1"
+
+        # VERIFY: Completion
+        assert result.result == "File created"
+
+    @pytest.mark.asyncio
+    async def test_worker_completes_multi_step_task_after_answer(self) -> None:
+        """Test that Worker can complete a multi-step task after receiving answer.
+
+        This test simulates a realistic scenario where:
+        1. Worker starts a task
+        2. Worker asks a question
+        3. Developer provides an answer
+        4. Worker performs multiple steps based on the answer
+        5. Worker completes the task successfully
+        """
+        steps_completed: list[str] = []
+
+        async def answer_callback(context: QuestionContext) -> str:
+            return "Use the REST API approach"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t703_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=answer_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        question_block = AskUserQuestionBlock(
+            questions=[
+                {
+                    "question": "Which API approach should I use?",
+                    "options": [
+                        {"label": "REST API"},
+                        {"label": "GraphQL"},
+                    ],
+                }
+            ]
+        )
+
+        # Multi-step response after answer
+        mock_client.set_responses(
+            [
+                # Question phase
+                [
+                    AssistantMessage(content=[TextBlock("Analyzing requirements...")]),
+                    AssistantMessage(content=[question_block]),
+                ],
+                # Work phase after answer (multiple steps)
+                [
+                    AssistantMessage(content=[TextBlock("Step 1: Creating REST endpoints...")]),
+                    AssistantMessage(content=[TextBlock("Step 2: Setting up routes...")]),
+                    AssistantMessage(content=[TextBlock("Step 3: Implementing handlers...")]),
+                    AssistantMessage(content=[TextBlock("Step 4: Adding authentication...")]),
+                    AssistantMessage(content=[TextBlock("Step 5: Writing integration tests...")]),
+                    ResultMessage(result="REST API implementation complete with 5 endpoints"),
+                ],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "Build an API", mock_client
+        )
+
+        # VERIFY: All steps were processed
+        text_contents = []
+        for msg in all_messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "TextBlock":
+                            text_contents.append(block.get("text", ""))
+
+        assert any("Step 1" in t for t in text_contents), "Step 1 should be processed"
+        assert any("Step 2" in t for t in text_contents), "Step 2 should be processed"
+        assert any("Step 3" in t for t in text_contents), "Step 3 should be processed"
+        assert any("Step 4" in t for t in text_contents), "Step 4 should be processed"
+        assert any("Step 5" in t for t in text_contents), "Step 5 should be processed"
+
+        # VERIFY: Task completed successfully
+        assert result.result == "REST API implementation complete with 5 endpoints"
+
+    @pytest.mark.asyncio
+    async def test_worker_handles_multiple_questions_and_continues_work(self) -> None:
+        """Test Worker handles multiple questions and continues work after each.
+
+        Verifies that the Worker can:
+        - Answer multiple sequential questions
+        - Continue working after each answer
+        - Eventually complete the task
+        """
+        answers_given: list[str] = []
+
+        async def multi_answer_callback(context: QuestionContext) -> str:
+            answer = f"Answer to question {len(answers_given) + 1}"
+            answers_given.append(answer)
+            return answer
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t703_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=multi_answer_callback,
+        )
+
+        mock_client = MockClaudeSDKClient()
+
+        q1 = AskUserQuestionBlock(questions=[{"question": "First decision?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Second decision?"}])
+        q3 = AskUserQuestionBlock(questions=[{"question": "Final confirmation?"}])
+
+        mock_client.set_responses(
+            [
+                # First question
+                [
+                    AssistantMessage(content=[TextBlock("Starting project...")]),
+                    AssistantMessage(content=[q1]),
+                ],
+                # Work after first answer, then second question
+                [
+                    AssistantMessage(content=[TextBlock("Configuring based on first answer...")]),
+                    AssistantMessage(content=[q2]),
+                ],
+                # Work after second answer, then third question
+                [
+                    AssistantMessage(content=[TextBlock("Setting up based on second answer...")]),
+                    AssistantMessage(content=[q3]),
+                ],
+                # Final work and completion
+                [
+                    AssistantMessage(content=[TextBlock("Finalizing project...")]),
+                    AssistantMessage(content=[TextBlock("Running tests...")]),
+                    ResultMessage(result="Project completed with all decisions made"),
+                ],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "Create complex project", mock_client
+        )
+
+        # VERIFY: All three questions were answered
+        assert len(answers_given) == 3, "All three questions should have been answered"
+
+        # VERIFY: Work continued after each answer
+        text_contents = []
+        for msg in all_messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "TextBlock":
+                            text_contents.append(block.get("text", ""))
+
+        assert any("first answer" in t.lower() for t in text_contents), (
+            "Work should continue after first answer"
+        )
+        assert any("second answer" in t.lower() for t in text_contents), (
+            "Work should continue after second answer"
+        )
+        assert any("Finalizing" in t for t in text_contents), (
+            "Final work should be done after all questions answered"
+        )
+
+        # VERIFY: Task completed
+        assert result.result == "Project completed with all decisions made"
+
+    @pytest.mark.asyncio
+    async def test_worker_loop_continues_until_no_more_questions(self) -> None:
+        """Test that the Worker's while loop continues until no more questions.
+
+        This directly tests the while True loop behavior in _stream_sdk_messages_with_client.
+        """
+        loop_iterations: list[int] = []
+        iteration = 0
+
+        class CountingClient:
+            """Client that tracks receive_response iterations."""
+
+            def __init__(self) -> None:
+                self.session_id = "loop-test-session"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+
+            async def query(self, prompt: str) -> None:
+                nonlocal iteration
+                iteration += 1
+                loop_iterations.append(iteration)
+                self._queries.append(prompt)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="Done")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        async def simple_callback(context: QuestionContext) -> str:
+            return "Continue"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t703_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=simple_callback,
+        )
+
+        counting_client = CountingClient()
+        q1 = AskUserQuestionBlock(questions=[{"question": "Q1?"}])
+        q2 = AskUserQuestionBlock(questions=[{"question": "Q2?"}])
+
+        counting_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],  # Question 1
+                [AssistantMessage(content=[q2])],  # Question 2 after answer
+                [ResultMessage(result="All done")],  # Final result - no question
+            ]
+        )
+
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Start", counting_client
+        )
+
+        # VERIFY: Loop iterated correct number of times
+        # 1. Initial query
+        # 2. Answer to Q1
+        # 3. Answer to Q2
+        assert len(loop_iterations) == 3, (
+            f"Expected 3 loop iterations (initial + 2 answers), got {len(loop_iterations)}"
+        )
+
+        # VERIFY: Loop exited when no more questions
+        assert result.result == "All done"
+
+    @pytest.mark.asyncio
+    async def test_worker_execution_does_not_stop_after_single_answer(self) -> None:
+        """Explicit test that Worker does NOT stop after receiving just one answer.
+
+        This is a negative test to ensure the Worker doesn't have early exit behavior.
+        """
+        work_done_after_answer = False
+
+        async def answer_callback(context: QuestionContext) -> str:
+            return "Proceed"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t703_test",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=answer_callback,
+        )
+
+        class EarlyExitDetectingClient:
+            """Client that detects if Worker tries to exit early."""
+
+            def __init__(self) -> None:
+                self.session_id = "early-exit-test"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+                self.all_responses_consumed = False
+
+            async def query(self, prompt: str) -> None:
+                self._queries.append(prompt)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                    # Mark when we've consumed all responses
+                    if self._response_index == len(self._responses):
+                        self.all_responses_consumed = True
+                else:
+                    yield ResultMessage(result="Complete")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        detecting_client = EarlyExitDetectingClient()
+        question = AskUserQuestionBlock(questions=[{"question": "Continue?"}])
+
+        # Important: After the answer, there's MORE work before the result
+        detecting_client.set_responses(
+            [
+                [AssistantMessage(content=[question])],  # Question
+                [
+                    # After answer: significant work before result
+                    AssistantMessage(content=[TextBlock("Starting work...")]),
+                    AssistantMessage(content=[TextBlock("Middle of work...")]),
+                    AssistantMessage(content=[TextBlock("Almost done...")]),
+                    ResultMessage(result="All work completed"),
+                ],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "Do work", detecting_client
+        )
+
+        # VERIFY: All responses were consumed (Worker didn't exit early)
+        assert detecting_client.all_responses_consumed, (
+            "Worker exited early without consuming all responses after answer"
+        )
+
+        # VERIFY: Work was done after answer
+        text_contents = []
+        for msg in all_messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "TextBlock":
+                            text_contents.append(block.get("text", ""))
+
+        assert any("Starting work" in t for t in text_contents)
+        assert any("Middle of work" in t for t in text_contents)
+        assert any("Almost done" in t for t in text_contents)
+
+        # VERIFY: Final result
+        assert result.result == "All work completed"
+
+    @pytest.mark.asyncio
+    async def test_acceptance_criteria_t703_complete_verification(self) -> None:
+        """Complete verification of T703 acceptance criteria.
+
+        Acceptance Criteria Checklist:
+        [x] After client.query(answer) is called, the Worker continues streaming
+        [x] The Worker processes subsequent messages from the stream
+        [x] The Worker can complete its task after receiving the answer
+        [x] The Worker does not stop but keeps working
+        """
+        verification_results: dict[str, bool] = {
+            "continues_streaming_after_answer": False,
+            "processes_subsequent_messages": False,
+            "completes_task_after_answer": False,
+            "does_not_stop_early": False,
+        }
+
+        messages_after_answer: list[str] = []
+        queries_sent: list[str] = []
+
+        class VerificationClient:
+            """Client that verifies all T703 acceptance criteria."""
+
+            def __init__(self) -> None:
+                self.session_id = "t703-verification"
+                self._queries: list[str] = []
+                self._responses: list[list[Any]] = []
+                self._response_index = 0
+
+            async def query(self, prompt: str) -> None:
+                queries_sent.append(prompt)
+                self._queries.append(prompt)
+
+            async def receive_response(self) -> Any:
+                if self._response_index < len(self._responses):
+                    responses = self._responses[self._response_index]
+                    self._response_index += 1
+                    for response in responses:
+                        yield response
+                else:
+                    yield ResultMessage(result="Verified")
+
+            def set_responses(self, responses: list[list[Any]]) -> None:
+                self._responses = responses
+                self._response_index = 0
+
+        async def verification_callback(context: QuestionContext) -> str:
+            return "Verification answer"
+
+        worker = WorkerAgent(
+            execution_mode=ExecutionMode.sdk,
+            project_directory="/tmp/t703_verification",
+            active_session=False,
+            permission_mode=PermissionMode.plan,
+            on_question_callback=verification_callback,
+        )
+
+        verification_client = VerificationClient()
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Verification question?"}]
+        )
+
+        # Setup: question, then multiple messages after answer, then result
+        verification_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+                [
+                    AssistantMessage(content=[TextBlock("Processing answer...")]),
+                    AssistantMessage(content=[TextBlock("Doing more work...")]),
+                    AssistantMessage(content=[TextBlock("Final processing...")]),
+                    ResultMessage(result="T703 Verified Complete"),
+                ],
+            ]
+        )
+
+        result, _, all_messages = await worker._stream_sdk_messages_with_client(
+            "Verify T703", verification_client
+        )
+
+        # Collect messages processed after the answer
+        for msg in all_messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "TextBlock":
+                            messages_after_answer.append(block.get("text", ""))
+
+        # CRITERION 1: Worker continues streaming after answer
+        # Verified by: answer was sent, then more responses were received
+        verification_results["continues_streaming_after_answer"] = (
+            len(queries_sent) >= 2 and  # Initial + answer
+            "Verification answer" in queries_sent
+        )
+
+        # CRITERION 2: Worker processes subsequent messages
+        # Verified by: messages after the answer are in the history
+        verification_results["processes_subsequent_messages"] = (
+            "Processing answer..." in messages_after_answer and
+            "Doing more work..." in messages_after_answer and
+            "Final processing..." in messages_after_answer
+        )
+
+        # CRITERION 3: Worker completes task after receiving answer
+        # Verified by: final result is received
+        verification_results["completes_task_after_answer"] = (
+            result.result == "T703 Verified Complete"
+        )
+
+        # CRITERION 4: Worker does not stop early
+        # Verified by: all expected messages were processed
+        verification_results["does_not_stop_early"] = (
+            len(messages_after_answer) >= 3  # At least the 3 messages we expect
+        )
+
+        # VERIFY: All criteria pass
+        for criterion, passed in verification_results.items():
+            assert passed, f"T703 criterion '{criterion}' failed"
