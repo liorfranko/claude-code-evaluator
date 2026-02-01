@@ -342,7 +342,11 @@ class WorkerAgent:
                     response_content, all_messages
                 )
                 if implicit_answer is not None:
-                    # Send the answer and continue
+                    # Log and send the answer to continue
+                    self._emit_progress(ProgressEvent(
+                        event_type=ProgressEventType.TEXT,
+                        message=f"Developer answered implicit question: {implicit_answer[:100]}",
+                    ))
                     await client.query(implicit_answer)
                     result_message = None  # Reset to wait for new result
                     continue
@@ -597,11 +601,16 @@ class WorkerAgent:
                     tool_input=block.input,
                 )
                 pending_tool_uses[block.id] = invocation
-                # Emit tool start progress event
+                # Emit tool start progress event with tool details
+                tool_detail = self._get_tool_detail(block.name, block.input)
                 self._emit_progress(ProgressEvent(
                     event_type=ProgressEventType.TOOL_START,
                     message=f"Tool: {block.name}",
-                    data={"tool_name": block.name, "tool_use_id": block.id},
+                    data={
+                        "tool_name": block.name,
+                        "tool_use_id": block.id,
+                        "tool_detail": tool_detail,
+                    },
                 ))
             elif block_type == "TextBlock" and hasattr(block, "text"):
                 text_parts.append(block.text)
@@ -798,6 +807,63 @@ class WorkerAgent:
         if len(input_str) <= max_length:
             return input_str
         return input_str[:max_length - 3] + "..."
+
+    def _get_tool_detail(
+        self,
+        tool_name: str,
+        tool_input: dict[str, Any],
+    ) -> str:
+        """Extract a human-readable detail from tool input.
+
+        Provides context about what the tool is doing based on
+        common tool input patterns.
+
+        Args:
+            tool_name: Name of the tool being invoked.
+            tool_input: Input parameters for the tool.
+
+        Returns:
+            A short description of the tool action.
+        """
+        try:
+            # Handle common tools
+            if tool_name == "Bash":
+                cmd = tool_input.get("command", "")
+                if len(cmd) > 60:
+                    cmd = cmd[:57] + "..."
+                return cmd
+            elif tool_name == "Read":
+                path = tool_input.get("file_path", "")
+                return path.split("/")[-1] if "/" in path else path
+            elif tool_name == "Write":
+                path = tool_input.get("file_path", "")
+                return path.split("/")[-1] if "/" in path else path
+            elif tool_name == "Edit":
+                path = tool_input.get("file_path", "")
+                return path.split("/")[-1] if "/" in path else path
+            elif tool_name == "Glob":
+                return tool_input.get("pattern", "")
+            elif tool_name == "Grep":
+                pattern = tool_input.get("pattern", "")
+                return f'"{pattern}"' if pattern else ""
+            elif tool_name == "Skill":
+                return tool_input.get("skill", "")
+            elif tool_name == "Task":
+                return tool_input.get("description", "")[:40]
+            elif tool_name == "TodoWrite":
+                todos = tool_input.get("todos", [])
+                return f"{len(todos)} items"
+            else:
+                # For unknown tools, try to get a meaningful field
+                for key in ["name", "path", "file_path", "command", "query", "prompt"]:
+                    if key in tool_input:
+                        val = str(tool_input[key])
+                        if len(val) > 40:
+                            val = val[:37] + "..."
+                        return val
+                return ""
+        except Exception:
+            return ""
 
     def _serialize_message(
         self,

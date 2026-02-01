@@ -6,6 +6,8 @@ is useful for complex evaluation scenarios that require multiple distinct
 commands to be executed in order.
 """
 
+import asyncio
+import logging
 from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
@@ -216,6 +218,11 @@ class MultiCommandWorkflow(BaseWorkflow):
                 # Get developer's analysis and potential response
                 answer_result = await developer.answer_question(question_context)
 
+                # Log the developer's answer for visibility
+                logging.getLogger(__name__).info(
+                    f"Developer answered worker: {answer_result.answer}"
+                )
+
                 # Check if developer indicates task is complete (no follow-up needed)
                 answer_lower = answer_result.answer.lower().strip()
                 if answer_lower in ("complete", "done", "finished", "no follow-up needed"):
@@ -232,8 +239,12 @@ class MultiCommandWorkflow(BaseWorkflow):
                 self.metrics_collector.add_query_metrics(query_metrics)
                 response = query_metrics.response
 
-            except (RuntimeError, AttributeError):
-                # SDK not available or answer_question not working - skip continuation
+            except (RuntimeError, AttributeError, asyncio.CancelledError, Exception) as e:
+                # SDK not available, answer_question not working, or other error - skip continuation
+                # Log the error for debugging but don't fail the evaluation
+                logging.getLogger(__name__).debug(
+                    f"Developer continuation skipped due to error: {type(e).__name__}: {e}"
+                )
                 break
 
         # Clear tool invocations for the next phase (if not continuing session)

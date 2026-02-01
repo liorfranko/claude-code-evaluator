@@ -59,6 +59,22 @@ evaluations:
 claude-eval run my-suite.yaml
 ```
 
+3. Run with verbose mode to see detailed tool execution:
+
+```bash
+claude-evaluator --suite my-suite.yaml --verbose
+```
+
+Verbose output shows what each tool is doing:
+```
+  → Bash: git status
+  ← Bash ✓
+  → Read: spec.md
+  ← Read ✓
+  → Skill: spectra:plan
+  ← Skill ✓
+```
+
 ## Question and Answer (Q&A) Feature
 
 During evaluations, Claude (the Worker agent) may ask questions when it needs clarification or user input. The Q&A feature enables the Developer agent to automatically generate intelligent, context-aware answers using an LLM.
@@ -94,7 +110,7 @@ evaluations:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `model` | `claude-haiku-4-5@20251001` | The model used by the Worker agent for task execution |
-| `developer_qa_model` | `claude-haiku-4-5@20251001` | The model used by the Developer agent to generate answers |
+| `developer_qa_model` | `claude-3-haiku@20240307` | The model used by the Developer agent to generate answers (cheapest option) |
 | `question_timeout_seconds` | `60` | Maximum time (in seconds) to wait for answer generation |
 | `context_window_size` | `10` | Number of recent messages to include when generating answers |
 
@@ -108,6 +124,20 @@ The evaluator can detect when the Worker asks questions in plain text without us
 - Asking for preferences or confirmation
 
 When an implicit question is detected, the Developer agent automatically generates an appropriate answer to keep the workflow moving.
+
+### Developer Continuation
+
+In multi-command workflows, the Developer agent analyzes Worker responses after each phase to determine if follow-up is needed. If the Worker presents options, asks questions in text, or seems stuck, the Developer will:
+
+1. Analyze the response using an LLM
+2. Generate an appropriate instruction (e.g., "continue", "proceed with full implementation")
+3. Send the instruction back to the Worker to continue
+
+This enables fully autonomous evaluation runs where the Worker can receive guidance without manual intervention. Continuation answers are logged with `--verbose`:
+
+```
+INFO:claude_evaluator.workflows.multi_command:Developer answered worker: continue
+```
 
 For detailed examples and configuration options, see the [Quickstart Guide](docs/quickstart.md).
 

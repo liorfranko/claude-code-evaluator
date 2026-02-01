@@ -5,6 +5,7 @@ orchestrating Claude Code during evaluation. The agent manages state transitions
 through the evaluation workflow and logs autonomous decisions.
 """
 
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -27,7 +28,7 @@ except ImportError:
 
 __all__ = ["DeveloperAgent", "InvalidStateTransitionError", "LoopDetectedError"]
 
-# Default model to use for Q&A when not specified
+# Default model to use for Q&A when not specified (cheapest Haiku on Vertex AI)
 DEFAULT_QA_MODEL = "claude-3-haiku@20240307"
 
 # Define valid state transitions for the Developer agent state machine
@@ -106,6 +107,7 @@ class DeveloperAgent:
         developer_qa_model: Model identifier for Q&A (optional, uses DEFAULT_QA_MODEL if None).
         context_window_size: Number of recent messages to include as context (1-100).
         max_answer_retries: Maximum retries for rejected answers (0-5).
+        cwd: Working directory for SDK queries (optional, defaults to os.getcwd()).
         _answer_retry_count: Internal counter for answer attempt tracking.
     """
 
@@ -118,6 +120,7 @@ class DeveloperAgent:
     developer_qa_model: Optional[str] = field(default=None)
     context_window_size: int = field(default=10)
     max_answer_retries: int = field(default=1)
+    cwd: Optional[str] = field(default=None)
     _answer_retry_count: int = field(default=0, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -603,10 +606,12 @@ class DeveloperAgent:
         try:
             # Call the SDK query function for one-off answer generation
             # sdk_query returns an async generator, must consume fully to clean up
+            # Use cwd if set, otherwise use current directory
+            working_dir = self.cwd or os.getcwd()
             result_message = None
             query_gen = sdk_query(
                 prompt=prompt,
-                options=ClaudeAgentOptions(model=model, max_turns=1),
+                options=ClaudeAgentOptions(cwd=working_dir, model=model, max_turns=1),
             )
             try:
                 async for message in query_gen:
@@ -941,10 +946,12 @@ Your response:"""
             model = self.developer_qa_model or DEFAULT_QA_MODEL
 
             # sdk_query returns an async generator, must consume fully to clean up
+            # Use cwd if set, otherwise use current directory
+            working_dir = self.cwd or os.getcwd()
             result_message = None
             query_gen = sdk_query(
                 prompt=prompt,
-                options=ClaudeAgentOptions(model=model, max_turns=1),
+                options=ClaudeAgentOptions(cwd=working_dir, model=model, max_turns=1),
             )
             try:
                 async for message in query_gen:

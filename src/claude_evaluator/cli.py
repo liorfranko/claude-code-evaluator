@@ -175,8 +175,12 @@ def create_progress_callback():
         if event.event_type == ProgressEventType.TOOL_START:
             tool_name = event.data.get("tool_name", "unknown") if event.data else "unknown"
             tool_id = event.data.get("tool_use_id", "") if event.data else ""
+            tool_detail = event.data.get("tool_detail", "") if event.data else ""
             _active_tools[tool_id] = tool_name
-            print(f"  → {tool_name}")
+            if tool_detail:
+                print(f"  → {tool_name}: {tool_detail}")
+            else:
+                print(f"  → {tool_name}")
         elif event.event_type == ProgressEventType.TOOL_END:
             success = event.data.get("success", True) if event.data else True
             tool_name = event.data.get("tool_name", "tool") if event.data else "tool"

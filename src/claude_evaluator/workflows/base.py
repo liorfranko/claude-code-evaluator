@@ -354,6 +354,7 @@ class BaseWorkflow(ABC):
         if self._developer_qa_model is not None:
             developer.developer_qa_model = self._developer_qa_model
         developer.context_window_size = self._context_window_size
+        developer.cwd = worker.project_directory
 
         # Create and set the question callback on WorkerAgent
         callback = self.create_question_callback(developer)
