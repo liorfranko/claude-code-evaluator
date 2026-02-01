@@ -749,7 +749,7 @@ def format_results(reports: list[EvaluationReport], json_output: bool = False) -
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Main entry point for the CLI.
+    """Run the CLI application.
 
     Args:
         argv: Command-line arguments (defaults to sys.argv[1:]).

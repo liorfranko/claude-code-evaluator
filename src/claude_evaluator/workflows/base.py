@@ -132,9 +132,9 @@ class BaseWorkflow(ABC):
         pass
 
     def on_execution_start(self, evaluation: "Evaluation") -> None:
-        """Hook called when workflow execution begins.
+        """Handle workflow execution start.
 
-        Sets the start time on the metrics collector and transitions the
+        Set the start time on the metrics collector and transition the
         evaluation to running state if it's not already running.
 
         Args:
@@ -146,10 +146,10 @@ class BaseWorkflow(ABC):
             evaluation.start()
 
     def on_execution_complete(self, evaluation: "Evaluation") -> "Metrics":
-        """Hook called when workflow execution completes successfully.
+        """Handle successful workflow execution completion.
 
-        Sets the end time on the metrics collector, aggregates the metrics,
-        and transitions the evaluation to completed state.
+        Set the end time on the metrics collector, aggregate the metrics,
+        and transition the evaluation to completed state.
 
         Args:
             evaluation: The Evaluation instance that completed.
@@ -164,9 +164,9 @@ class BaseWorkflow(ABC):
         return metrics
 
     def on_execution_error(self, evaluation: "Evaluation", error: Exception) -> None:
-        """Hook called when workflow execution fails.
+        """Handle workflow execution failure.
 
-        Sets the end time on the metrics collector and transitions the
+        Set the end time on the metrics collector and transition the
         evaluation to failed state.
 
         Args:

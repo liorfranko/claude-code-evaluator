@@ -22,6 +22,7 @@ def test_workspace(tmp_path: Path) -> Path:
 
     Returns:
         Path to a clean temporary directory unique to this test invocation.
+
     """
     return tmp_path
 
@@ -35,6 +36,7 @@ def sample_task_description() -> dict[str, Any]:
 
     Returns:
         A dictionary containing sample task metadata and requirements.
+
     """
     return {
         "id": "sample-task-001",
@@ -65,6 +67,7 @@ def sample_task_descriptions() -> list[dict[str, Any]]:
 
     Returns:
         A list of task description dictionaries.
+
     """
     return [
         {
