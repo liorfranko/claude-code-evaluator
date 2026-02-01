@@ -27,6 +27,7 @@ try:
         ToolUseBlock,
         ToolResultBlock,
         PermissionResultAllow,
+        PermissionResultDeny,
         ToolPermissionContext,
     )
     SDK_AVAILABLE = True
@@ -38,6 +39,7 @@ except ImportError:
     ToolUseBlock = None  # type: ignore
     ToolResultBlock = None  # type: ignore
     PermissionResultAllow = None  # type: ignore
+    PermissionResultDeny = None  # type: ignore
     ToolPermissionContext = None  # type: ignore
     SDK_AVAILABLE = False
 
@@ -233,6 +235,82 @@ class WorkerAgent:
         if self.on_progress_callback is not None:
             self.on_progress_callback(event)
 
+    def _is_path_allowed(self, path: str) -> bool:
+        """Check if a file path is within allowed directories.
+
+        Validates that the path is within project_directory or additional_dirs.
+        This prevents the worker from accessing files outside the workspace.
+
+        Args:
+            path: The file path to check.
+
+        Returns:
+            True if the path is allowed, False otherwise.
+        """
+        from pathlib import Path
+
+        # Resolve the path to handle .. and symlinks
+        try:
+            resolved = Path(path).resolve()
+        except (OSError, ValueError):
+            return False
+
+        # Build list of allowed directories
+        allowed_dirs = [Path(self.project_directory).resolve()]
+        for dir_path in self.additional_dirs:
+            try:
+                allowed_dirs.append(Path(dir_path).resolve())
+            except (OSError, ValueError):
+                continue
+
+        # Check if path is within any allowed directory
+        for allowed_dir in allowed_dirs:
+            try:
+                resolved.relative_to(allowed_dir)
+                return True
+            except ValueError:
+                continue
+
+        return False
+
+    def _extract_paths_from_tool(
+        self,
+        tool_name: str,
+        input_data: dict[str, Any],
+    ) -> list[str]:
+        """Extract file paths from tool input data.
+
+        Args:
+            tool_name: Name of the tool.
+            input_data: Tool input parameters.
+
+        Returns:
+            List of file paths found in the input.
+        """
+        paths: list[str] = []
+
+        # File operation tools
+        if tool_name in ("Read", "Write", "Edit"):
+            if "file_path" in input_data:
+                paths.append(input_data["file_path"])
+
+        # Search tools
+        elif tool_name in ("Glob", "Grep", "LS"):
+            if "path" in input_data:
+                paths.append(input_data["path"])
+
+        # Notebook tools
+        elif tool_name == "NotebookEdit":
+            if "notebook_path" in input_data:
+                paths.append(input_data["notebook_path"])
+
+        # Task tool - check prompt for file paths (heuristic)
+        elif tool_name == "Task":
+            # Don't restrict Task tool - it spawns subagents
+            pass
+
+        return paths
+
     async def _handle_tool_permission(
         self,
         tool_name: str,
@@ -242,7 +320,8 @@ class WorkerAgent:
         """Handle tool permission requests for interactive tools.
 
         Auto-approves ExitPlanMode and answers AskUserQuestion using
-        the developer agent callback.
+        the developer agent callback. Also restricts file access to
+        allowed directories (project_directory and additional_dirs).
 
         Args:
             tool_name: Name of the tool being called.
@@ -250,10 +329,22 @@ class WorkerAgent:
             context: Tool permission context from SDK.
 
         Returns:
-            PermissionResultAllow with appropriate response.
+            PermissionResultAllow or PermissionResultDeny based on validation.
         """
         import logging
         logger = logging.getLogger(__name__)
+
+        # Check file paths for file operation tools
+        paths = self._extract_paths_from_tool(tool_name, input_data)
+        for path in paths:
+            if not self._is_path_allowed(path):
+                logger.warning(
+                    f"Denying {tool_name} access to path outside allowed directories: {path}"
+                )
+                return PermissionResultDeny(
+                    message=f"Access denied: {path} is outside the allowed workspace. "
+                    f"Only files within {self.project_directory} and additional_dirs are accessible."
+                )
 
         if tool_name == "ExitPlanMode":
             # Auto-approve plan mode exit
