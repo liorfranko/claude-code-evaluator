@@ -602,22 +602,21 @@ async def run_suite(
     return reports
 
 
-def _determine_workflow_type(config: EvaluationConfig) -> WorkflowType:
+def _determine_workflow_type(_config: EvaluationConfig) -> WorkflowType:
     """Determine the workflow type from evaluation config.
 
+    Always returns multi_command for YAML configs with phases.
+    MultiCommandWorkflow properly respects phase prompts (including skill
+    invocations like /feature-dev). DirectWorkflow ignores phase configuration
+    and is only suitable for ad-hoc CLI usage without phases.
+
     Args:
-        config: The evaluation configuration.
+        _config: The evaluation configuration (unused, kept for API consistency).
 
     Returns:
-        The appropriate WorkflowType.
+        WorkflowType.multi_command for all YAML-based evaluations.
     """
-    if len(config.phases) == 1:
-        return WorkflowType.direct
-    else:
-        # Use multi_command for all multi-phase workflows to respect custom prompts
-        # from the YAML config. PlanThenImplementWorkflow has hardcoded prompts
-        # that don't use the phase prompts from config.
-        return WorkflowType.multi_command
+    return WorkflowType.multi_command
 
 
 def validate_suite(suite_path: Path, verbose: bool = False) -> bool:

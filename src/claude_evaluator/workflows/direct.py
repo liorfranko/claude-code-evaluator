@@ -117,15 +117,9 @@ class DirectWorkflow(BaseWorkflow):
                 },
             ))
 
-            # Instruct Claude to use the current directory (cwd is already set by SDK)
-            prompt = (
-                "Create all files in the current directory using relative paths.\n\n"
-                f"{evaluation.task_description}"
-            )
-
             # Execute the task prompt directly
             query_metrics = await worker.execute_query(
-                query=prompt,
+                query=evaluation.task_description,
                 phase="implementation",
             )
 
