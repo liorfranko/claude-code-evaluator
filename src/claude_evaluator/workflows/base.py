@@ -254,7 +254,7 @@ class BaseWorkflow(ABC):
             async with asyncio.timeout(timeout_seconds):
                 return await self.execute(evaluation)
         except asyncio.TimeoutError:
-            logger.error(
+            logger.warning(
                 f"Workflow execution timed out after {timeout_seconds} seconds "
                 f"for evaluation {evaluation.id}"
             )

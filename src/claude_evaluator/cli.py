@@ -354,6 +354,20 @@ async def run_evaluation(
                 print(f"Total tokens: {evaluation.metrics.total_tokens}")
                 print(f"Total cost: ${evaluation.metrics.total_cost_usd:.4f}")
 
+    except WorkflowTimeoutError as e:
+        # Handle timeout errors with a clean message and helpful suggestion
+        timeout_msg = (
+            f"Evaluation timed out after {e.timeout_seconds} seconds.\n"
+            f"  Tip: Increase the timeout using --timeout or timeout_seconds in your YAML config."
+        )
+        logger.warning(f"Evaluation {evaluation.id} timed out after {e.timeout_seconds}s")
+
+        if not evaluation.is_terminal():
+            evaluation.fail(str(e))
+
+        if verbose:
+            print(timeout_msg)
+
     except Exception as e:
         # Log error always, print to console if verbose
         logger.error(f"Evaluation {evaluation.id} failed: {e}", exc_info=True)
