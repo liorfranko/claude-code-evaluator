@@ -347,9 +347,15 @@ class WorkerAgent:
                 )
 
         if tool_name == "ExitPlanMode":
-            # Auto-approve plan mode exit
-            logger.info("Auto-approving ExitPlanMode")
-            return PermissionResultAllow()
+            # Deny ExitPlanMode - the evaluator workflow controls phase transitions,
+            # not Claude. Allowing this would let Claude escape plan mode mid-phase
+            # and start implementing before the implementation phase begins.
+            logger.info("Denying ExitPlanMode - workflow controls phase transitions")
+            return PermissionResultDeny(
+                message="ExitPlanMode is not available in this evaluation context. "
+                "The workflow will transition to the next phase automatically. "
+                "Please complete your current task (planning or analysis) fully."
+            )
 
         if tool_name == "AskUserQuestion":
             # Generate answers for each question using developer callback
