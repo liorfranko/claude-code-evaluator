@@ -29,7 +29,7 @@ class ToolInvocation(BaseSchema):
         is_error: Whether the tool call resulted in an error.
         success: Whether the tool call succeeded. None if unknown.
         phase: Workflow phase when invoked (optional).
-        input_summary: Summarized input for display (optional, deprecated).
+        input_summary: Summarized input for display (optional).
 
     """
 
