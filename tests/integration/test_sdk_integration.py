@@ -13,15 +13,14 @@ without actual API calls or SDK installation.
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from claude_evaluator.agents.worker import SDK_AVAILABLE, WorkerAgent, DEFAULT_MODEL
+from claude_evaluator.core.agents import WorkerAgent
+from claude_evaluator.core.agents.worker import DEFAULT_MODEL, SDK_AVAILABLE
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.query_metrics import QueryMetrics
-
 
 # Check if SDK is available for conditional test skipping
 try:
@@ -202,10 +201,14 @@ class TestExecuteQueryWithMockedSDK:
         """Test execute_query when SDK is available and properly mocked."""
         mock_client = create_mock_client(mock_sdk_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             # Execute query
             result = asyncio.run(
-                worker_agent.execute_query("Write a hello world script", phase="implementation")
+                worker_agent.execute_query(
+                    "Write a hello world script", phase="implementation"
+                )
             )
 
             # Verify result
@@ -222,7 +225,7 @@ class TestExecuteQueryWithMockedSDK:
     ) -> None:
         """Test that execute_query raises RuntimeError when SDK is not available."""
         # Patch SDK_AVAILABLE and ClaudeSDKClient to simulate SDK not being installed
-        with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", False):
+        with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", False):
             with patch("claude_evaluator.agents.worker.ClaudeSDKClient", None):
                 with pytest.raises(RuntimeError) as exc_info:
                     asyncio.run(worker_agent.execute_query("test query"))
@@ -236,7 +239,9 @@ class TestExecuteQueryWithMockedSDK:
         """Test that ClaudeSDKClient methods are called correctly."""
         mock_client = create_mock_client(mock_sdk_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             # Execute query
             asyncio.run(worker_agent.execute_query("query 1"))
 
@@ -251,7 +256,9 @@ class TestExecuteQueryWithMockedSDK:
         """Test that query counter increments with each execution."""
         mock_client = create_mock_client(mock_sdk_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             assert worker_agent._query_counter == 0
 
             result1 = asyncio.run(worker_agent.execute_query("query 1"))
@@ -281,9 +288,7 @@ class TestSDKOptionsConfiguration:
         )
 
     @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
-    def test_options_include_project_directory(
-        self, worker_agent: WorkerAgent
-    ) -> None:
+    def test_options_include_project_directory(self, worker_agent: WorkerAgent) -> None:
         """Test that SDK options include the correct project directory."""
         mock_result = ResultMessage(
             duration_ms=100,
@@ -300,7 +305,10 @@ class TestSDKOptionsConfiguration:
             captured_options = options
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=capture_options):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=capture_options,
+        ):
             asyncio.run(worker_agent.execute_query("test"))
 
             # Verify options were created with correct cwd
@@ -308,9 +316,7 @@ class TestSDKOptionsConfiguration:
             assert captured_options.cwd == "/home/user/project"
 
     @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
-    def test_options_include_permission_mode(
-        self, worker_agent: WorkerAgent
-    ) -> None:
+    def test_options_include_permission_mode(self, worker_agent: WorkerAgent) -> None:
         """Test that SDK options include the correct permission mode."""
         mock_result = ResultMessage(
             duration_ms=100,
@@ -327,16 +333,17 @@ class TestSDKOptionsConfiguration:
             captured_options = options
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=capture_options):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=capture_options,
+        ):
             asyncio.run(worker_agent.execute_query("test"))
 
             assert captured_options is not None
             assert captured_options.permission_mode == "acceptEdits"
 
     @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
-    def test_options_include_allowed_tools(
-        self, worker_agent: WorkerAgent
-    ) -> None:
+    def test_options_include_allowed_tools(self, worker_agent: WorkerAgent) -> None:
         """Test that SDK options include the allowed tools list."""
         mock_result = ResultMessage(
             duration_ms=100,
@@ -353,7 +360,10 @@ class TestSDKOptionsConfiguration:
             captured_options = options
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=capture_options):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=capture_options,
+        ):
             asyncio.run(worker_agent.execute_query("test"))
 
             assert captured_options is not None
@@ -379,7 +389,10 @@ class TestSDKOptionsConfiguration:
             captured_options = options
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=capture_options):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=capture_options,
+        ):
             asyncio.run(worker_agent.execute_query("test"))
 
             assert captured_options is not None
@@ -425,7 +438,10 @@ class TestPermissionModeMapping:
             captured_options = options
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=capture_options):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=capture_options,
+        ):
             asyncio.run(agent.execute_query("test"))
 
             assert captured_options is not None
@@ -464,16 +480,16 @@ class TestToolInvocationTrackingDuringSDKExecution:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             asyncio.run(worker_agent.execute_query("test"))
 
             # Invocations should be cleared
             assert len(worker_agent.tool_invocations) == 0
 
     @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
-    def test_tool_use_tracking_method_exists(
-        self, worker_agent: WorkerAgent
-    ) -> None:
+    def test_tool_use_tracking_method_exists(self, worker_agent: WorkerAgent) -> None:
         """Test that _on_tool_use method exists and works."""
         invocation = worker_agent._on_tool_use("Read", "test-id", {"path": "/file.txt"})
 
@@ -513,7 +529,10 @@ class TestSDKExecutionWithEmptyAllowedTools:
             captured_options = options
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=capture_options):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=capture_options,
+        ):
             asyncio.run(agent.execute_query("test"))
 
             assert captured_options is not None
@@ -544,10 +563,10 @@ class TestQueryMetricsFromSDKResult:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
-            result = asyncio.run(
-                agent.execute_query("complex query", phase="planning")
-            )
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
+            result = asyncio.run(agent.execute_query("complex query", phase="planning"))
 
             assert result.query_index == 1
             assert result.prompt == "complex query"
@@ -577,7 +596,9 @@ class TestQueryMetricsFromSDKResult:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             result = asyncio.run(agent.execute_query("test query"))
 
             assert result.phase is None
@@ -605,7 +626,9 @@ class TestClientSessionManagement:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             assert agent.has_active_client() is False
             asyncio.run(agent.execute_query("test"))
             assert agent.has_active_client() is True
@@ -656,7 +679,10 @@ class TestClientSessionManagement:
             client_created_count += 1
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=track_client_creation):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=track_client_creation,
+        ):
             # First query creates new client
             asyncio.run(agent.execute_query("query 1"))
             assert client_created_count == 1
@@ -702,7 +728,10 @@ class TestClaudeSDKClientCreation:
             client_class_called = True
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=track_client_creation):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=track_client_creation,
+        ):
             asyncio.run(agent.execute_query("test query"))
 
             # Verify ClaudeSDKClient was instantiated
@@ -737,7 +766,10 @@ class TestClaudeSDKClientCreation:
             captured_options = options
             return mock_client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=capture_options):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=capture_options,
+        ):
             asyncio.run(agent.execute_query("test"))
 
             # Verify all options were passed correctly
@@ -792,7 +824,9 @@ class TestAsyncClientLifecycle:
         mock_client.connect = tracked_connect
         mock_client.query = tracked_query
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             asyncio.run(agent.execute_query("test"))
 
             # Verify connect was called before query
@@ -817,7 +851,9 @@ class TestAsyncClientLifecycle:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             # Before query, no client
             assert agent._client is None
 
@@ -845,7 +881,9 @@ class TestAsyncClientLifecycle:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             asyncio.run(agent.execute_query("test"))
 
             # Reset mock to track disconnect call
@@ -884,7 +922,9 @@ class TestClientCleanupNormalCompletion:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             asyncio.run(agent.execute_query("test"))
 
             # Client should persist for potential session resumption
@@ -921,7 +961,9 @@ class TestClientCleanupNormalCompletion:
             client_index += 1
             return client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=create_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=create_client
+        ):
             # First query
             asyncio.run(agent.execute_query("first query"))
             assert agent._client is mock_client1
@@ -953,7 +995,9 @@ class TestClientCleanupNormalCompletion:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             asyncio.run(agent.execute_query("test"))
             assert agent.has_active_client() is True
 
@@ -983,10 +1027,14 @@ class TestClientCleanupOnException:
         )
 
         mock_client = MagicMock()
-        mock_client.connect = AsyncMock(side_effect=ConnectionError("Connection failed"))
+        mock_client.connect = AsyncMock(
+            side_effect=ConnectionError("Connection failed")
+        )
         mock_client.disconnect = AsyncMock()
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             with pytest.raises(ConnectionError):
                 asyncio.run(agent.execute_query("test"))
 
@@ -1012,7 +1060,9 @@ class TestClientCleanupOnException:
         # receive_response should not be called if query fails
         mock_client.receive_response = MagicMock()
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             with pytest.raises(RuntimeError, match="Query failed"):
                 asyncio.run(agent.execute_query("test"))
 
@@ -1043,7 +1093,9 @@ class TestClientCleanupOnException:
 
         mock_client.receive_response = failing_receive
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             with pytest.raises(RuntimeError, match="Streaming failed"):
                 asyncio.run(agent.execute_query("test"))
 
@@ -1058,10 +1110,16 @@ class TestClientCleanupOnException:
         )
 
         mock_client = MagicMock()
-        mock_client.connect = AsyncMock(side_effect=ConnectionError("Connection failed"))
-        mock_client.disconnect = AsyncMock(side_effect=RuntimeError("Disconnect also failed"))
+        mock_client.connect = AsyncMock(
+            side_effect=ConnectionError("Connection failed")
+        )
+        mock_client.disconnect = AsyncMock(
+            side_effect=RuntimeError("Disconnect also failed")
+        )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             # Should raise the original connection error, not the disconnect error
             with pytest.raises(ConnectionError, match="Connection failed"):
                 asyncio.run(agent.execute_query("test"))
@@ -1088,13 +1146,17 @@ class TestClientCleanupOnException:
 
         mock_client = create_mock_client(mock_result)
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             # First query succeeds
             asyncio.run(agent.execute_query("first query"))
             assert agent._client is mock_client
 
             # Now make query fail on resume
-            mock_client.query = AsyncMock(side_effect=RuntimeError("Resume query failed"))
+            mock_client.query = AsyncMock(
+                side_effect=RuntimeError("Resume query failed")
+            )
 
             with pytest.raises(RuntimeError, match="Resume query failed"):
                 asyncio.run(agent.execute_query("second query", resume_session=True))
@@ -1164,9 +1226,13 @@ class TestIntegrationWorkflow:
 
         mock_client.receive_response = dynamic_receive
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", return_value=mock_client
+        ):
             # Planning phase
-            plan_metrics = asyncio.run(agent.execute_query("Create a plan", phase="planning"))
+            plan_metrics = asyncio.run(
+                agent.execute_query("Create a plan", phase="planning")
+            )
             assert plan_metrics.phase == "planning"
             assert plan_metrics.query_index == 1
 
@@ -1174,7 +1240,9 @@ class TestIntegrationWorkflow:
             mock_client.receive_response = dynamic_receive  # Reset generator
             result_index = 1  # Reset to use implement_result
             impl_metrics = asyncio.run(
-                agent.execute_query("Implement the plan", phase="implementation", resume_session=True)
+                agent.execute_query(
+                    "Implement the plan", phase="implementation", resume_session=True
+                )
             )
             assert impl_metrics.phase == "implementation"
             assert impl_metrics.query_index == 2
@@ -1209,7 +1277,10 @@ class TestIntegrationWorkflow:
             clients.append(client)
             return client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=create_fresh_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            side_effect=create_fresh_client,
+        ):
             # First independent task
             asyncio.run(agent.execute_query("Task 1"))
             assert client_count == 1
@@ -1260,7 +1331,9 @@ class TestIntegrationWorkflow:
             client_index += 1
             return client
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=create_client):
+        with patch(
+            "claude_evaluator.agents.worker.ClaudeSDKClient", side_effect=create_client
+        ):
             # First attempt fails
             with pytest.raises(ConnectionError):
                 asyncio.run(agent.execute_query("First attempt"))

@@ -81,7 +81,9 @@ And some code:
 
     def test_valid_construction_with_unicode_answer(self) -> None:
         """Test that unicode content in answer is valid."""
-        unicode_answer = "This answer contains unicode: \u4e2d\u6587, \u65e5\u672c\u8a9e, \U0001f600"
+        unicode_answer = (
+            "This answer contains unicode: \u4e2d\u6587, \u65e5\u672c\u8a9e, \U0001f600"
+        )
         result = AnswerResult(
             answer=unicode_answer,
             model_used="claude-3-opus",

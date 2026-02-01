@@ -10,10 +10,14 @@ This module tests the YAML suite loader functionality including:
 from pathlib import Path
 
 import pytest
-import yaml
 
 from claude_evaluator.config.loader import apply_defaults, load_suite
-from claude_evaluator.config.models import EvalDefaults, EvaluationConfig, EvaluationSuite, Phase
+from claude_evaluator.config.models import (
+    EvalDefaults,
+    EvaluationConfig,
+    EvaluationSuite,
+    Phase,
+)
 from claude_evaluator.models.enums import PermissionMode
 
 
@@ -44,7 +48,10 @@ evaluations:
         assert suite.evaluations[0].task == "Complete the test task"
         assert len(suite.evaluations[0].phases) == 1
         assert suite.evaluations[0].phases[0].name == "implementation"
-        assert suite.evaluations[0].phases[0].permission_mode == PermissionMode.bypassPermissions
+        assert (
+            suite.evaluations[0].phases[0].permission_mode
+            == PermissionMode.bypassPermissions
+        )
 
     def test_load_full_suite_with_all_fields(self, tmp_path: Path) -> None:
         """Test loading a suite with all optional fields populated."""
@@ -122,7 +129,9 @@ evaluations:
         impl_phase = eval_config.phases[1]
         assert impl_phase.name == "implementation"
         assert impl_phase.permission_mode == PermissionMode.acceptEdits
-        assert impl_phase.prompt_template == "Implement based on plan: {previous_result}"
+        assert (
+            impl_phase.prompt_template == "Implement based on plan: {previous_result}"
+        )
         assert impl_phase.continue_session is True
 
     def test_load_suite_with_multiple_evaluations(self, tmp_path: Path) -> None:
@@ -360,7 +369,9 @@ evaluations:
         suite_file = tmp_path / "missing-permission-mode.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'permission_mode'"):
+        with pytest.raises(
+            ValueError, match="Missing required field 'permission_mode'"
+        ):
             load_suite(suite_file)
 
     def test_invalid_max_turns_type(self, tmp_path: Path) -> None:
@@ -441,7 +452,9 @@ evaluations:
 
         suite = load_suite(suite_file)
 
-        assert suite.evaluations[0].phases[0].permission_mode == PermissionMode.acceptEdits
+        assert (
+            suite.evaluations[0].phases[0].permission_mode == PermissionMode.acceptEdits
+        )
 
     def test_permission_mode_bypass_permissions(self, tmp_path: Path) -> None:
         """Test that 'bypassPermissions' permission mode is correctly parsed."""
@@ -460,7 +473,10 @@ evaluations:
 
         suite = load_suite(suite_file)
 
-        assert suite.evaluations[0].phases[0].permission_mode == PermissionMode.bypassPermissions
+        assert (
+            suite.evaluations[0].phases[0].permission_mode
+            == PermissionMode.bypassPermissions
+        )
 
     def test_invalid_permission_mode(self, tmp_path: Path) -> None:
         """Test that ValueError is raised for invalid permission mode."""
@@ -816,7 +832,9 @@ evaluations:
         assert suite.defaults.question_timeout_seconds == 90
         assert suite.defaults.context_window_size == 15
 
-    def test_load_suite_parses_developer_qa_model_in_evaluation(self, tmp_path: Path) -> None:
+    def test_load_suite_parses_developer_qa_model_in_evaluation(
+        self, tmp_path: Path
+    ) -> None:
         """Test that developer_qa_model is correctly parsed from YAML evaluation."""
         suite_content = """
 name: qa-eval-suite

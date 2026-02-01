@@ -15,10 +15,10 @@ from datetime import datetime
 from pathlib import Path
 
 from claude_evaluator import __version__
-from claude_evaluator.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.config import load_suite
 from claude_evaluator.config.models import EvaluationConfig, Phase
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.logging_config import configure_logging, get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (

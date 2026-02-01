@@ -9,8 +9,8 @@ from datetime import datetime
 
 import pytest
 
-from claude_evaluator.agents.developer import (
-    DeveloperAgent,
+from claude_evaluator.core.agents import DeveloperAgent
+from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
@@ -271,7 +271,9 @@ class TestStateTransitions:
         with pytest.raises(InvalidStateTransitionError) as exc_info:
             agent.transition_to(DeveloperState.completed)
 
-        assert "Cannot transition from answering_question to completed" in str(exc_info.value)
+        assert "Cannot transition from answering_question to completed" in str(
+            exc_info.value
+        )
         assert agent.current_state == DeveloperState.answering_question
 
     def test_invalid_transition_answering_question_to_prompting(self) -> None:
@@ -281,7 +283,9 @@ class TestStateTransitions:
         with pytest.raises(InvalidStateTransitionError) as exc_info:
             agent.transition_to(DeveloperState.prompting)
 
-        assert "Cannot transition from answering_question to prompting" in str(exc_info.value)
+        assert "Cannot transition from answering_question to prompting" in str(
+            exc_info.value
+        )
         assert agent.current_state == DeveloperState.answering_question
 
     def test_invalid_transition_answering_question_to_reviewing_plan(self) -> None:
@@ -291,7 +295,9 @@ class TestStateTransitions:
         with pytest.raises(InvalidStateTransitionError) as exc_info:
             agent.transition_to(DeveloperState.reviewing_plan)
 
-        assert "Cannot transition from answering_question to reviewing_plan" in str(exc_info.value)
+        assert "Cannot transition from answering_question to reviewing_plan" in str(
+            exc_info.value
+        )
         assert agent.current_state == DeveloperState.answering_question
 
     def test_can_transition_to_from_answering_question(self) -> None:
@@ -430,9 +436,7 @@ class TestLoopDetection:
             agent.handle_response({}, is_complete=True)
 
         # Should have logged loop detection decision
-        loop_decisions = [
-            d for d in agent.decisions_log if "loop" in d.action.lower()
-        ]
+        loop_decisions = [d for d in agent.decisions_log if "loop" in d.action.lower()]
         assert len(loop_decisions) >= 1
 
     def test_loop_detected_transitions_to_failed(self) -> None:
@@ -742,9 +746,7 @@ class TestRunWorkflow:
 
         assert outcome == Outcome.success
         # Should have logged using fallback
-        fallback_decisions = [
-            d for d in decisions if "fallback" in d.action.lower()
-        ]
+        fallback_decisions = [d for d in decisions if "fallback" in d.action.lower()]
         assert len(fallback_decisions) >= 1
 
     def test_run_workflow_loop_detection(self) -> None:
@@ -775,7 +777,10 @@ class TestRunWorkflow:
         outcome, decisions = agent.run_workflow("Test prompt")
 
         # First decision should be about starting workflow
-        assert "workflow" in decisions[0].context.lower() or "workflow" in decisions[0].action.lower()
+        assert (
+            "workflow" in decisions[0].context.lower()
+            or "workflow" in decisions[0].action.lower()
+        )
 
     def test_run_workflow_logs_final_outcome(self) -> None:
         """Test run_workflow logs final outcome decision."""
@@ -785,7 +790,10 @@ class TestRunWorkflow:
 
         # Last decision should contain outcome information
         final_decision = decisions[-1]
-        assert "outcome" in final_decision.action.lower() or "finished" in final_decision.context.lower()
+        assert (
+            "outcome" in final_decision.action.lower()
+            or "finished" in final_decision.context.lower()
+        )
 
 
 class TestReset:

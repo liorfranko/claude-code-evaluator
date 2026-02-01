@@ -10,14 +10,12 @@ Tests mock the SDK client to run without external dependencies.
 """
 
 import asyncio
-from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
@@ -27,7 +25,6 @@ from claude_evaluator.models.enums import (
 )
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
 
@@ -91,7 +88,9 @@ class TestPlanWorkflowE2EPlanModeExecution:
             response="Implementation complete. Created yaml_config.py with YAMLConfig class.",
         )
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -113,7 +112,9 @@ class TestPlanWorkflowE2EPlanModeExecution:
 
         received_queries: list[tuple[str, str]] = []
 
-        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def capture_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             received_queries.append((query, phase))
             return QueryMetrics(
                 query_index=len(received_queries),
@@ -147,7 +148,9 @@ class TestPlanWorkflowE2EPlanModeExecution:
         # Track the permission mode when execute_query is called
         permission_during_planning: PermissionMode | None = None
 
-        async def capture_permission_and_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def capture_permission_and_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             nonlocal permission_during_planning
             if phase == "planning":
                 permission_during_planning = evaluation.worker_agent.permission_mode
@@ -220,7 +223,9 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
             response="Response",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -241,7 +246,9 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
 
         received_queries: list[tuple[str, str]] = []
 
-        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def capture_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             received_queries.append((query, phase))
             return QueryMetrics(
                 query_index=len(received_queries),
@@ -282,7 +289,9 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         5. Add refresh token support
         """
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             response = planning_response if phase == "planning" else "Done"
             return QueryMetrics(
                 query_index=1,
@@ -333,10 +342,14 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
 
         call_count = [0]
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             nonlocal call_count
             call_count[0] += 1
-            messages = planning_messages if call_count[0] == 1 else implementation_messages
+            messages = (
+                planning_messages if call_count[0] == 1 else implementation_messages
+            )
             return QueryMetrics(
                 query_index=call_count[0],
                 prompt="test",
@@ -412,7 +425,9 @@ class TestPlanWorkflowE2EMetricsCapture:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -458,7 +473,9 @@ class TestPlanWorkflowE2EMetricsCapture:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -510,7 +527,9 @@ class TestPlanWorkflowE2EMetricsCapture:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -560,10 +579,14 @@ class TestPlanWorkflowE2EMetricsCapture:
 
         call_count = [0]
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             nonlocal call_count
             call_count[0] += 1
-            messages = planning_messages if call_count[0] == 1 else implementation_messages
+            messages = (
+                planning_messages if call_count[0] == 1 else implementation_messages
+            )
             return QueryMetrics(
                 query_index=call_count[0],
                 prompt="test",
@@ -637,7 +660,9 @@ class TestPlanWorkflowE2ECompleteLifecycle:
             response="Cache implementation complete",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -670,7 +695,9 @@ class TestPlanWorkflowE2ECompleteLifecycle:
             response="Response",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -711,7 +738,9 @@ class TestPlanWorkflowE2ECompleteLifecycle:
             response="Implementation complete",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -736,7 +765,9 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_evaluation()
 
-        async def mock_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query_error(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 raise RuntimeError("Planning failed: Cannot access repository")
             return QueryMetrics(
@@ -767,7 +798,9 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_evaluation()
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             if phase == "implementation":
                 raise RuntimeError("Implementation failed: Syntax error")
             return QueryMetrics(

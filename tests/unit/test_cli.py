@@ -2,9 +2,6 @@
 
 from argparse import Namespace
 from pathlib import Path
-from typing import Any
-
-import pytest
 
 from claude_evaluator.cli import (
     _determine_workflow_type,
@@ -32,7 +29,9 @@ class TestCreateParser:
         parser = create_parser()
         # The version action should be present
         version_actions = [
-            a for a in parser._actions if "--version" in getattr(a, "option_strings", [])
+            a
+            for a in parser._actions
+            if "--version" in getattr(a, "option_strings", [])
         ]
         assert len(version_actions) == 1
 

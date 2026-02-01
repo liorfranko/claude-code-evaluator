@@ -6,14 +6,12 @@ Tests mock the Worker agent to run without SDK dependencies.
 """
 
 import asyncio
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
@@ -23,7 +21,6 @@ from claude_evaluator.models.enums import (
 )
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
 from claude_evaluator.workflows.direct import DirectWorkflow
 
 
@@ -245,7 +242,9 @@ class TestDirectWorkflowPermissionMode:
         # Track permission mode changes
         permission_mode_during_execution = None
 
-        async def mock_execute_query(query: str, phase: str = None, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str = None, resume_session: bool = False
+        ) -> QueryMetrics:
             nonlocal permission_mode_during_execution
             permission_mode_during_execution = evaluation.worker_agent.permission_mode
             return sample_metrics
@@ -370,8 +369,18 @@ class TestDirectWorkflowMockedWorker:
                 {
                     "role": "assistant",
                     "content": [
-                        {"type": "ToolUseBlock", "id": "inv-001", "name": "Read", "input": {}},
-                        {"type": "ToolUseBlock", "id": "inv-002", "name": "Edit", "input": {}},
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-001",
+                            "name": "Read",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-002",
+                            "name": "Edit",
+                            "input": {},
+                        },
                     ],
                 },
             ],
@@ -587,10 +596,30 @@ class TestDirectWorkflowToolCounts:
                 {
                     "role": "assistant",
                     "content": [
-                        {"type": "ToolUseBlock", "id": "inv-001", "name": "Read", "input": {}},
-                        {"type": "ToolUseBlock", "id": "inv-002", "name": "Read", "input": {}},
-                        {"type": "ToolUseBlock", "id": "inv-003", "name": "Edit", "input": {}},
-                        {"type": "ToolUseBlock", "id": "inv-004", "name": "Bash", "input": {}},
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-001",
+                            "name": "Read",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-002",
+                            "name": "Read",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-003",
+                            "name": "Edit",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-004",
+                            "name": "Bash",
+                            "input": {},
+                        },
                     ],
                 },
             ],
@@ -628,7 +657,10 @@ class TestPlanThenImplementWorkflowInitialization:
         collector = MetricsCollector()
         workflow = PlanThenImplementWorkflow(collector)
 
-        assert workflow.planning_prompt_template == PlanThenImplementWorkflow.DEFAULT_PLANNING_PROMPT
+        assert (
+            workflow.planning_prompt_template
+            == PlanThenImplementWorkflow.DEFAULT_PLANNING_PROMPT
+        )
         assert "{task_description}" in workflow.planning_prompt_template
 
     def test_default_implementation_prompt_template(self) -> None:
@@ -636,13 +668,18 @@ class TestPlanThenImplementWorkflowInitialization:
         collector = MetricsCollector()
         workflow = PlanThenImplementWorkflow(collector)
 
-        assert workflow.implementation_prompt_template == PlanThenImplementWorkflow.DEFAULT_IMPLEMENTATION_PROMPT
+        assert (
+            workflow.implementation_prompt_template
+            == PlanThenImplementWorkflow.DEFAULT_IMPLEMENTATION_PROMPT
+        )
 
     def test_custom_planning_prompt_template(self) -> None:
         """Test custom planning prompt template can be set."""
         collector = MetricsCollector()
         custom_template = "Create a plan for: {task_description}"
-        workflow = PlanThenImplementWorkflow(collector, planning_prompt_template=custom_template)
+        workflow = PlanThenImplementWorkflow(
+            collector, planning_prompt_template=custom_template
+        )
 
         assert workflow.planning_prompt_template == custom_template
 
@@ -650,7 +687,9 @@ class TestPlanThenImplementWorkflowInitialization:
         """Test custom implementation prompt template can be set."""
         collector = MetricsCollector()
         custom_template = "Execute the plan now."
-        workflow = PlanThenImplementWorkflow(collector, implementation_prompt_template=custom_template)
+        workflow = PlanThenImplementWorkflow(
+            collector, implementation_prompt_template=custom_template
+        )
 
         assert workflow.implementation_prompt_template == custom_template
 
@@ -722,7 +761,9 @@ class TestPlanThenImplementWorkflowExecution:
         call_count = 0
         phases_called = []
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
             phases_called.append(phase)
@@ -821,7 +862,9 @@ class TestPlanThenImplementWorkflowExecution:
 
         captured_queries = []
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             captured_queries.append((phase, query))
             return QueryMetrics(
                 query_index=1,
@@ -855,7 +898,9 @@ class TestPlanThenImplementWorkflowExecution:
 
         call_count = 0
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
             response = planning_response if phase == "planning" else "Done"
@@ -956,7 +1001,9 @@ class TestPlanThenImplementWorkflowMetrics:
             response="Done",
         )
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -1019,8 +1066,18 @@ class TestPlanThenImplementWorkflowMetrics:
                 {
                     "role": "assistant",
                     "content": [
-                        {"type": "ToolUseBlock", "id": "inv-001", "name": "Read", "input": {}},
-                        {"type": "ToolUseBlock", "id": "inv-002", "name": "Glob", "input": {}},
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-001",
+                            "name": "Read",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-002",
+                            "name": "Glob",
+                            "input": {},
+                        },
                     ],
                 },
             ],
@@ -1040,8 +1097,18 @@ class TestPlanThenImplementWorkflowMetrics:
                 {
                     "role": "assistant",
                     "content": [
-                        {"type": "ToolUseBlock", "id": "inv-003", "name": "Edit", "input": {}},
-                        {"type": "ToolUseBlock", "id": "inv-004", "name": "Write", "input": {}},
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-003",
+                            "name": "Edit",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "inv-004",
+                            "name": "Write",
+                            "input": {},
+                        },
                     ],
                 },
             ],
@@ -1095,7 +1162,9 @@ class TestPlanThenImplementWorkflowMetrics:
             response="Done",
         )
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
@@ -1139,7 +1208,9 @@ class TestPlanThenImplementWorkflowErrorHandling:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_mock_evaluation()
 
-        async def mock_execute_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_execute_query_error(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             raise RuntimeError("Planning phase failed")
 
         evaluation.worker_agent.execute_query = mock_execute_query_error
@@ -1159,7 +1230,9 @@ class TestPlanThenImplementWorkflowErrorHandling:
 
         call_count = 0
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
             if phase == "implementation":
@@ -1191,7 +1264,9 @@ class TestPlanThenImplementWorkflowErrorHandling:
         workflow = PlanThenImplementWorkflow(collector)
         evaluation = self.create_mock_evaluation()
 
-        async def mock_execute_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_execute_query_error(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Specific error message")
 
         evaluation.worker_agent.execute_query = mock_execute_query_error

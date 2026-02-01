@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, Outcome
 from claude_evaluator.models.metrics import Metrics

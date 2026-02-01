@@ -15,7 +15,7 @@ from claude_evaluator.models.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
-    from claude_evaluator.evaluation import Evaluation
+    from claude_evaluator.core import Evaluation
     from claude_evaluator.metrics.collector import MetricsCollector
     from claude_evaluator.models.metrics import Metrics
 

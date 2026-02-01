@@ -13,10 +13,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from claude_evaluator.agents.worker import WorkerAgent
+from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
-from claude_evaluator.models.question import QuestionContext, QuestionItem, QuestionOption
-
+from claude_evaluator.models.question import (
+    QuestionContext,
+)
 
 # =============================================================================
 # Mock Classes for SDK Types
@@ -30,7 +31,9 @@ class AskUserQuestionBlock:
     """
 
     def __init__(self, questions: list[dict[str, Any]] | None = None) -> None:
-        self.questions = questions if questions is not None else [{"question": "What should I do?"}]
+        self.questions = (
+            questions if questions is not None else [{"question": "What should I do?"}]
+        )
 
 
 class TextBlock:
@@ -222,8 +225,12 @@ class TestQuestionBlockDetection:
         self, base_agent: WorkerAgent
     ) -> None:
         """Test that _find_question_block returns first question block when multiple exist."""
-        question_block_1 = AskUserQuestionBlock(questions=[{"question": "First question?"}])
-        question_block_2 = AskUserQuestionBlock(questions=[{"question": "Second question?"}])
+        question_block_1 = AskUserQuestionBlock(
+            questions=[{"question": "First question?"}]
+        )
+        question_block_2 = AskUserQuestionBlock(
+            questions=[{"question": "Second question?"}]
+        )
         message = AssistantMessage(content=[question_block_1, question_block_2])
 
         result = base_agent._find_question_block(message)
@@ -446,7 +453,9 @@ class TestCallbackInvocation:
 
         assert answer == "user's answer"
         assert len(callback_received_context) == 1
-        assert callback_received_context[0].questions[0].question == "What is the answer?"
+        assert (
+            callback_received_context[0].questions[0].question == "What is the answer?"
+        )
 
     @pytest.mark.asyncio
     async def test_handle_question_block_raises_without_callback(
@@ -516,7 +525,9 @@ class TestAnswerInjection:
         mock_client = MockClaudeSDKClient()
 
         # Set up responses: first an assistant message with question, then result
-        question_block = AskUserQuestionBlock(questions=[{"question": "What is the answer?"}])
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "What is the answer?"}]
+        )
         assistant_with_question = AssistantMessage(
             content=[TextBlock("I need to know:"), question_block]
         )
@@ -532,9 +543,11 @@ class TestAnswerInjection:
         )
 
         # Execute the streaming with client
-        result_message, response_content, all_messages = await agent._stream_sdk_messages_with_client(
-            "Calculate", mock_client
-        )
+        (
+            result_message,
+            response_content,
+            all_messages,
+        ) = await agent._stream_sdk_messages_with_client("Calculate", mock_client)
 
         # Verify the answer was sent to the client
         assert len(mock_client._queries) == 2
@@ -579,9 +592,11 @@ class TestAnswerInjection:
             ]
         )
 
-        result_message, response_content, all_messages = await agent._stream_sdk_messages_with_client(
-            "Start task", mock_client
-        )
+        (
+            result_message,
+            response_content,
+            all_messages,
+        ) = await agent._stream_sdk_messages_with_client("Start task", mock_client)
 
         # Verify result is from after answer
         assert result_message is not None
@@ -679,7 +694,9 @@ class TestTimeoutHandling:
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=0,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(exc_info.value)
+        assert "question_timeout_seconds must be between 1 and 300" in str(
+            exc_info.value
+        )
 
     def test_question_timeout_validation_rejects_negative(self) -> None:
         """Test that negative timeout is rejected."""
@@ -691,7 +708,9 @@ class TestTimeoutHandling:
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=-5,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(exc_info.value)
+        assert "question_timeout_seconds must be between 1 and 300" in str(
+            exc_info.value
+        )
 
     def test_question_timeout_validation_rejects_over_max(self) -> None:
         """Test that timeout over 300 is rejected."""
@@ -703,7 +722,9 @@ class TestTimeoutHandling:
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=301,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(exc_info.value)
+        assert "question_timeout_seconds must be between 1 and 300" in str(
+            exc_info.value
+        )
 
     @pytest.mark.asyncio
     async def test_callback_timeout_raises_timeout_error(self) -> None:
@@ -722,9 +743,7 @@ class TestTimeoutHandling:
             question_timeout_seconds=1,  # Very short timeout
         )
 
-        block = AskUserQuestionBlock(
-            questions=[{"question": "Will this timeout?"}]
-        )
+        block = AskUserQuestionBlock(questions=[{"question": "Will this timeout?"}])
         mock_client = MockClaudeSDKClient()
 
         with pytest.raises(asyncio.TimeoutError) as exc_info:
@@ -856,9 +875,7 @@ class TestQuestionHandlingIntegration:
         assert len(summary) < len(long_question)
         assert summary.endswith("...")
 
-    def test_summarize_questions_limits_to_three(
-        self, base_agent: WorkerAgent
-    ) -> None:
+    def test_summarize_questions_limits_to_three(self, base_agent: WorkerAgent) -> None:
         """Test that summary shows at most 3 questions with count of remaining."""
         block = AskUserQuestionBlock(
             questions=[
@@ -936,9 +953,7 @@ class TestQuestionHandlingIntegration:
         # Single option should be converted to None
         assert context.questions[0].options is None
 
-    def test_empty_options_become_none(
-        self, base_agent: WorkerAgent
-    ) -> None:
+    def test_empty_options_become_none(self, base_agent: WorkerAgent) -> None:
         """Test that empty options list becomes None in context."""
         block = AskUserQuestionBlock(
             questions=[
@@ -1003,7 +1018,11 @@ class TestQuestionHandlingIntegration:
             ]
         )
 
-        result_message, response_content, all_messages = await agent._stream_sdk_messages_with_client(
+        (
+            result_message,
+            response_content,
+            all_messages,
+        ) = await agent._stream_sdk_messages_with_client(
             "Configure the project", mock_client
         )
 

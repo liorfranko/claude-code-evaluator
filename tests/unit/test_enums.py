@@ -40,7 +40,9 @@ class TestWorkflowType:
     def test_string_operations(self) -> None:
         """Test that WorkflowType supports string operations."""
         assert WorkflowType.direct.upper() == "DIRECT"
-        assert WorkflowType.plan_then_implement.replace("_", "-") == "plan-then-implement"
+        assert (
+            WorkflowType.plan_then_implement.replace("_", "-") == "plan-then-implement"
+        )
         assert "multi" in WorkflowType.multi_command
 
     def test_json_serialization(self) -> None:

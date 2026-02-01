@@ -11,14 +11,12 @@ the complete workflow execution path.
 
 import asyncio
 from datetime import datetime
-from typing import List
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
@@ -93,7 +91,7 @@ class TestDirectWorkflowE2EExecution:
         )
 
     @pytest.fixture
-    def realistic_tool_invocations(self) -> List[ToolInvocation]:
+    def realistic_tool_invocations(self) -> list[ToolInvocation]:
         """Create realistic tool invocations for a direct workflow task."""
         base_time = datetime.now()
         return [
@@ -135,7 +133,7 @@ class TestDirectWorkflowE2EExecution:
         self,
         evaluation: Evaluation,
         realistic_query_metrics: QueryMetrics,
-        realistic_tool_invocations: List[ToolInvocation],
+        realistic_tool_invocations: list[ToolInvocation],
     ) -> None:
         """Test complete direct workflow execution from start to finish.
 
@@ -175,7 +173,7 @@ class TestDirectWorkflowE2EExecution:
         self,
         evaluation: Evaluation,
         realistic_query_metrics: QueryMetrics,
-        realistic_tool_invocations: List[ToolInvocation],
+        realistic_tool_invocations: list[ToolInvocation],
     ) -> None:
         """Verify that direct workflow executes only implementation phase.
 
@@ -186,7 +184,7 @@ class TestDirectWorkflowE2EExecution:
         workflow = DirectWorkflow(collector)
 
         # Track all phase changes
-        phase_changes: List[str] = []
+        phase_changes: list[str] = []
         original_set_phase = collector.set_phase
 
         def tracking_set_phase(phase: str) -> None:
@@ -243,9 +241,11 @@ class TestDirectWorkflowE2EExecution:
         collector = MetricsCollector()
         workflow = DirectWorkflow(collector)
 
-        received_queries: List[str] = []
+        received_queries: list[str] = []
 
-        async def capture_query(query: str, phase: str = None, resume_session: bool = False) -> QueryMetrics:
+        async def capture_query(
+            query: str, phase: str = None, resume_session: bool = False
+        ) -> QueryMetrics:
             received_queries.append(query)
             return realistic_query_metrics
 
@@ -620,7 +620,8 @@ class TestDirectWorkflowCompleteLifecycle:
                 "content": [
                     {"type": "ToolUseBlock", "name": "Read", "id": f"inv-{i}"}
                     for i in range(5)
-                ] + [
+                ]
+                + [
                     {"type": "ToolUseBlock", "name": "Write", "id": f"write-{i}"}
                     for i in range(3)
                 ],

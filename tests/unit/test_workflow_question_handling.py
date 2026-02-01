@@ -5,14 +5,13 @@ WorkerAgent, and DeveloperAgent as specified in tasks T600-T610.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.config.models import EvalDefaults
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.enums import (
@@ -22,10 +21,9 @@ from claude_evaluator.models.enums import (
 )
 from claude_evaluator.models.query_metrics import QueryMetrics
 from claude_evaluator.models.question import QuestionContext, QuestionItem
-from claude_evaluator.workflows.base import BaseWorkflow, QuestionHandlingError
+from claude_evaluator.workflows.base import QuestionHandlingError
 from claude_evaluator.workflows.direct import DirectWorkflow
 from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
-
 
 # =============================================================================
 # T600: BaseWorkflow creates callback connecting Worker to Developer
@@ -182,7 +180,9 @@ class TestWorkflowConfigurationPassing:
         """Test that configure_worker_for_questions sets developer_qa_model."""
         defaults = EvalDefaults(developer_qa_model="claude-sonnet")
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector, defaults=defaults, enable_question_handling=False)
+        workflow = DirectWorkflow(
+            collector, defaults=defaults, enable_question_handling=False
+        )
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -206,7 +206,9 @@ class TestWorkflowConfigurationPassing:
         """Test that configure_worker_for_questions sets context_window_size."""
         defaults = EvalDefaults(context_window_size=50)
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector, defaults=defaults, enable_question_handling=False)
+        workflow = DirectWorkflow(
+            collector, defaults=defaults, enable_question_handling=False
+        )
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -256,7 +258,9 @@ class TestWorkflowConfigurationPassing:
         """Test that configure_worker_for_questions sets question_timeout_seconds."""
         defaults = EvalDefaults(question_timeout_seconds=90)
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector, defaults=defaults, enable_question_handling=False)
+        workflow = DirectWorkflow(
+            collector, defaults=defaults, enable_question_handling=False
+        )
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -477,8 +481,12 @@ class TestPlanThenImplementWorkflowQuestionHandling:
 
         callbacks_during_execution: list = []
 
-        async def capture_callback(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
-            callbacks_during_execution.append(evaluation.worker_agent.on_question_callback)
+        async def capture_callback(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
+            callbacks_during_execution.append(
+                evaluation.worker_agent.on_question_callback
+            )
             return sample_metrics
 
         evaluation.worker_agent.execute_query = capture_callback

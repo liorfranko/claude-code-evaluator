@@ -6,12 +6,10 @@ Tests are designed to run without the SDK installed by using appropriate mocks.
 """
 
 from datetime import datetime
-from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from claude_evaluator.agents.worker import WorkerAgent
+from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.tool_invocation import ToolInvocation
 

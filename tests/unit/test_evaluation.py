@@ -12,11 +12,11 @@ This module tests the Evaluation dataclass lifecycle including:
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
-from claude_evaluator.evaluation import Evaluation, InvalidEvaluationStateError
+from claude_evaluator.core import Evaluation, InvalidEvaluationStateError
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.models.enums import (
     EvaluationStatus,
     ExecutionMode,
@@ -24,8 +24,6 @@ from claude_evaluator.models.enums import (
     WorkflowType,
 )
 from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
 
 
 @pytest.fixture
@@ -437,9 +435,7 @@ class TestEvaluationFail:
 class TestWorkspaceManagement:
     """Tests for workspace creation and cleanup."""
 
-    def test_cleanup_removes_workspace_directory(
-        self, evaluation: Evaluation
-    ) -> None:
+    def test_cleanup_removes_workspace_directory(self, evaluation: Evaluation) -> None:
         """Test that cleanup() removes the workspace directory."""
         evaluation.start()
         workspace_path = evaluation.workspace_path
@@ -478,9 +474,7 @@ class TestWorkspaceManagement:
         # Cleanup should handle missing directory gracefully
         evaluation.cleanup()  # Should not raise
 
-    def test_cleanup_sets_workspace_path_to_none(
-        self, evaluation: Evaluation
-    ) -> None:
+    def test_cleanup_sets_workspace_path_to_none(self, evaluation: Evaluation) -> None:
         """Test that cleanup() sets workspace_path to None."""
         evaluation.start()
         assert evaluation.workspace_path is not None
@@ -488,9 +482,7 @@ class TestWorkspaceManagement:
         evaluation.cleanup()
         assert evaluation.workspace_path is None
 
-    def test_workspace_with_files_is_cleaned_up(
-        self, evaluation: Evaluation
-    ) -> None:
+    def test_workspace_with_files_is_cleaned_up(self, evaluation: Evaluation) -> None:
         """Test that cleanup() removes workspace with files inside."""
         evaluation.start()
         workspace = Path(evaluation.workspace_path)
@@ -580,9 +572,7 @@ class TestCanTransitionTo:
         # Cleanup
         evaluation.cleanup()
 
-    def test_running_cannot_transition_to_pending(
-        self, evaluation: Evaluation
-    ) -> None:
+    def test_running_cannot_transition_to_pending(self, evaluation: Evaluation) -> None:
         """Test that running cannot transition back to pending."""
         evaluation.start()
         assert not evaluation.can_transition_to(EvaluationStatus.pending)

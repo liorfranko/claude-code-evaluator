@@ -163,14 +163,16 @@ class TestQuestionItem:
     def test_empty_options_list_raises_value_error(self) -> None:
         """Test that empty options list raises ValueError."""
         with pytest.raises(
-            ValueError, match="QuestionItem.options must have at least 2 items if provided"
+            ValueError,
+            match="QuestionItem.options must have at least 2 items if provided",
         ):
             QuestionItem(question="Valid question", options=[])
 
     def test_single_option_raises_value_error(self) -> None:
         """Test that single option raises ValueError."""
         with pytest.raises(
-            ValueError, match="QuestionItem.options must have at least 2 items if provided"
+            ValueError,
+            match="QuestionItem.options must have at least 2 items if provided",
         ):
             QuestionItem(
                 question="Valid question",
@@ -279,7 +281,9 @@ class TestQuestionContext:
 
     def test_attempt_number_0_raises_value_error(self) -> None:
         """Test that attempt_number=0 raises ValueError."""
-        with pytest.raises(ValueError, match="QuestionContext.attempt_number must be 1 or 2"):
+        with pytest.raises(
+            ValueError, match="QuestionContext.attempt_number must be 1 or 2"
+        ):
             QuestionContext(
                 questions=[QuestionItem(question="Question?")],
                 conversation_history=[],
@@ -289,7 +293,9 @@ class TestQuestionContext:
 
     def test_attempt_number_3_raises_value_error(self) -> None:
         """Test that attempt_number=3 raises ValueError."""
-        with pytest.raises(ValueError, match="QuestionContext.attempt_number must be 1 or 2"):
+        with pytest.raises(
+            ValueError, match="QuestionContext.attempt_number must be 1 or 2"
+        ):
             QuestionContext(
                 questions=[QuestionItem(question="Question?")],
                 conversation_history=[],
@@ -299,7 +305,9 @@ class TestQuestionContext:
 
     def test_negative_attempt_number_raises_value_error(self) -> None:
         """Test that negative attempt_number raises ValueError."""
-        with pytest.raises(ValueError, match="QuestionContext.attempt_number must be 1 or 2"):
+        with pytest.raises(
+            ValueError, match="QuestionContext.attempt_number must be 1 or 2"
+        ):
             QuestionContext(
                 questions=[QuestionItem(question="Question?")],
                 conversation_history=[],
@@ -309,7 +317,9 @@ class TestQuestionContext:
 
     def test_large_attempt_number_raises_value_error(self) -> None:
         """Test that large attempt_number raises ValueError."""
-        with pytest.raises(ValueError, match="QuestionContext.attempt_number must be 1 or 2"):
+        with pytest.raises(
+            ValueError, match="QuestionContext.attempt_number must be 1 or 2"
+        ):
             QuestionContext(
                 questions=[QuestionItem(question="Question?")],
                 conversation_history=[],
