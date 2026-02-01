@@ -330,7 +330,7 @@ class ReportGenerator:
             A dictionary representation of the metrics.
         """
         result = {
-            "total_runtime_ms": metrics.total_runtime_ms,
+            "total_runtime_seconds": round(metrics.total_runtime_ms / 1000, 2),
             "total_tokens": metrics.total_tokens,
             "input_tokens": metrics.input_tokens,
             "output_tokens": metrics.output_tokens,
@@ -358,7 +358,7 @@ class ReportGenerator:
                 "prompt": q.prompt,
                 "response": q.response,
                 "messages": q.messages,
-                "duration_ms": q.duration_ms,
+                "duration_seconds": round(q.duration_ms / 1000, 2),
                 "input_tokens": q.input_tokens,
                 "output_tokens": q.output_tokens,
                 "cost_usd": q.cost_usd,
