@@ -349,11 +349,18 @@ class WorkerAgent:
                 )
 
         if tool_name == "ExitPlanMode":
-            # Approve ExitPlanMode but signal that we should end this query.
+            # Approve ExitPlanMode and immediately interrupt to end this query.
             # This allows Claude to complete planning naturally while preventing
             # it from continuing to implement in the same query.
-            logger.info("Approving ExitPlanMode - will interrupt after tool completes")
+            logger.info("Approving ExitPlanMode - interrupting to end phase")
             self._exit_plan_mode_triggered = True
+
+            # Schedule interrupt to stop Claude from continuing after this tool
+            # We need to do this in a task since we can't await in the callback
+            import asyncio
+            if self._client is not None:
+                asyncio.create_task(self._interrupt_after_delay())
+
             return PermissionResultAllow()
 
         if tool_name == "AskUserQuestion":
@@ -442,6 +449,26 @@ class WorkerAgent:
             setting_sources=["user"] if self.use_user_plugins else None,
             can_use_tool=self._handle_tool_permission,
         )
+
+    async def _interrupt_after_delay(self) -> None:
+        """Interrupt the client after a brief delay.
+
+        This is used to stop Claude from continuing execution after ExitPlanMode
+        is called. We use a small delay to allow the current tool to complete
+        before interrupting.
+        """
+        import asyncio
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Small delay to let the current tool result be processed
+            await asyncio.sleep(0.1)
+            if self._client is not None and self._exit_plan_mode_triggered:
+                logger.info("Interrupting client after ExitPlanMode")
+                await self._client.interrupt()
+        except Exception as e:
+            logger.debug(f"Interrupt after ExitPlanMode failed (may be expected): {e}")
 
     async def _cleanup_client(self) -> None:
         """Disconnect and clear the current client.
