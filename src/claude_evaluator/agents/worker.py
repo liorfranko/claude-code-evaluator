@@ -104,6 +104,7 @@ class WorkerAgent:
     _query_counter: int = field(default=0, repr=False)
     _client: Optional[Any] = field(default=None, repr=False)
     _question_attempt_counter: int = field(default=0, repr=False)
+    _exit_plan_mode_triggered: bool = field(default=False, repr=False)
 
     def __post_init__(self) -> None:
         """Validate WorkerAgent initialization parameters."""
@@ -186,6 +187,7 @@ class WorkerAgent:
         # Prepare for new query
         self.tool_invocations = []
         self._query_counter += 1
+        self._exit_plan_mode_triggered = False  # Reset ExitPlanMode flag
 
         # Determine if we should reuse existing client or create new one
         if resume_session and self._client is not None:
@@ -347,15 +349,12 @@ class WorkerAgent:
                 )
 
         if tool_name == "ExitPlanMode":
-            # Deny ExitPlanMode - the evaluator workflow controls phase transitions,
-            # not Claude. Allowing this would let Claude escape plan mode mid-phase
-            # and start implementing before the implementation phase begins.
-            logger.info("Denying ExitPlanMode - workflow controls phase transitions")
-            return PermissionResultDeny(
-                message="ExitPlanMode is not available in this evaluation context. "
-                "The workflow will transition to the next phase automatically. "
-                "Please complete your current task (planning or analysis) fully."
-            )
+            # Approve ExitPlanMode but signal that we should end this query.
+            # This allows Claude to complete planning naturally while preventing
+            # it from continuing to implement in the same query.
+            logger.info("Approving ExitPlanMode - will interrupt after tool completes")
+            self._exit_plan_mode_triggered = True
+            return PermissionResultAllow()
 
         if tool_name == "AskUserQuestion":
             # Generate answers for each question using developer callback
@@ -513,6 +512,15 @@ class WorkerAgent:
                 elif message_type == "ResultMessage":
                     result_message = message
 
+            # If ExitPlanMode was triggered, end the query gracefully
+            # This allows the planning phase to complete without continuing to implement
+            if self._exit_plan_mode_triggered:
+                import logging
+                logging.getLogger(__name__).info(
+                    "ExitPlanMode triggered - ending query to complete phase"
+                )
+                break
+
             # If we found a question block, handle it and continue the loop
             if question_block is not None:
                 answer = await self._handle_question_block(
@@ -545,8 +553,33 @@ class WorkerAgent:
             # No question found, exit the loop
             break
 
+        # If ExitPlanMode triggered early exit, we may not have a ResultMessage
+        # In this case, create a synthetic one to allow the phase to complete
         if result_message is None:
-            raise RuntimeError("No result message received from SDK")
+            if self._exit_plan_mode_triggered:
+                import logging
+                logging.getLogger(__name__).info(
+                    "Creating synthetic result for ExitPlanMode early exit"
+                )
+                # Create a minimal result-like object with the essential fields
+                from dataclasses import dataclass
+
+                @dataclass
+                class SyntheticResultMessage:
+                    """Synthetic result message for early phase completion."""
+                    subtype: str = "exit_plan_mode"
+                    duration_ms: int = 0
+                    duration_api_ms: int = 0
+                    is_error: bool = False
+                    num_turns: int = 1
+                    session_id: str = ""
+                    total_cost_usd: float | None = None
+                    usage: dict | None = None
+                    result: str | None = "ExitPlanMode triggered - phase complete"
+
+                result_message = SyntheticResultMessage()
+            else:
+                raise RuntimeError("No result message received from SDK")
 
         return result_message, response_content, all_messages
 
