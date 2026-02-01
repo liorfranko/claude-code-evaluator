@@ -110,7 +110,7 @@ evaluations:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `model` | `claude-haiku-4-5@20251001` | The model used by the Worker agent for task execution |
-| `developer_qa_model` | `claude-3-haiku@20240307` | The model used by the Developer agent to generate answers (cheapest option) |
+| `developer_qa_model` | `claude-haiku-4-5@20251001` | The model used by the Developer agent to generate answers |
 | `question_timeout_seconds` | `60` | Maximum time (in seconds) to wait for answer generation |
 | `context_window_size` | `10` | Number of recent messages to include when generating answers |
 

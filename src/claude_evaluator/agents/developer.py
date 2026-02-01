@@ -32,8 +32,9 @@ except ImportError:
 
 __all__ = ["DeveloperAgent", "InvalidStateTransitionError", "LoopDetectedError"]
 
-# Default model to use for Q&A when not specified (cheapest Haiku on Vertex AI)
-DEFAULT_QA_MODEL = "claude-3-haiku@20240307"
+# Default model to use for Q&A when not specified
+# Note: claude-3-haiku@20240307 returns 404, use claude-haiku-4-5@20251001
+DEFAULT_QA_MODEL = "claude-haiku-4-5@20251001"
 
 # Define valid state transitions for the Developer agent state machine
 _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
@@ -634,10 +635,14 @@ class DeveloperAgent:
                     logger.debug(f"Developer SDK received message type: {msg_type}")
                     if msg_type == "ResultMessage":
                         result_message = message
-                        # Don't break - consume remaining messages to clean up properly
+                        # Break immediately - continuing causes exit code 1 error
+                        break
             finally:
                 # Ensure the generator is properly closed
-                await query_gen.aclose()
+                try:
+                    await query_gen.aclose()
+                except Exception as close_err:
+                    logger.debug(f"Generator close error (ignored): {close_err}")
 
             # Extract the answer text from the result message
             answer = self._extract_answer_from_response(result_message)
@@ -1006,10 +1011,14 @@ Your response:"""
                     logger.debug(f"Developer implicit detection received: {msg_type}")
                     if msg_type == "ResultMessage":
                         result_message = message
-                        # Don't break - consume remaining messages to clean up properly
+                        # Break immediately - continuing causes exit code 1 error
+                        break
             finally:
                 # Ensure the generator is properly closed
-                await query_gen.aclose()
+                try:
+                    await query_gen.aclose()
+                except Exception as close_err:
+                    logger.debug(f"Generator close error (ignored): {close_err}")
 
             # Extract the answer
             answer_text = self._extract_answer_from_response(result_message)
