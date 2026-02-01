@@ -7,7 +7,10 @@ A CLI tool for evaluating Claude Code agent implementations with automated, inte
 - **Evaluation Suites**: Define and run structured evaluation suites using YAML configuration
 - **Multi-Phase Workflows**: Support for plan-then-implement and direct execution workflows
 - **ClaudeSDKClient Integration**: Persistent session management for multi-turn conversations
-- **Automatic Question Answering**: LLM-powered Q&A for autonomous evaluation runs
+- **LLM-Powered Q&A**: Automatic, intelligent answer generation using `claude-agent-sdk`
+- **Implicit Question Detection**: Detects and answers questions asked without the AskUserQuestion tool
+- **User Plugins Support**: Inherit user-level plugins, skills, and settings during evaluations
+- **Per-Evaluation Model Selection**: Configure different models for worker and developer agents
 
 ## Installation
 
@@ -69,30 +72,62 @@ During evaluations, Claude (the Worker agent) may ask questions when it needs cl
 
 ### Configuration
 
-Configure Q&A settings in your evaluation suite:
+Configure Q&A and model settings in your evaluation suite:
 
 ```yaml
 defaults:
+  # Model Configuration
+  model: claude-haiku-4-5@20251001                # Worker model for task execution
+
   # Q&A Configuration
-  developer_qa_model: claude-haiku-4-5@20251001  # Model for generating answers
-  question_timeout_seconds: 60                    # Timeout for answer generation
-  context_window_size: 10                         # Recent messages to include as context
+  developer_qa_model: claude-haiku-4-5@20251001   # Model for generating answers
+  question_timeout_seconds: 60                     # Timeout for answer generation
+  context_window_size: 10                          # Recent messages to include as context
+
+evaluations:
+  - id: my-eval
+    name: My Evaluation
+    model: claude-sonnet-4-20250514               # Override model per evaluation
+    developer_qa_model: claude-haiku-4-5@20251001 # Override Q&A model per evaluation
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `developer_qa_model` | `claude-haiku-4-5@20251001` | The model used to generate answers to Worker questions |
+| `model` | `claude-haiku-4-5@20251001` | The model used by the Worker agent for task execution |
+| `developer_qa_model` | `claude-haiku-4-5@20251001` | The model used by the Developer agent to generate answers |
 | `question_timeout_seconds` | `60` | Maximum time (in seconds) to wait for answer generation |
 | `context_window_size` | `10` | Number of recent messages to include when generating answers |
 
+### Implicit Question Detection
+
+The evaluator can detect when the Worker asks questions in plain text without using the `AskUserQuestion` tool. Common patterns detected include:
+
+- "What would you like to do?"
+- "Should I proceed?"
+- Presenting numbered options (Option A, Option B, etc.)
+- Asking for preferences or confirmation
+
+When an implicit question is detected, the Developer agent automatically generates an appropriate answer to keep the workflow moving.
+
 For detailed examples and configuration options, see the [Quickstart Guide](docs/quickstart.md).
+
+## User Plugins Support
+
+Enable user-level plugins, skills, and settings during evaluation runs:
+
+```bash
+# CLI automatically enables user plugins
+claude-eval run my-suite.yaml
+```
+
+This allows evaluations to use custom skills like `spectra:specify`, `spectra:plan`, and other user-configured plugins. The feature passes `setting_sources=['user']` to the SDK, inheriting your personal Claude Code configuration.
 
 ## Architecture
 
 The evaluator uses a two-agent architecture:
 
-- **Worker Agent**: Executes Claude Code commands using ClaudeSDKClient for persistent session management
-- **Developer Agent**: Orchestrates evaluations and provides LLM-powered answers to Worker questions
+- **Worker Agent**: Executes Claude Code commands using ClaudeSDKClient for persistent session management. Supports configurable models, permission modes, and tool access.
+- **Developer Agent**: Orchestrates evaluations and uses an LLM (via `claude-agent-sdk` `query()`) to generate intelligent, context-aware answers when the Worker asks questions. Handles both explicit questions (AskUserQuestion) and implicit questions in plain text.
 
 ## Requirements
 
