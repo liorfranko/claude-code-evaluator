@@ -112,6 +112,7 @@ class MockSDKResponse:
     """Mock response from the SDK query function."""
 
     def __init__(self, result: str) -> None:
+        """Initialize mock SDK response."""
         self.result = result
 
 

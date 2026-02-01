@@ -31,6 +31,7 @@ class AskUserQuestionBlock:
     """
 
     def __init__(self, questions: list[dict[str, Any]] | None = None) -> None:
+        """Initialize mock AskUserQuestionBlock."""
         self.questions = (
             questions if questions is not None else [{"question": "What should I do?"}]
         )
@@ -43,6 +44,7 @@ class TextBlock:
     """
 
     def __init__(self, text: str = "Sample text") -> None:
+        """Initialize mock TextBlock."""
         self.text = text
 
 
@@ -58,6 +60,7 @@ class ToolUseBlock:
         name: str = "Read",
         tool_input: dict[str, Any] | None = None,
     ) -> None:
+        """Initialize mock ToolUseBlock."""
         self.id = block_id
         self.name = name
         self.input = tool_input or {}
@@ -70,6 +73,7 @@ class AssistantMessage:
     """
 
     def __init__(self, content: list[Any] | None = None) -> None:
+        """Initialize mock AssistantMessage."""
         self.content = content or []
 
 
@@ -87,6 +91,7 @@ class ResultMessage:
         total_cost_usd: float = 0.01,
         usage: dict[str, int] | None = None,
     ) -> None:
+        """Initialize mock ResultMessage."""
         self.result = result
         self.duration_ms = duration_ms
         self.num_turns = num_turns
@@ -98,6 +103,7 @@ class MockClaudeSDKClient:
     """Mock for ClaudeSDKClient from claude-agent-sdk."""
 
     def __init__(self, options: Any = None) -> None:
+        """Initialize mock ClaudeSDKClient."""
         self.options = options
         self.session_id = "test-session-123"
         self._connected = False
@@ -106,12 +112,15 @@ class MockClaudeSDKClient:
         self._response_index = 0
 
     async def connect(self) -> None:
+        """Connect the mock client."""
         self._connected = True
 
     async def disconnect(self) -> None:
+        """Disconnect the mock client."""
         self._connected = False
 
     async def query(self, prompt: str) -> None:
+        """Send a query to the mock client."""
         self._queries.append(prompt)
 
     async def receive_response(self) -> Any:

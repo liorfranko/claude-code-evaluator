@@ -141,7 +141,8 @@ class ResultMessage:
         total_cost_usd: float,
         num_turns: int,
         result: str | None = None,
-    ):
+    ) -> None:
+        """Initialize mock ResultMessage."""
         self.duration_ms = duration_ms
         self.usage = usage
         self.total_cost_usd = total_cost_usd
