@@ -15,8 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 from claude_evaluator import __version__
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
+from claude_evaluator.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.config import load_suite
 from claude_evaluator.config.models import EvaluationConfig, Phase
 from claude_evaluator.evaluation import Evaluation

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from claude_evaluator.agents.exceptions import (
+from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
