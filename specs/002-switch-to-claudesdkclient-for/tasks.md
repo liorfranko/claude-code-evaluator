@@ -189,21 +189,21 @@ Wire up question callback in workflow classes.
 
 ### Workflow Updates
 
-- [ ] T600 [US1] Update BaseWorkflow to create callback connecting Worker to Developer
-- [ ] T601 [US1] Pass configuration values to DeveloperAgent (developer_qa_model, etc.)
-- [ ] T602 [US1] Update DirectWorkflow to support question handling (src/claude_evaluator/workflows/direct.py)
-- [ ] T603 [US2] Update PlanThenImplementWorkflow for question handling with session context
-- [ ] T604 [US3] Ensure proper error propagation from question handling to workflow
-- [ ] T605 [US3] Ensure resource cleanup on workflow failure
+- [x] T600 [US1] Update BaseWorkflow to create callback connecting Worker to Developer
+- [x] T601 [US1] Pass configuration values to DeveloperAgent (developer_qa_model, etc.)
+- [x] T602 [US1] Update DirectWorkflow to support question handling (src/claude_evaluator/workflows/direct.py)
+- [x] T603 [US2] Update PlanThenImplementWorkflow for question handling with session context
+- [x] T604 [US3] Ensure proper error propagation from question handling to workflow
+- [x] T605 [US3] Ensure resource cleanup on workflow failure
 
 ### Integration Tests
 
-- [ ] T606 [US1] Write integration test: DirectWorkflow handles question correctly
-- [ ] T607 [US2] Write integration test: PlanThenImplementWorkflow maintains context across Q&A
-- [ ] T608 [US3] Write integration test: 50 sequential evaluations without resource leaks
-- [ ] T609 [US1] Write integration test: end-to-end Q&A flow with mocked SDK
+- [x] T606 [US1] Write integration test: DirectWorkflow handles question correctly
+- [x] T607 [US2] Write integration test: PlanThenImplementWorkflow maintains context across Q&A
+- [x] T608 [US3] Write integration test: 50 sequential evaluations without resource leaks
+- [x] T609 [US1] Write integration test: end-to-end Q&A flow with mocked SDK
 
-- [ ] T610 CHECKPOINT: Verify full workflow integration works
+- [x] T610 CHECKPOINT: Verify full workflow integration works
 
 ---
 
@@ -235,7 +235,7 @@ Final verification and documentation updates.
 - [x] T713 Update quickstart.md with verified examples
 - [x] T714 Update README.md with new Q&A feature documentation
 
-- [ ] T715 CHECKPOINT: All acceptance criteria verified, feature complete
+- [x] T715 CHECKPOINT: All acceptance criteria verified, feature complete
 
 ---
 
