@@ -553,7 +553,7 @@ class WorkerAgent:
         message: Any,
         pending_tool_uses: dict[str, ToolInvocation],
         all_messages: list[dict[str, Any]],
-    ) -> Any:
+    ) -> str | None:
         """Process an AssistantMessage from the SDK stream.
 
         Args:
@@ -562,21 +562,27 @@ class WorkerAgent:
             all_messages: List to append serialized message to.
 
         Returns:
-            The message content for response tracking.
+            The text content from the message for response tracking,
+            or None if no text content is present.
         """
         msg_record = self._serialize_message(message, "assistant")
         all_messages.append(msg_record)
 
+        text_parts: list[str] = []
         for block in message.content:
-            if type(block).__name__ == "ToolUseBlock":
+            block_type = type(block).__name__
+            if block_type == "ToolUseBlock":
                 invocation = self._on_tool_use(
                     tool_name=block.name,
                     tool_use_id=block.id,
                     tool_input=block.input,
                 )
                 pending_tool_uses[block.id] = invocation
+            elif block_type == "TextBlock" and hasattr(block, "text"):
+                text_parts.append(block.text)
 
-        return message.content
+        # Return joined text content or None if no text
+        return "\n".join(text_parts) if text_parts else None
 
     def _process_user_message(
         self,
