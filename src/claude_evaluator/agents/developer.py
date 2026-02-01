@@ -5,11 +5,15 @@ orchestrating Claude Code during evaluation. The agent manages state transitions
 through the evaluation workflow and logs autonomous decisions.
 """
 
+import logging
 import os
 import time
+import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from ..models.answer import AnswerResult
 from ..models.decision import Decision
@@ -608,6 +612,12 @@ class DeveloperAgent:
             # sdk_query returns an async generator, must consume fully to clean up
             # Use cwd if set, otherwise use current directory
             working_dir = self.cwd or os.getcwd()
+
+            logger.debug(
+                f"Developer SDK query starting: model={model}, cwd={working_dir}, "
+                f"prompt_length={len(prompt)}"
+            )
+
             result_message = None
             query_gen = sdk_query(
                 prompt=prompt,
@@ -620,7 +630,9 @@ class DeveloperAgent:
             )
             try:
                 async for message in query_gen:
-                    if type(message).__name__ == "ResultMessage":
+                    msg_type = type(message).__name__
+                    logger.debug(f"Developer SDK received message type: {msg_type}")
+                    if msg_type == "ResultMessage":
                         result_message = message
                         # Don't break - consume remaining messages to clean up properly
             finally:
@@ -653,6 +665,25 @@ class DeveloperAgent:
 
         except Exception as e:
             generation_time_ms = int((time.time() - start_time) * 1000)
+
+            # Detailed error logging
+            logger.error(
+                f"Developer SDK query failed after {generation_time_ms}ms: "
+                f"model={model}, cwd={working_dir}"
+            )
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            # Check for additional error attributes
+            if hasattr(e, 'stderr'):
+                logger.error(f"stderr: {e.stderr}")
+            if hasattr(e, 'stdout'):
+                logger.error(f"stdout: {e.stdout}")
+            if hasattr(e, 'returncode'):
+                logger.error(f"returncode: {e.returncode}")
+            if hasattr(e, '__cause__') and e.__cause__:
+                logger.error(f"Cause: {type(e.__cause__).__name__}: {e.__cause__}")
 
             # Log the failure
             self.log_decision(
@@ -953,6 +984,12 @@ Your response:"""
             # sdk_query returns an async generator, must consume fully to clean up
             # Use cwd if set, otherwise use current directory
             working_dir = self.cwd or os.getcwd()
+
+            logger.debug(
+                f"Developer implicit question detection starting: model={model}, "
+                f"cwd={working_dir}, response_length={len(response_text)}"
+            )
+
             result_message = None
             query_gen = sdk_query(
                 prompt=prompt,
@@ -965,7 +1002,9 @@ Your response:"""
             )
             try:
                 async for message in query_gen:
-                    if type(message).__name__ == "ResultMessage":
+                    msg_type = type(message).__name__
+                    logger.debug(f"Developer implicit detection received: {msg_type}")
+                    if msg_type == "ResultMessage":
                         result_message = message
                         # Don't break - consume remaining messages to clean up properly
             finally:
@@ -994,6 +1033,15 @@ Your response:"""
             return None
 
         except Exception as e:
+            # Detailed error logging for implicit question detection
+            logger.error(
+                f"Developer implicit question detection failed: model={model}, "
+                f"cwd={working_dir if 'working_dir' in dir() else 'not set'}"
+            )
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
             self.log_decision(
                 context="Error detecting implicit question",
                 action="Assuming no implicit question",
