@@ -688,7 +688,15 @@ def format_results(reports: list[EvaluationReport], json_output: bool = False) -
         lines.append(f"  Task: {report.task_description[:50]}...")
         lines.append(f"  Workflow: {report.workflow_type.value}")
         lines.append(f"  Outcome: {report.outcome.value}")
-        lines.append(f"  Duration: {report.metrics.total_runtime_ms}ms")
+        # Format duration as human-readable
+        total_seconds = report.metrics.total_runtime_ms / 1000
+        if total_seconds >= 60:
+            minutes = int(total_seconds // 60)
+            seconds = total_seconds % 60
+            duration_str = f"{minutes}m {seconds:.1f}s"
+        else:
+            duration_str = f"{total_seconds:.1f}s"
+        lines.append(f"  Duration: {duration_str}")
         lines.append(f"  Tokens: {report.metrics.total_tokens}")
         lines.append(f"  Cost: ${report.metrics.total_cost_usd:.4f}")
 
