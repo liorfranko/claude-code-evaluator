@@ -163,6 +163,18 @@ class MultiCommandWorkflow(BaseWorkflow):
         worker = evaluation.worker_agent
         worker.set_permission_mode(phase.permission_mode)
 
+        # Emit phase start event for verbose output
+        from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
+        worker._emit_progress(ProgressEvent(
+            event_type=ProgressEventType.PHASE_START,
+            message=f"Starting phase: {phase.name}",
+            data={
+                "phase_name": phase.name,
+                "phase_index": self._current_phase_index,
+                "total_phases": len(self._phases),
+            },
+        ))
+
         # Configure allowed tools if specified
         if phase.allowed_tools:
             worker.configure_tools(phase.allowed_tools)

@@ -197,6 +197,18 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         worker = evaluation.worker_agent
         worker.set_permission_mode(PermissionMode.plan)
 
+        # Emit phase start event for verbose output
+        from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
+        worker._emit_progress(ProgressEvent(
+            event_type=ProgressEventType.PHASE_START,
+            message="Starting phase: planning",
+            data={
+                "phase_name": "planning",
+                "phase_index": 0,
+                "total_phases": 2,
+            },
+        ))
+
         # Format the planning prompt with the task description
         planning_prompt = self._planning_prompt_template.format(
             task_description=evaluation.task_description
@@ -234,6 +246,18 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         # Switch Worker to acceptEdits permission
         worker = evaluation.worker_agent
         worker.set_permission_mode(PermissionMode.acceptEdits)
+
+        # Emit phase start event for verbose output
+        from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
+        worker._emit_progress(ProgressEvent(
+            event_type=ProgressEventType.PHASE_START,
+            message="Starting phase: implementation",
+            data={
+                "phase_name": "implementation",
+                "phase_index": 1,
+                "total_phases": 2,
+            },
+        ))
 
         # Build implementation prompt - Claude will read the plan file
         implementation_prompt = self._implementation_prompt_template

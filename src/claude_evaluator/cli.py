@@ -197,6 +197,14 @@ def create_progress_callback():
             print("  🤔 Thinking...")
         elif event.event_type == ProgressEventType.QUESTION:
             print("  ❓ Claude is asking a question...")
+        elif event.event_type == ProgressEventType.PHASE_START:
+            phase_name = event.data.get("phase_name", "unknown") if event.data else "unknown"
+            phase_index = event.data.get("phase_index", 0) if event.data else 0
+            total_phases = event.data.get("total_phases", 1) if event.data else 1
+            print()
+            print(f"{'─' * 60}")
+            print(f"📋 Phase {phase_index + 1}/{total_phases}: {phase_name.upper()}")
+            print(f"{'─' * 60}")
 
     return progress_callback
 

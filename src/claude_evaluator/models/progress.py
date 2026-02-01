@@ -33,6 +33,9 @@ class ProgressEventType(Enum):
     # System message
     SYSTEM = "system"
 
+    # Phase transition (new workflow phase starting)
+    PHASE_START = "phase_start"
+
 
 @dataclass
 class ProgressEvent:

@@ -105,6 +105,18 @@ class DirectWorkflow(BaseWorkflow):
             worker = evaluation.worker_agent
             worker.set_permission_mode(PermissionMode.acceptEdits)
 
+            # Emit phase start event for verbose output
+            from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
+            worker._emit_progress(ProgressEvent(
+                event_type=ProgressEventType.PHASE_START,
+                message="Starting phase: implementation",
+                data={
+                    "phase_name": "implementation",
+                    "phase_index": 0,
+                    "total_phases": 1,
+                },
+            ))
+
             # Instruct Claude to use the current directory (cwd is already set by SDK)
             prompt = (
                 "Create all files in the current directory using relative paths.\n\n"
