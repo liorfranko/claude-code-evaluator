@@ -61,6 +61,4 @@ logs/
 
 # Evaluation outputs
 evaluations/
-
-# Task Manager data files
-.task-manager/
+worktrees/
