@@ -22,7 +22,7 @@ from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
-from claude_evaluator.core.agents.worker import (
+from claude_evaluator.core.agents.worker_agent import (
     DEFAULT_MODEL,
     SDK_AVAILABLE,
 )

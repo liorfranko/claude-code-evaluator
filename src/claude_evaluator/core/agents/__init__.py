@@ -12,7 +12,7 @@ from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
-from claude_evaluator.core.agents.worker import WorkerAgent
+from claude_evaluator.core.agents.worker_agent import WorkerAgent
 
 __all__ = [
     "AgentError",

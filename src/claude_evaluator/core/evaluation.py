@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from claude_evaluator.core.agents.developer import DeveloperAgent
-from claude_evaluator.core.agents.worker import WorkerAgent
+from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.core.exceptions import InvalidEvaluationStateError
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import EvaluationStatus, WorkflowType

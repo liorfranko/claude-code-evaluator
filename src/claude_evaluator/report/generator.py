@@ -8,15 +8,17 @@ import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from claude_evaluator.core import Evaluation
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, Outcome
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.timeline_event import TimelineEvent
 from claude_evaluator.report.exceptions import ReportGenerationError
 from claude_evaluator.report.models import EvaluationReport
+
+if TYPE_CHECKING:
+    from claude_evaluator.core import Evaluation
 
 __all__ = ["ReportGenerator", "ReportGenerationError"]
 
@@ -40,7 +42,7 @@ class ReportGenerator:
         """Initialize the report generator."""
         pass
 
-    def generate(self, evaluation: Evaluation) -> EvaluationReport:
+    def generate(self, evaluation: "Evaluation") -> EvaluationReport:
         """Generate a report from a completed evaluation.
 
         Creates an EvaluationReport from the evaluation's collected data,
@@ -171,7 +173,7 @@ class ReportGenerator:
             f"Invalid path: {path} must be within current directory or temp directory"
         )
 
-    def build_timeline(self, evaluation: Evaluation) -> list[TimelineEvent]:
+    def build_timeline(self, evaluation: "Evaluation") -> list[TimelineEvent]:
         """Build a timeline from evaluation events.
 
         Creates an ordered list of TimelineEvent objects from the evaluation's
@@ -239,7 +241,7 @@ class ReportGenerator:
 
         return timeline
 
-    def _determine_outcome(self, evaluation: Evaluation) -> Outcome:
+    def _determine_outcome(self, evaluation: "Evaluation") -> Outcome:
         """Determine the outcome from an evaluation's status.
 
         Maps the evaluation status to an Outcome enum value.

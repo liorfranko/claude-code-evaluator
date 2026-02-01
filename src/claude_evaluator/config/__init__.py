@@ -2,10 +2,12 @@
 
 This module provides dataclasses for parsing and validating evaluation
 configurations from YAML files, as well as loaders for YAML suite files.
+It also provides centralized settings via pydantic-settings.
 """
 
-from .loader import apply_defaults, load_suite
-from .models import (
+from claude_evaluator.config import defaults
+from claude_evaluator.config.loader import apply_defaults, load_suite
+from claude_evaluator.config.models import (
     EvalDefaults,
     EvaluationConfig,
     EvaluationSuite,
@@ -13,14 +15,25 @@ from .models import (
     SuiteRunResult,
     SuiteSummary,
 )
+from claude_evaluator.config.settings import (
+    DeveloperSettings,
+    Settings,
+    WorkerSettings,
+    get_settings,
+)
 
 __all__ = [
     "apply_defaults",
-    "load_suite",
-    "Phase",
+    "defaults",
+    "DeveloperSettings",
     "EvalDefaults",
     "EvaluationConfig",
     "EvaluationSuite",
-    "SuiteSummary",
+    "get_settings",
+    "load_suite",
+    "Phase",
+    "Settings",
     "SuiteRunResult",
+    "SuiteSummary",
+    "WorkerSettings",
 ]

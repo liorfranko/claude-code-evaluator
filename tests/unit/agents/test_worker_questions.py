@@ -1,8 +1,8 @@
 """Unit tests for WorkerAgent question handling capabilities.
 
-This module tests the question detection and callback mechanism in the WorkerAgent,
-including AskUserQuestionBlock detection, callback invocation, answer injection,
-and timeout handling.
+This module tests the question detection and callback mechanism in the WorkerAgent
+and QuestionHandler component, including AskUserQuestionBlock detection, callback
+invocation, answer injection, and timeout handling.
 
 Task IDs: T307, T308, T309, T310, T311
 """
@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
+from claude_evaluator.core.agents.worker.question_handler import QuestionHandler
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.question import (
     QuestionContext,

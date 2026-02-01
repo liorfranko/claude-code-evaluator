@@ -200,8 +200,12 @@ class TestValidateArgs:
 class TestDetermineWorkflowType:
     """Tests for _determine_workflow_type function."""
 
-    def test_single_phase_returns_direct(self) -> None:
-        """Test that single phase returns direct workflow."""
+    def test_single_phase_returns_multi_command(self) -> None:
+        """Test that single phase returns multi_command workflow.
+
+        Note: The implementation now always returns multi_command for YAML-based
+        configs to enable custom prompts from the config.
+        """
         config = EvaluationConfig(
             id="test",
             name="Test",
@@ -213,7 +217,7 @@ class TestDetermineWorkflowType:
                 ),
             ],
         )
-        assert _determine_workflow_type(config) == WorkflowType.direct
+        assert _determine_workflow_type(config) == WorkflowType.multi_command
 
     def test_two_phases_with_plan_mode_first(self) -> None:
         """Test that two phases with plan mode first returns plan_then_implement."""

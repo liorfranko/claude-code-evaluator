@@ -7,7 +7,7 @@ This module contains the core evaluation logic including:
 """
 
 from claude_evaluator.core.agents.developer import DeveloperAgent
-from claude_evaluator.core.agents.worker import WorkerAgent
+from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.core.evaluation import Evaluation
 from claude_evaluator.core.exceptions import (
     EvaluationError,

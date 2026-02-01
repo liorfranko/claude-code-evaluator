@@ -13,6 +13,16 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, TypeAlias
 
+from claude_evaluator.config.defaults import (
+    CONTEXT_WINDOW_MAX,
+    CONTEXT_WINDOW_MIN,
+    DEFAULT_CONTEXT_WINDOW_SIZE,
+    DEFAULT_MAX_ANSWER_RETRIES,
+    DEFAULT_MAX_ITERATIONS,
+    DEFAULT_QA_MODEL,
+    MAX_ANSWER_RETRIES_MAX,
+    MAX_ANSWER_RETRIES_MIN,
+)
 from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
@@ -42,9 +52,8 @@ except ImportError:
 
 __all__ = ["DeveloperAgent"]
 
-# Default model to use for Q&A when not specified
-# Note: claude-3-haiku@20240307 returns 404, use claude-haiku-4-5@20251001
-DEFAULT_QA_MODEL = "claude-haiku-4-5@20251001"
+# Note: Re-exporting for potential backward compatibility is not needed
+# as DEFAULT_QA_MODEL was not in __all__
 
 # Define valid state transitions for the Developer agent state machine
 _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
@@ -119,11 +128,11 @@ class DeveloperAgent:
     current_state: DeveloperState = field(default=DeveloperState.initializing)
     decisions_log: list[Decision] = field(default_factory=list)
     fallback_responses: dict[str, str] | None = field(default=None)
-    max_iterations: int = field(default=100)
+    max_iterations: int = field(default=DEFAULT_MAX_ITERATIONS)
     iteration_count: int = field(default=0, init=False)
     developer_qa_model: str | None = field(default=None)
-    context_window_size: int = field(default=10)
-    max_answer_retries: int = field(default=1)
+    context_window_size: int = field(default=DEFAULT_CONTEXT_WINDOW_SIZE)
+    max_answer_retries: int = field(default=DEFAULT_MAX_ANSWER_RETRIES)
     cwd: str | None = field(default=None)
     _answer_retry_count: int = field(default=0, init=False, repr=False)
 
@@ -132,18 +141,22 @@ class DeveloperAgent:
         if self.max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
 
-        # Validate context_window_size is in valid range (1-100)
-        if not (1 <= self.context_window_size <= 100):
+        # Validate context_window_size is in valid range
+        if not (CONTEXT_WINDOW_MIN <= self.context_window_size <= CONTEXT_WINDOW_MAX):
             raise ValueError(
-                f"context_window_size must be between 1 and 100, "
-                f"got {self.context_window_size}"
+                f"context_window_size must be between {CONTEXT_WINDOW_MIN} "
+                f"and {CONTEXT_WINDOW_MAX}, got {self.context_window_size}"
             )
 
-        # Validate max_answer_retries is in valid range (0-5)
-        if not (0 <= self.max_answer_retries <= 5):
+        # Validate max_answer_retries is in valid range
+        if not (
+            MAX_ANSWER_RETRIES_MIN
+            <= self.max_answer_retries
+            <= MAX_ANSWER_RETRIES_MAX
+        ):
             raise ValueError(
-                f"max_answer_retries must be between 0 and 5, "
-                f"got {self.max_answer_retries}"
+                f"max_answer_retries must be between {MAX_ANSWER_RETRIES_MIN} "
+                f"and {MAX_ANSWER_RETRIES_MAX}, got {self.max_answer_retries}"
             )
 
     def transition_to(self, new_state: DeveloperState) -> None:
