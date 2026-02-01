@@ -34,6 +34,7 @@ class EvaluationReport(BaseSchema):
         decisions: All Developer agent decisions.
         errors: Any errors encountered (optional).
         generated_at: When report was generated.
+
     """
 
     evaluation_id: str
@@ -51,6 +52,7 @@ class EvaluationReport(BaseSchema):
 
         Returns:
             True if errors were recorded, False otherwise.
+
         """
         return len(self.errors) > 0
 
@@ -59,6 +61,7 @@ class EvaluationReport(BaseSchema):
 
         Returns:
             Total runtime in milliseconds from the metrics.
+
         """
         return self.metrics.total_runtime_ms
 
@@ -67,6 +70,7 @@ class EvaluationReport(BaseSchema):
 
         Returns:
             Dictionary containing key summary information.
+
         """
         return {
             "evaluation_id": self.evaluation_id,

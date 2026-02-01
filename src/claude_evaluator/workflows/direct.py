@@ -43,6 +43,7 @@ class DirectWorkflow(BaseWorkflow):
         collector = MetricsCollector()
         workflow = DirectWorkflow(collector)
         metrics = await workflow.execute(evaluation)
+
     """
 
     def __init__(
@@ -61,6 +62,7 @@ class DirectWorkflow(BaseWorkflow):
             enable_question_handling: Whether to configure the WorkerAgent
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
+
         """
         super().__init__(metrics_collector, defaults)
         self._enable_question_handling = enable_question_handling
@@ -90,6 +92,7 @@ class DirectWorkflow(BaseWorkflow):
         Raises:
             Exception: If the workflow execution fails.
             QuestionHandlingError: If question handling fails during execution.
+
         """
         self.on_execution_start(evaluation)
 

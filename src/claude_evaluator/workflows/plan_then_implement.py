@@ -52,6 +52,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         collector = MetricsCollector()
         workflow = PlanThenImplementWorkflow(collector)
         metrics = await workflow.execute(evaluation)
+
     """
 
     # Default prompt templates
@@ -96,6 +97,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
             enable_question_handling: Whether to configure the WorkerAgent
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
+
         """
         super().__init__(metrics_collector, defaults)
         self._planning_prompt_template = (
@@ -157,6 +159,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         Raises:
             Exception: If either phase fails.
             QuestionHandlingError: If question handling fails during execution.
+
         """
         self.on_execution_start(evaluation)
 
@@ -189,6 +192,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
 
         Args:
             evaluation: The Evaluation instance.
+
         """
         # Set phase for metrics tracking
         self.set_phase("planning")
@@ -242,6 +246,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
 
         Args:
             evaluation: The Evaluation instance.
+
         """
         # Set phase for metrics tracking
         self.set_phase("implementation")

@@ -11,6 +11,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -48,6 +49,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     Returns:
         An ArgumentParser configured with all CLI options.
+
     """
     parser = argparse.ArgumentParser(
         prog="claude-evaluator",
@@ -158,11 +160,12 @@ For more information, see the documentation.
     return parser
 
 
-def create_progress_callback():
+def create_progress_callback() -> Callable[[ProgressEvent], None]:
     """Create a progress callback for verbose output.
 
     Returns:
         A callback function that prints progress events.
+
     """
     # Track tool invocations to show tool names on completion
     _active_tools: dict[str, str] = {}
@@ -221,6 +224,7 @@ def validate_output_path(output_path: str) -> str | None:
 
     Returns:
         Error message if validation fails, None if valid.
+
     """
     try:
         path = Path(output_path).resolve()
@@ -253,6 +257,7 @@ def validate_args(args: argparse.Namespace) -> str | None:
 
     Returns:
         Error message if validation fails, None if valid.
+
     """
     # Check --workflow requires --task
     if args.workflow is not None and args.task is None:
@@ -313,6 +318,7 @@ async def run_evaluation(
 
     Returns:
         The generated EvaluationReport.
+
     """
     if verbose:
         print(f"Starting evaluation with {workflow_type.value} workflow...")
@@ -537,6 +543,7 @@ async def run_suite(
 
     Returns:
         List of generated EvaluationReports.
+
     """
     # Load the suite
     suite = load_suite(suite_path)
@@ -630,6 +637,7 @@ def _determine_workflow_type(_config: EvaluationConfig) -> WorkflowType:
 
     Returns:
         WorkflowType.multi_command for all YAML-based evaluations.
+
     """
     return WorkflowType.multi_command
 
@@ -643,6 +651,7 @@ def validate_suite(suite_path: Path, verbose: bool = False) -> bool:
 
     Returns:
         True if valid, False otherwise.
+
     """
     try:
         suite = load_suite(suite_path)
@@ -679,6 +688,7 @@ def format_results(reports: list[EvaluationReport], json_output: bool = False) -
 
     Returns:
         Formatted string output.
+
     """
     if json_output:
         results = [report.get_summary() for report in reports]
@@ -746,6 +756,7 @@ def main(argv: list[str] | None = None) -> int:
 
     Returns:
         Exit code (0 for success, non-zero for errors).
+
     """
     parser = create_parser()
     args = parser.parse_args(argv)
@@ -820,6 +831,7 @@ def _setup_logging(verbose: bool = False) -> None:
 
     Args:
         verbose: Whether to enable debug-level logging to console.
+
     """
     configure_logging(verbose=verbose, json_output=False)
 

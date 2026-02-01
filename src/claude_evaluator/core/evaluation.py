@@ -64,6 +64,7 @@ class Evaluation:
         worker_agent: The Worker agent instance.
         metrics: Collected metrics (populated on completion).
         error: Error message if evaluation failed (optional).
+
     """
 
     task_description: str
@@ -91,6 +92,7 @@ class Evaluation:
 
         Raises:
             InvalidEvaluationStateError: If not in pending state.
+
         """
         if self.status != EvaluationStatus.pending:
             raise InvalidEvaluationStateError(
@@ -119,6 +121,7 @@ class Evaluation:
 
         Raises:
             InvalidEvaluationStateError: If not in running state.
+
         """
         if self.status != EvaluationStatus.running:
             raise InvalidEvaluationStateError(
@@ -141,6 +144,7 @@ class Evaluation:
 
         Raises:
             InvalidEvaluationStateError: If already in a terminal state.
+
         """
         valid_states = {EvaluationStatus.pending, EvaluationStatus.running}
         if self.status not in valid_states:
@@ -185,6 +189,7 @@ class Evaluation:
 
         Returns:
             True if the evaluation is completed or failed.
+
         """
         return self.status in {EvaluationStatus.completed, EvaluationStatus.failed}
 
@@ -196,6 +201,7 @@ class Evaluation:
 
         Returns:
             True if the transition is allowed, False otherwise.
+
         """
         valid_targets = _VALID_TRANSITIONS.get(self.status, set())
         return new_status in valid_targets
@@ -205,6 +211,7 @@ class Evaluation:
 
         Returns:
             Duration in milliseconds if end_time is set, None otherwise.
+
         """
         if self.end_time is None:
             return None
@@ -239,6 +246,7 @@ class Evaluation:
                 worker_agent=worker,
             )
             metrics = await evaluation.run_direct_workflow(collector)
+
         """
         # Import here to avoid circular imports
         from claude_evaluator.workflows.direct import DirectWorkflow

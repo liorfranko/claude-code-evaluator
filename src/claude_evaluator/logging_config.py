@@ -21,6 +21,7 @@ def configure_logging(verbose: bool = False, json_output: bool = False) -> None:
     Args:
         verbose: Enable verbose/debug output.
         json_output: If True, output JSON format. Otherwise, pretty console format.
+
     """
     level = logging.DEBUG if verbose else logging.INFO
 
@@ -72,5 +73,6 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     Example:
         logger = get_logger(__name__)
         logger.info("evaluation_started", evaluation_id="abc123", task="create function")
+
     """
     return structlog.get_logger(name)

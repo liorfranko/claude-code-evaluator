@@ -6,6 +6,7 @@ with configurable permission levels and tool access.
 """
 
 import asyncio
+import contextlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -89,6 +90,7 @@ class WorkerAgent:
         _query_counter: Internal counter for query indexing.
         _client: Internal ClaudeSDKClient instance for session management.
         _question_attempt_counter: Internal counter for question attempt tracking.
+
     """
 
     execution_mode: ExecutionMode
@@ -124,11 +126,13 @@ class WorkerAgent:
             )
 
         # Validate on_question_callback is async if provided
-        if self.on_question_callback is not None:
-            if not asyncio.iscoroutinefunction(self.on_question_callback):
-                raise TypeError(
-                    "on_question_callback must be an async function (coroutine function)"
-                )
+        if (
+            self.on_question_callback is not None
+            and not asyncio.iscoroutinefunction(self.on_question_callback)
+        ):
+            raise TypeError(
+                "on_question_callback must be an async function (coroutine function)"
+            )
 
     async def execute_query(
         self,
@@ -152,6 +156,7 @@ class WorkerAgent:
         Raises:
             RuntimeError: If SDK is not available and SDK mode is configured.
             NotImplementedError: If CLI mode is requested (not yet implemented).
+
         """
         if self.execution_mode == ExecutionMode.sdk:
             return await self._execute_via_sdk(query, phase, resume_session)
@@ -185,6 +190,7 @@ class WorkerAgent:
 
         Raises:
             RuntimeError: If SDK is not available or no result message is received.
+
         """
         if not SDK_AVAILABLE or ClaudeSDKClient is None:
             raise RuntimeError(
@@ -226,10 +232,8 @@ class WorkerAgent:
                 ) = await self._stream_sdk_messages_with_client(query, self._client)
             except Exception:
                 # Clean up the new client on connection or streaming failure
-                try:
+                with contextlib.suppress(Exception):
                     await new_client.disconnect()
-                except Exception:
-                    pass  # Ignore cleanup errors
                 # Clear the client reference if it was set
                 if self._client is new_client:
                     self._client = None
@@ -245,6 +249,7 @@ class WorkerAgent:
 
         Args:
             event: The ProgressEvent to emit.
+
         """
         if self.on_progress_callback is not None:
             self.on_progress_callback(event)
@@ -260,6 +265,7 @@ class WorkerAgent:
 
         Returns:
             True if the path is allowed, False otherwise.
+
         """
         from pathlib import Path
 
@@ -300,6 +306,7 @@ class WorkerAgent:
 
         Returns:
             List of file paths found in the input.
+
         """
         paths: list[str] = []
 
@@ -344,6 +351,7 @@ class WorkerAgent:
 
         Returns:
             PermissionResultAllow or PermissionResultDeny based on validation.
+
         """
         # Check file paths for file operation tools
         paths = self._extract_paths_from_tool(tool_name, input_data)
@@ -448,6 +456,7 @@ class WorkerAgent:
 
         Returns:
             Configured ClaudeAgentOptions instance.
+
         """
         permission_map = {
             PermissionMode.plan: "plan",
@@ -521,6 +530,7 @@ class WorkerAgent:
             RuntimeError: If no result message is received or if a question
                 is received but no callback is configured.
             asyncio.TimeoutError: If question callback times out.
+
         """
         result_message = None
         response_content = None
@@ -636,6 +646,7 @@ class WorkerAgent:
 
         Returns:
             The AskUserQuestionBlock if found, None otherwise.
+
         """
         if not hasattr(message, "content"):
             return None
@@ -674,6 +685,7 @@ class WorkerAgent:
         Raises:
             RuntimeError: If no callback is configured.
             asyncio.TimeoutError: If callback times out.
+
         """
         if self.on_question_callback is None:
             raise RuntimeError(
@@ -698,7 +710,7 @@ class WorkerAgent:
             raise asyncio.TimeoutError(
                 f"Question callback timed out after {self.question_timeout_seconds} seconds. "
                 f"Question: {self._summarize_questions(block)}"
-            )
+            ) from None
 
     async def _handle_implicit_question(
         self,
@@ -718,6 +730,7 @@ class WorkerAgent:
         Returns:
             An answer string if an implicit question was detected,
             None otherwise.
+
         """
         if self.on_implicit_question_callback is None:
             return None
@@ -750,6 +763,7 @@ class WorkerAgent:
 
         Returns:
             A populated QuestionContext instance.
+
         """
         # Extract questions from the block
         raw_questions = getattr(block, "questions", [])
@@ -822,6 +836,7 @@ class WorkerAgent:
 
         Returns:
             A truncated string representation of the questions.
+
         """
         raw_questions = getattr(block, "questions", [])
         if not raw_questions:
@@ -860,6 +875,7 @@ class WorkerAgent:
         Returns:
             The text content from the message for response tracking,
             or None if no text content is present.
+
         """
         msg_record = self._serialize_message(message, "assistant")
         all_messages.append(msg_record)
@@ -923,6 +939,7 @@ class WorkerAgent:
             message: The UserMessage to process.
             pending_tool_uses: Dict of pending tool invocations to update.
             all_messages: List to append serialized message to.
+
         """
         msg_record = self._serialize_message(message, "user")
         all_messages.append(msg_record)
@@ -967,6 +984,7 @@ class WorkerAgent:
         Args:
             message: The SystemMessage to process.
             all_messages: List to append serialized message to.
+
         """
         msg_record = self._serialize_message(message, "system")
         all_messages.append(msg_record)
@@ -990,6 +1008,7 @@ class WorkerAgent:
 
         Returns:
             Populated QueryMetrics instance.
+
         """
         usage = result_message.usage or {}
         input_tokens = usage.get("input_tokens", 0)
@@ -1030,6 +1049,7 @@ class WorkerAgent:
 
         Returns:
             The created ToolInvocation for later updates.
+
         """
         invocation = ToolInvocation(
             timestamp=datetime.now(),
@@ -1054,6 +1074,7 @@ class WorkerAgent:
 
         Returns:
             Formatted string representation of the output.
+
         """
         if content is None:
             return ""
@@ -1087,6 +1108,7 @@ class WorkerAgent:
 
         Returns:
             A truncated string representation of the input.
+
         """
         input_str = str(tool_input)
         if len(input_str) <= max_length:
@@ -1109,6 +1131,7 @@ class WorkerAgent:
 
         Returns:
             A short description of the tool action.
+
         """
         try:
             # Handle common tools - show full paths/commands for clarity
@@ -1153,6 +1176,7 @@ class WorkerAgent:
 
         Returns:
             A dictionary representation of the message.
+
         """
         result: dict[str, Any] = {"role": role}
 
@@ -1193,6 +1217,7 @@ class WorkerAgent:
 
         Returns:
             List of dictionary representations.
+
         """
         result = []
         for block in blocks:
@@ -1227,6 +1252,7 @@ class WorkerAgent:
 
         Returns:
             List of ToolInvocation records.
+
         """
         return self.tool_invocations.copy()
 
@@ -1239,6 +1265,7 @@ class WorkerAgent:
 
         Returns:
             True if a client exists for session continuation, False otherwise.
+
         """
         return self._client is not None
 
@@ -1256,6 +1283,7 @@ class WorkerAgent:
 
         Args:
             mode: The new permission mode to set.
+
         """
         self.permission_mode = mode
 
@@ -1270,6 +1298,7 @@ class WorkerAgent:
 
         Raises:
             NotImplementedError: SDK/CLI integration not yet implemented.
+
         """
         # TODO: Implement session creation via SDK/CLI
         raise NotImplementedError("Session management not yet implemented")
@@ -1281,6 +1310,7 @@ class WorkerAgent:
 
         Raises:
             NotImplementedError: SDK/CLI integration not yet implemented.
+
         """
         # TODO: Implement session termination via SDK/CLI
         raise NotImplementedError("Session management not yet implemented")
@@ -1290,5 +1320,6 @@ class WorkerAgent:
 
         Args:
             tools: List of tool names to auto-approve for execution.
+
         """
         self.allowed_tools = tools.copy()

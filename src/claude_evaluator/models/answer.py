@@ -23,6 +23,7 @@ class AnswerResult(BaseSchema):
         context_size: The size of the context in tokens (required).
         generation_time_ms: Time taken to generate in milliseconds (required, >= 0).
         attempt_number: The attempt number for this answer (required).
+
     """
 
     answer: str

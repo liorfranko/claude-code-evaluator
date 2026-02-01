@@ -30,6 +30,7 @@ class ToolInvocation(BaseSchema):
         success: Whether the tool call succeeded. None if unknown.
         phase: Workflow phase when invoked (optional).
         input_summary: Summarized input for display (optional, deprecated).
+
     """
 
     timestamp: datetime

@@ -22,6 +22,7 @@ class Decision(BaseSchema):
         context: What prompted the decision.
         action: What action was taken.
         rationale: Why this action was chosen (optional).
+
     """
 
     timestamp: datetime

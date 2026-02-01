@@ -39,6 +39,7 @@ class Phase(BaseSchema):
         allowed_tools: Override allowed tools for this phase.
         max_turns: Override max turns for this phase.
         continue_session: Continue from previous phase session.
+
     """
 
     name: str
@@ -64,6 +65,7 @@ class EvalDefaults(BaseSchema):
         developer_qa_model: Model for developer Q&A interactions.
         question_timeout_seconds: Timeout for developer Q&A questions (default 60).
         context_window_size: Number of recent conversation turns for Q&A context (default 10).
+
     """
 
     max_turns: int | None = None
@@ -93,6 +95,7 @@ class EvaluationConfig(BaseSchema):
         max_budget_usd: Override suite default.
         timeout_seconds: Override suite default.
         developer_qa_model: Override suite default for developer Q&A model.
+
     """
 
     id: str
@@ -121,6 +124,7 @@ class EvaluationSuite(BaseSchema):
         description: Description of what this suite tests.
         version: Suite version (semver).
         defaults: Default settings inherited by all evals.
+
     """
 
     name: str
@@ -142,6 +146,7 @@ class SuiteSummary(BaseSchema):
         total_runtime_ms: Total execution time in milliseconds.
         total_tokens: Total tokens consumed across all evaluations.
         total_cost_usd: Total cost in USD across all evaluations.
+
     """
 
     total_evaluations: int
@@ -167,6 +172,7 @@ class SuiteRunResult(BaseSchema):
         suite_version: Version of the suite that was run.
         completed_at: When the suite run completed.
         summary: Aggregated summary statistics.
+
     """
 
     suite_name: str

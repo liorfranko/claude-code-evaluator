@@ -33,6 +33,7 @@ class ReportGenerator:
         report = generator.generate(evaluation)
         json_str = generator.to_json(report)
         generator.save(report, Path("./reports/eval-001.json"))
+
     """
 
     def __init__(self) -> None:
@@ -53,6 +54,7 @@ class ReportGenerator:
 
         Raises:
             ReportGenerationError: If the evaluation is not in a terminal state.
+
         """
         if not evaluation.is_terminal():
             raise ReportGenerationError(
@@ -101,6 +103,7 @@ class ReportGenerator:
 
         Returns:
             A JSON string representation of the report.
+
         """
         report_dict = self._report_to_dict(report)
         return json.dumps(report_dict, indent=indent, default=str)
@@ -117,6 +120,7 @@ class ReportGenerator:
 
         Raises:
             ReportGenerationError: If the file cannot be written or path is invalid.
+
         """
         try:
             # Validate path to prevent directory traversal attacks
@@ -144,6 +148,7 @@ class ReportGenerator:
 
         Raises:
             ReportGenerationError: If the path is outside allowed directories.
+
         """
         resolved_path = path.resolve()
         cwd = Path.cwd().resolve()
@@ -177,6 +182,7 @@ class ReportGenerator:
 
         Returns:
             An ordered list of TimelineEvent objects.
+
         """
         timeline: list[TimelineEvent] = []
 
@@ -243,6 +249,7 @@ class ReportGenerator:
 
         Returns:
             The corresponding Outcome value.
+
         """
         # Guard: Success case
         if evaluation.status == EvaluationStatus.completed:
@@ -272,6 +279,7 @@ class ReportGenerator:
 
         Returns:
             A Metrics instance with all values set to zero/empty.
+
         """
         return Metrics(
             total_runtime_ms=0,
@@ -293,6 +301,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the report.
+
         """
         return {
             "evaluation_id": report.evaluation_id,
@@ -314,6 +323,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the metrics.
+
         """
         result = {
             "total_runtime_seconds": round(metrics.total_runtime_ms / 1000, 2),
@@ -364,6 +374,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the event.
+
         """
         return {
             "timestamp": event.timestamp.isoformat(),
@@ -381,6 +392,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the decision.
+
         """
         return {
             "timestamp": decision.timestamp.isoformat(),

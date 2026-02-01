@@ -22,6 +22,7 @@ class QuestionOption(BaseSchema):
     Attributes:
         label: The display text for this option (required, non-empty).
         description: Additional context or explanation (optional).
+
     """
 
     label: str
@@ -46,6 +47,7 @@ class QuestionItem(BaseSchema):
         question: The question text (required, non-empty).
         options: List of selectable options (optional, must have >=2 items if provided).
         header: Optional header text for grouping or context.
+
     """
 
     question: str
@@ -84,6 +86,7 @@ class QuestionContext(BaseSchema):
         conversation_history: Full conversation history as message dicts (required).
         session_id: The session identifier (required).
         attempt_number: The attempt number, must be 1 or 2 (required).
+
     """
 
     questions: list[QuestionItem]

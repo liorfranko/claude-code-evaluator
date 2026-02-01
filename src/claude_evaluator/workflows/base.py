@@ -58,6 +58,7 @@ class BaseWorkflow(ABC):
                 except Exception as e:
                     self.on_execution_error(evaluation, e)
                     raise
+
     """
 
     def __init__(
@@ -73,6 +74,7 @@ class BaseWorkflow(ABC):
             defaults: Optional EvalDefaults containing configuration for
                 question handling (developer_qa_model, question_timeout_seconds,
                 context_window_size). If not provided, defaults are used.
+
         """
         self._metrics_collector = metrics_collector
         self._question_timeout_seconds: int = 60
@@ -105,6 +107,7 @@ class BaseWorkflow(ABC):
 
         Returns:
             The MetricsCollector used by this workflow.
+
         """
         return self._metrics_collector
 
@@ -124,6 +127,7 @@ class BaseWorkflow(ABC):
 
         Raises:
             Exception: If the workflow execution fails.
+
         """
         pass
 
@@ -135,6 +139,7 @@ class BaseWorkflow(ABC):
 
         Args:
             evaluation: The Evaluation instance being executed.
+
         """
         self._metrics_collector.set_start_time(self._current_time_ms())
         if not evaluation.is_terminal() and evaluation.status.value == "pending":
@@ -151,6 +156,7 @@ class BaseWorkflow(ABC):
 
         Returns:
             The aggregated Metrics object.
+
         """
         self._metrics_collector.set_end_time(self._current_time_ms())
         metrics = self._metrics_collector.get_metrics()
@@ -166,6 +172,7 @@ class BaseWorkflow(ABC):
         Args:
             evaluation: The Evaluation instance that failed.
             error: The exception that caused the failure.
+
         """
         self._metrics_collector.set_end_time(self._current_time_ms())
         evaluation.fail(str(error))
@@ -178,6 +185,7 @@ class BaseWorkflow(ABC):
 
         Args:
             phase: The name of the current phase (e.g., "planning", "implementation").
+
         """
         self._metrics_collector.set_phase(phase)
 
@@ -194,6 +202,7 @@ class BaseWorkflow(ABC):
 
         Returns:
             Current time as milliseconds since epoch.
+
         """
         return int(time.time() * 1000)
 
@@ -218,6 +227,7 @@ class BaseWorkflow(ABC):
         Raises:
             WorkflowTimeoutError: If the workflow exceeds the timeout.
             Exception: If the workflow execution fails for other reasons.
+
         """
         if timeout_seconds is None:
             return await self.execute(evaluation)
@@ -262,6 +272,7 @@ class BaseWorkflow(ABC):
         Example:
             callback = workflow.create_question_callback(developer_agent)
             worker.on_question_callback = callback
+
         """
 
         async def question_callback(context: "QuestionContext") -> str:
@@ -278,6 +289,7 @@ class BaseWorkflow(ABC):
 
             Raises:
                 QuestionHandlingError: If answer generation fails.
+
             """
             try:
                 logger.debug(
@@ -324,6 +336,7 @@ class BaseWorkflow(ABC):
 
         Args:
             evaluation: The Evaluation containing both Worker and Developer agents.
+
         """
         developer = evaluation.developer_agent
         worker = evaluation.worker_agent
@@ -368,6 +381,7 @@ class BaseWorkflow(ABC):
         Returns:
             An async callback function with signature
             (response_text, conversation_history) -> str | None.
+
         """
 
         async def implicit_question_callback(
@@ -382,6 +396,7 @@ class BaseWorkflow(ABC):
 
             Returns:
                 An answer if an implicit question was detected, None otherwise.
+
             """
             return await developer_agent.detect_and_answer_implicit_question(
                 response_text, conversation_history
@@ -397,6 +412,7 @@ class BaseWorkflow(ABC):
 
         Returns:
             A truncated string representation of the questions.
+
         """
         if not context.questions:
             return "(no questions)"
@@ -422,6 +438,7 @@ class BaseWorkflow(ABC):
 
         Args:
             evaluation: The Evaluation containing the WorkerAgent to clean up.
+
         """
         try:
             await evaluation.worker_agent.clear_session()

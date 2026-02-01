@@ -30,6 +30,7 @@ class QueryMetrics(BaseSchema):
         phase: Workflow phase (planning, implementation, etc.).
         response: The final response text from Claude Code.
         messages: Full conversation history with all message details.
+
     """
 
     query_index: int

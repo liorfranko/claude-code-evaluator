@@ -8,12 +8,15 @@ comprehensive validation.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import yaml
 
 from ..models.enums import PermissionMode
 from .models import EvalDefaults, EvaluationConfig, EvaluationSuite, Phase
+
+# Type alias for unvalidated data from YAML parsing
+UnvalidatedData: TypeAlias = Any
 
 __all__ = ["load_suite", "apply_defaults"]
 
@@ -36,6 +39,7 @@ def _require_string(data: dict[str, Any], field: str, context: str) -> str:
 
     Raises:
         ValueError: If field is missing or not a non-empty string.
+
     """
     if field not in data:
         raise ValueError(f"Missing required field '{field}' in {context}")
@@ -58,6 +62,7 @@ def _optional_int(data: dict[str, Any], field: str, context: str) -> int | None:
 
     Raises:
         ValueError: If field is present but not an integer.
+
     """
     value = data.get(field)
     if value is not None and not isinstance(value, int):
@@ -78,6 +83,7 @@ def _optional_number(data: dict[str, Any], field: str, context: str) -> float | 
 
     Raises:
         ValueError: If field is present but not a number.
+
     """
     value = data.get(field)
     if value is not None and not isinstance(value, (int, float)):
@@ -98,6 +104,7 @@ def _optional_string(data: dict[str, Any], field: str, context: str) -> str | No
 
     Raises:
         ValueError: If field is present but not a string.
+
     """
     value = data.get(field)
     if value is not None and not isinstance(value, str):
@@ -121,6 +128,7 @@ def _optional_bool(
 
     Raises:
         ValueError: If field is present but not a boolean.
+
     """
     value = data.get(field, default)
     if not isinstance(value, bool):
@@ -143,6 +151,7 @@ def _optional_string_list(
 
     Raises:
         ValueError: If field is not a list or contains non-strings.
+
     """
     value = data.get(field)
     if value is None:
@@ -169,6 +178,7 @@ def _require_non_empty_list(
 
     Raises:
         ValueError: If field is missing, not a list, or empty.
+
     """
     if field not in data:
         raise ValueError(f"Missing required field '{field}' in {context}")
@@ -182,7 +192,7 @@ def _require_non_empty_list(
     return value
 
 
-def _require_mapping(data: Any, context: str) -> dict[str, Any]:
+def _require_mapping(data: UnvalidatedData, context: str) -> dict[str, Any]:
     """Validate that data is a dictionary/mapping.
 
     Args:
@@ -194,6 +204,7 @@ def _require_mapping(data: Any, context: str) -> dict[str, Any]:
 
     Raises:
         ValueError: If data is not a dict.
+
     """
     if not isinstance(data, dict):
         raise ValueError(
@@ -219,6 +230,7 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
         >>> suite = load_suite("evaluations/my-suite.yaml")
         >>> # Defaults are automatically applied, but can also be called explicitly:
         >>> suite = apply_defaults(suite)
+
     """
     if suite.defaults is None:
         return suite
@@ -273,6 +285,7 @@ def load_suite(path: Path | str) -> EvaluationSuite:
         >>> suite = load_suite("evaluations/my-suite.yaml")
         >>> print(suite.name)
         'my-suite'
+
     """
     path = Path(path)
 
@@ -311,6 +324,7 @@ def _parse_suite(data: dict[str, Any], source_path: Path) -> EvaluationSuite:
 
     Raises:
         ValueError: If required fields are missing or invalid.
+
     """
     context = f"suite: {source_path}"
 
@@ -350,6 +364,7 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> EvalDefaults:
 
     Raises:
         ValueError: If fields have invalid types.
+
     """
     context = f"defaults in {source_path}"
     _require_mapping(data, context)
@@ -391,6 +406,7 @@ def _parse_evaluation(
 
     Raises:
         ValueError: If required fields are missing or invalid.
+
     """
     context = f"evaluation[{index}] in {source_path}"
     _require_mapping(data, context)
@@ -436,6 +452,7 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
 
     Raises:
         ValueError: If required fields are missing or invalid.
+
     """
     context = f"phase[{index}] in {parent_context}"
     _require_mapping(data, context)
@@ -452,7 +469,7 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
         raise ValueError(
             f"Invalid 'permission_mode' value '{permission_mode_str}' in {context}. "
             f"Valid values are: {', '.join(valid_modes)}"
-        )
+        ) from None
 
     return Phase(
         name=name,

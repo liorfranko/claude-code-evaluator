@@ -62,6 +62,7 @@ class MultiCommandWorkflow(BaseWorkflow):
         collector = MetricsCollector()
         workflow = MultiCommandWorkflow(collector, phases)
         metrics = await workflow.execute(evaluation)
+
     """
 
     def __init__(
@@ -74,6 +75,7 @@ class MultiCommandWorkflow(BaseWorkflow):
         Args:
             metrics_collector: The MetricsCollector instance for aggregating metrics.
             phases: List of Phase configurations defining the workflow steps.
+
         """
         super().__init__(metrics_collector)
         self._phases = phases
@@ -103,6 +105,7 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         Returns:
             The phase result string, or None if not yet executed.
+
         """
         return self._phase_results.get(phase_name)
 
@@ -121,6 +124,7 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         Raises:
             Exception: If any phase execution fails.
+
         """
         self.on_execution_start(evaluation)
 
@@ -158,6 +162,7 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         Returns:
             The response from this phase's execution.
+
         """
         # Set phase for metrics tracking
         self.set_phase(phase.name)
@@ -303,6 +308,7 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         Returns:
             The formatted prompt string.
+
         """
         # Use static prompt if provided, otherwise use template
         if phase.prompt:

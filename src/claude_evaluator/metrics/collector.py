@@ -22,6 +22,7 @@ class MetricsCollector:
         collector.set_phase("planning")
         collector.add_query_metrics(query_metrics)
         metrics = collector.get_metrics()
+
     """
 
     def __init__(self) -> None:
@@ -39,6 +40,7 @@ class MetricsCollector:
 
         Args:
             query_metrics: The QueryMetrics object to add.
+
         """
         # If query doesn't have a phase but we have a current phase, use it
         if query_metrics.phase is None and self._current_phase is not None:
@@ -62,6 +64,7 @@ class MetricsCollector:
 
         Args:
             phase: The workflow phase name (e.g., "planning", "implementation").
+
         """
         self._current_phase = phase
 
@@ -70,6 +73,7 @@ class MetricsCollector:
 
         Args:
             time_ms: Start time in milliseconds.
+
         """
         self._start_time_ms = time_ms
 
@@ -78,6 +82,7 @@ class MetricsCollector:
 
         Args:
             time_ms: End time in milliseconds.
+
         """
         self._end_time_ms = time_ms
 
@@ -89,6 +94,7 @@ class MetricsCollector:
 
         Returns:
             A Metrics object containing all aggregated metrics.
+
         """
         # Calculate total tokens
         total_input_tokens = sum(q.input_tokens for q in self._queries)

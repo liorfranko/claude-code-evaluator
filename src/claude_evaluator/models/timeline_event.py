@@ -26,6 +26,7 @@ class TimelineEvent(BaseSchema):
         actor: Which agent (developer, worker, system).
         summary: Brief description of the event.
         details: Additional event-specific data (optional).
+
     """
 
     timestamp: datetime

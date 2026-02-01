@@ -8,9 +8,10 @@ through the evaluation workflow and logs autonomous decisions.
 import os
 import time
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeAlias
 
 from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
@@ -21,6 +22,10 @@ from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import DeveloperState, Outcome
 from claude_evaluator.models.question import QuestionContext
+
+# Callback type aliases for workflow execution
+SendPromptCallback: TypeAlias = Callable[[str], None]
+ReceiveResponseCallback: TypeAlias = Callable[[], dict[str, Any]]
 
 logger = get_logger(__name__)
 
@@ -107,6 +112,7 @@ class DeveloperAgent:
         max_answer_retries: Maximum retries for rejected answers (0-5).
         cwd: Working directory for SDK queries (optional, defaults to os.getcwd()).
         _answer_retry_count: Internal counter for answer attempt tracking.
+
     """
 
     role: str = field(default="developer", init=False)
@@ -151,6 +157,7 @@ class DeveloperAgent:
 
         Raises:
             InvalidStateTransitionError: If the transition is not allowed.
+
         """
         valid_targets = _VALID_TRANSITIONS.get(self.current_state, set())
         if new_state not in valid_targets:
@@ -168,6 +175,7 @@ class DeveloperAgent:
 
         Returns:
             True if the transition is allowed, False otherwise.
+
         """
         valid_targets = _VALID_TRANSITIONS.get(self.current_state, set())
         return new_state in valid_targets
@@ -190,6 +198,7 @@ class DeveloperAgent:
 
         Returns:
             The created Decision instance.
+
         """
         decision = Decision(
             timestamp=datetime.now(),
@@ -205,6 +214,7 @@ class DeveloperAgent:
 
         Returns:
             True if the agent is in completed or failed state.
+
         """
         return self.current_state in {DeveloperState.completed, DeveloperState.failed}
 
@@ -213,6 +223,7 @@ class DeveloperAgent:
 
         Returns:
             List of valid target states from the current state.
+
         """
         return list(_VALID_TRANSITIONS.get(self.current_state, set()))
 
@@ -221,6 +232,7 @@ class DeveloperAgent:
 
         Raises:
             LoopDetectedError: If max_iterations is exceeded.
+
         """
         self.iteration_count += 1
         if self.iteration_count > self.max_iterations:
@@ -248,6 +260,7 @@ class DeveloperAgent:
 
         Returns:
             A predefined response string if found, None otherwise.
+
         """
         if self.fallback_responses is None:
             return None
@@ -299,6 +312,7 @@ class DeveloperAgent:
         Raises:
             InvalidStateTransitionError: If no valid transition is possible.
             LoopDetectedError: If max_iterations is exceeded.
+
         """
         self._increment_iteration()
 
@@ -342,7 +356,7 @@ class DeveloperAgent:
     def _handle_prompting(
         self,
         initial_prompt: str,
-        send_prompt_callback: Any | None,
+        send_prompt_callback: SendPromptCallback | None,
     ) -> None:
         """Handle the prompting state - send prompt to Worker.
 
@@ -380,7 +394,7 @@ class DeveloperAgent:
 
     def _handle_awaiting_response(
         self,
-        receive_response_callback: Any | None,
+        receive_response_callback: ReceiveResponseCallback | None,
     ) -> None:
         """Handle the awaiting_response state - receive and process response."""
         if receive_response_callback is not None:
@@ -435,8 +449,8 @@ class DeveloperAgent:
     def _process_current_state(
         self,
         initial_prompt: str,
-        send_prompt_callback: Any | None,
-        receive_response_callback: Any | None,
+        send_prompt_callback: SendPromptCallback | None,
+        receive_response_callback: ReceiveResponseCallback | None,
     ) -> None:
         """Dispatch to the appropriate state handler based on current state."""
         handlers = {
@@ -460,8 +474,8 @@ class DeveloperAgent:
         self,
         initial_prompt: str,
         *,
-        send_prompt_callback: Any | None = None,
-        receive_response_callback: Any | None = None,
+        send_prompt_callback: SendPromptCallback | None = None,
+        receive_response_callback: ReceiveResponseCallback | None = None,
     ) -> tuple[Outcome, list[Decision]]:
         """Orchestrate a complete evaluation workflow.
 
@@ -484,6 +498,7 @@ class DeveloperAgent:
 
         Raises:
             LoopDetectedError: If max_iterations is exceeded during workflow.
+
         """
         self.iteration_count = 0  # Reset iteration count at workflow start
 
@@ -564,6 +579,7 @@ class DeveloperAgent:
 
         Raises:
             RuntimeError: If SDK is not available or answer generation fails.
+
         """
         if not SDK_AVAILABLE or sdk_query is None:
             raise RuntimeError(
@@ -706,6 +722,7 @@ class DeveloperAgent:
 
         Returns:
             The formatted prompt string.
+
         """
         # Format the questions
         question_text = self._format_questions(questions)
@@ -753,6 +770,7 @@ Your response:"""
 
         Returns:
             Formatted string representation of questions.
+
         """
         lines = []
         for i, q in enumerate(questions, 1):
@@ -798,6 +816,7 @@ Your response:"""
 
         Returns:
             Formatted string representation of the conversation.
+
         """
         if not messages:
             return "(No prior conversation context)"
@@ -841,6 +860,7 @@ Your response:"""
 
         Returns:
             Truncated summary string.
+
         """
         summaries = []
         for q in questions[:3]:  # Limit to first 3
@@ -860,7 +880,7 @@ Your response:"""
             result += f" (and {len(questions) - 3} more)"
         return result
 
-    def _extract_answer_from_response(self, response: Any) -> str:
+    def _extract_answer_from_response(self, response: Any) -> str:  # noqa: ANN401
         """Extract the answer text from an SDK query response.
 
         Args:
@@ -871,6 +891,7 @@ Your response:"""
 
         Raises:
             RuntimeError: If no answer text could be extracted.
+
         """
         # Handle different response formats
         if response is None:
@@ -921,7 +942,7 @@ Your response:"""
     async def detect_and_answer_implicit_question(
         self,
         response_text: str,
-        conversation_history: list[dict[str, Any]],
+        _conversation_history: list[dict[str, Any]],
     ) -> str | None:
         """Detect if a response contains an implicit question and answer it.
 
@@ -938,11 +959,12 @@ Your response:"""
 
         Args:
             response_text: The text response from the Worker.
-            conversation_history: Recent conversation context.
+            _conversation_history: Recent conversation context (reserved for future use).
 
         Returns:
             An answer string if an implicit question was detected and answered,
             None if no implicit question was found.
+
         """
         if not SDK_AVAILABLE or sdk_query is None:
             # Can't detect without SDK

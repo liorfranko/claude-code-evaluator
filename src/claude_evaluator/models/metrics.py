@@ -31,6 +31,7 @@ class Metrics(BaseSchema):
         prompt_count: Number of prompts exchanged.
         turn_count: Number of agentic turns.
         queries: Per-query metrics including full conversation messages.
+
     """
 
     total_runtime_ms: int

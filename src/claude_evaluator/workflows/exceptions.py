@@ -25,6 +25,7 @@ class QuestionHandlingError(WorkflowError):
     Attributes:
         original_error: The wrapped exception that caused the failure.
         question_context: Brief description of the question context.
+
     """
 
     def __init__(
@@ -39,6 +40,7 @@ class QuestionHandlingError(WorkflowError):
             message: Human-readable error description.
             original_error: The wrapped exception that caused the failure.
             question_context: Brief description of the question context.
+
         """
         super().__init__(message)
         self.original_error = original_error
@@ -50,6 +52,7 @@ class WorkflowTimeoutError(WorkflowError):
 
     Attributes:
         timeout_seconds: The configured timeout value.
+
     """
 
     def __init__(
@@ -63,6 +66,7 @@ class WorkflowTimeoutError(WorkflowError):
             timeout_seconds: The configured timeout value.
             message: Optional human-readable error description.
                 If not provided, a default message is generated.
+
         """
         self.timeout_seconds = timeout_seconds
         super().__init__(

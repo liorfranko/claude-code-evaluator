@@ -44,6 +44,7 @@ class ProgressEvent(BaseSchema):
         event_type: The type of progress event.
         message: A human-readable description of the event.
         data: Optional additional data about the event.
+
     """
 
     event_type: ProgressEventType

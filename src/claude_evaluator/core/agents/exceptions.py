@@ -25,6 +25,7 @@ class InvalidStateTransitionError(AgentError):
     Attributes:
         current_state: The state the entity is currently in.
         target_state: The state that was attempted to transition to.
+
     """
 
     def __init__(
@@ -39,6 +40,7 @@ class InvalidStateTransitionError(AgentError):
             message: Human-readable error description.
             current_state: The state the entity is currently in.
             target_state: The state that was attempted to transition to.
+
         """
         super().__init__(message)
         self.current_state = current_state
@@ -51,6 +53,7 @@ class LoopDetectedError(AgentError):
     Attributes:
         iteration_count: Number of iterations when loop was detected.
         max_iterations: Maximum allowed iterations.
+
     """
 
     def __init__(
@@ -65,6 +68,7 @@ class LoopDetectedError(AgentError):
             message: Human-readable error description.
             iteration_count: Number of iterations when loop was detected.
             max_iterations: Maximum allowed iterations.
+
         """
         super().__init__(message)
         self.iteration_count = iteration_count
