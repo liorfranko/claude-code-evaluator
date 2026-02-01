@@ -1,0 +1,1051 @@
+"""Developer Agent for claude-evaluator.
+
+This module defines the DeveloperAgent dataclass which simulates a human developer
+orchestrating Claude Code during evaluation. The agent manages state transitions
+through the evaluation workflow and logs autonomous decisions.
+"""
+
+import os
+import time
+import traceback
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
+from claude_evaluator.agents.exceptions import (
+    InvalidStateTransitionError,
+    LoopDetectedError,
+)
+from claude_evaluator.logging_config import get_logger
+from claude_evaluator.models.answer import AnswerResult
+from claude_evaluator.models.decision import Decision
+from claude_evaluator.models.enums import DeveloperState, Outcome
+from claude_evaluator.models.question import QuestionContext
+
+logger = get_logger(__name__)
+
+# Optional SDK import for LLM-powered answer generation
+try:
+    from claude_agent_sdk import ClaudeAgentOptions
+    from claude_agent_sdk import query as sdk_query
+
+    SDK_AVAILABLE = True
+except ImportError:
+    sdk_query = None  # type: ignore
+    ClaudeAgentOptions = None  # type: ignore
+    SDK_AVAILABLE = False
+
+__all__ = ["DeveloperAgent"]
+
+# Default model to use for Q&A when not specified
+# Note: claude-3-haiku@20240307 returns 404, use claude-haiku-4-5@20251001
+DEFAULT_QA_MODEL = "claude-haiku-4-5@20251001"
+
+# Define valid state transitions for the Developer agent state machine
+_VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
+    DeveloperState.initializing: {
+        DeveloperState.prompting,
+        DeveloperState.failed,
+    },
+    DeveloperState.prompting: {
+        DeveloperState.awaiting_response,
+        DeveloperState.failed,
+    },
+    DeveloperState.awaiting_response: {
+        DeveloperState.reviewing_plan,
+        DeveloperState.evaluating_completion,
+        DeveloperState.answering_question,
+        DeveloperState.failed,
+    },
+    DeveloperState.answering_question: {
+        DeveloperState.awaiting_response,
+        DeveloperState.failed,
+    },
+    DeveloperState.reviewing_plan: {
+        DeveloperState.approving_plan,
+        DeveloperState.prompting,  # Request revisions
+        DeveloperState.failed,
+    },
+    DeveloperState.approving_plan: {
+        DeveloperState.executing_command,
+        DeveloperState.awaiting_response,
+        DeveloperState.failed,
+    },
+    DeveloperState.executing_command: {
+        DeveloperState.executing_command,  # Sequential commands
+        DeveloperState.awaiting_response,
+        DeveloperState.evaluating_completion,
+        DeveloperState.failed,
+    },
+    DeveloperState.evaluating_completion: {
+        DeveloperState.completed,
+        DeveloperState.prompting,  # Follow-up needed
+        DeveloperState.failed,
+    },
+    DeveloperState.completed: set(),  # Terminal state
+    DeveloperState.failed: set(),  # Terminal state
+}
+
+
+@dataclass
+class DeveloperAgent:
+    """Developer agent that orchestrates Claude Code during evaluation.
+
+    The DeveloperAgent simulates a human developer interacting with Claude Code.
+    It maintains a state machine to track workflow progress, logs autonomous
+    decisions for traceability, and enforces maximum iteration limits to prevent
+    infinite loops.
+
+    Attributes:
+        role: Always "developer" - identifies this agent type.
+        current_state: Current position in the workflow state machine.
+        decisions_log: Log of autonomous decisions made during evaluation.
+        fallback_responses: Predefined responses for common questions (optional).
+        max_iterations: Maximum loop iterations before forced termination.
+        developer_qa_model: Model identifier for Q&A (optional, uses DEFAULT_QA_MODEL if None).
+        context_window_size: Number of recent messages to include as context (1-100).
+        max_answer_retries: Maximum retries for rejected answers (0-5).
+        cwd: Working directory for SDK queries (optional, defaults to os.getcwd()).
+        _answer_retry_count: Internal counter for answer attempt tracking.
+    """
+
+    role: str = field(default="developer", init=False)
+    current_state: DeveloperState = field(default=DeveloperState.initializing)
+    decisions_log: list[Decision] = field(default_factory=list)
+    fallback_responses: dict[str, str] | None = field(default=None)
+    max_iterations: int = field(default=100)
+    iteration_count: int = field(default=0, init=False)
+    developer_qa_model: str | None = field(default=None)
+    context_window_size: int = field(default=10)
+    max_answer_retries: int = field(default=1)
+    cwd: str | None = field(default=None)
+    _answer_retry_count: int = field(default=0, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Validate the initial state of the agent."""
+        if self.max_iterations < 1:
+            raise ValueError("max_iterations must be at least 1")
+
+        # Validate context_window_size is in valid range (1-100)
+        if not (1 <= self.context_window_size <= 100):
+            raise ValueError(
+                f"context_window_size must be between 1 and 100, "
+                f"got {self.context_window_size}"
+            )
+
+        # Validate max_answer_retries is in valid range (0-5)
+        if not (0 <= self.max_answer_retries <= 5):
+            raise ValueError(
+                f"max_answer_retries must be between 0 and 5, "
+                f"got {self.max_answer_retries}"
+            )
+
+    def transition_to(self, new_state: DeveloperState) -> None:
+        """Transition the agent to a new state.
+
+        Validates that the transition is allowed according to the state machine
+        rules before updating the current state.
+
+        Args:
+            new_state: The target state to transition to.
+
+        Raises:
+            InvalidStateTransitionError: If the transition is not allowed.
+        """
+        valid_targets = _VALID_TRANSITIONS.get(self.current_state, set())
+        if new_state not in valid_targets:
+            raise InvalidStateTransitionError(
+                f"Cannot transition from {self.current_state.value} to {new_state.value}. "
+                f"Valid transitions: {[s.value for s in valid_targets]}"
+            )
+        self.current_state = new_state
+
+    def can_transition_to(self, new_state: DeveloperState) -> bool:
+        """Check if a transition to the given state is valid.
+
+        Args:
+            new_state: The target state to check.
+
+        Returns:
+            True if the transition is allowed, False otherwise.
+        """
+        valid_targets = _VALID_TRANSITIONS.get(self.current_state, set())
+        return new_state in valid_targets
+
+    def log_decision(
+        self,
+        context: str,
+        action: str,
+        rationale: str | None = None,
+    ) -> Decision:
+        """Log an autonomous decision made by the agent.
+
+        Creates a Decision record with the current timestamp and adds it to
+        the decisions log.
+
+        Args:
+            context: What prompted the decision.
+            action: What action was taken.
+            rationale: Why this action was chosen (optional).
+
+        Returns:
+            The created Decision instance.
+        """
+        decision = Decision(
+            timestamp=datetime.now(),
+            context=context,
+            action=action,
+            rationale=rationale,
+        )
+        self.decisions_log.append(decision)
+        return decision
+
+    def is_terminal(self) -> bool:
+        """Check if the agent is in a terminal state.
+
+        Returns:
+            True if the agent is in completed or failed state.
+        """
+        return self.current_state in {DeveloperState.completed, DeveloperState.failed}
+
+    def get_valid_transitions(self) -> list[DeveloperState]:
+        """Get the list of valid states the agent can transition to.
+
+        Returns:
+            List of valid target states from the current state.
+        """
+        return list(_VALID_TRANSITIONS.get(self.current_state, set()))
+
+    def _increment_iteration(self) -> None:
+        """Increment the iteration counter and check for loop detection.
+
+        Raises:
+            LoopDetectedError: If max_iterations is exceeded.
+        """
+        self.iteration_count += 1
+        if self.iteration_count > self.max_iterations:
+            self.log_decision(
+                context=f"Iteration count ({self.iteration_count}) exceeded max_iterations ({self.max_iterations})",
+                action="Transitioning to failed state due to loop detection",
+                rationale="Preventing infinite loop by enforcing iteration limit",
+            )
+            # Force transition to failed state
+            self.current_state = DeveloperState.failed
+            raise LoopDetectedError(
+                f"Loop detected: iteration count ({self.iteration_count}) exceeded "
+                f"max_iterations ({self.max_iterations})"
+            )
+
+    def get_fallback_response(self, question: str) -> str | None:
+        """Get a predefined fallback response for a common question.
+
+        Searches the fallback_responses dictionary for a matching response
+        based on keywords in the question. If no fallback_responses are
+        configured or no match is found, returns None.
+
+        Args:
+            question: The question or prompt to find a fallback response for.
+
+        Returns:
+            A predefined response string if found, None otherwise.
+        """
+        if self.fallback_responses is None:
+            return None
+
+        # Normalize the question for matching
+        question_lower = question.lower()
+
+        # Check for exact key match first
+        if question_lower in self.fallback_responses:
+            self.log_decision(
+                context=f"Received question: {question[:50]}...",
+                action="Using fallback response (exact match)",
+                rationale="Question matched a predefined fallback response key",
+            )
+            return self.fallback_responses[question_lower]
+
+        # Check for partial keyword matches
+        for key, response in self.fallback_responses.items():
+            if key.lower() in question_lower:
+                self.log_decision(
+                    context=f"Received question: {question[:50]}...",
+                    action=f"Using fallback response (keyword match: {key})",
+                    rationale="Question contained a fallback response keyword",
+                )
+                return response
+
+        return None
+
+    def handle_response(
+        self,
+        response: dict[str, Any],
+        *,
+        is_plan: bool = False,
+        is_complete: bool = False,
+    ) -> DeveloperState:
+        """Process a Worker response and determine the next state.
+
+        Analyzes the response from the Worker agent and transitions to the
+        appropriate next state. Also logs the decision for traceability.
+
+        Args:
+            response: The response data from the Worker agent.
+            is_plan: Whether this response contains a plan to review.
+            is_complete: Whether the Worker indicates task completion.
+
+        Returns:
+            The new state after processing the response.
+
+        Raises:
+            InvalidStateTransitionError: If no valid transition is possible.
+            LoopDetectedError: If max_iterations is exceeded.
+        """
+        self._increment_iteration()
+
+        # Must be in awaiting_response state to handle a response
+        if self.current_state != DeveloperState.awaiting_response:
+            self.log_decision(
+                context=f"Received response while in {self.current_state.value} state",
+                action="Ignoring response - not in awaiting_response state",
+                rationale="Responses can only be processed in awaiting_response state",
+            )
+            return self.current_state
+
+        # Determine next state based on response characteristics
+        if is_plan:
+            new_state = DeveloperState.reviewing_plan
+            action = "Transitioning to reviewing_plan"
+            rationale = "Response contains a plan that needs review"
+        elif is_complete:
+            new_state = DeveloperState.evaluating_completion
+            action = "Transitioning to evaluating_completion"
+            rationale = "Worker indicates task is complete"
+        else:
+            # Default: evaluate completion status
+            new_state = DeveloperState.evaluating_completion
+            action = "Transitioning to evaluating_completion"
+            rationale = "Evaluating response to determine if task is done"
+
+        self.log_decision(
+            context=f"Processing Worker response: {str(response)[:100]}...",
+            action=action,
+            rationale=rationale,
+        )
+
+        self.transition_to(new_state)
+        return self.current_state
+
+    # =========================================================================
+    # State Handlers (Strategy pattern for run_workflow)
+    # =========================================================================
+
+    def _handle_prompting(
+        self,
+        initial_prompt: str,
+        send_prompt_callback: Any | None,
+    ) -> None:
+        """Handle the prompting state - send prompt to Worker.
+
+        Checks for fallback responses first, then sends via callback or
+        simulates in simulation mode.
+        """
+        # Check for fallback response first
+        fallback = self.get_fallback_response(initial_prompt)
+        if fallback is not None:
+            self.log_decision(
+                context="Fallback response available",
+                action="Using fallback instead of Worker",
+                rationale="Predefined response matched the prompt",
+            )
+            self.transition_to(DeveloperState.awaiting_response)
+            # Simulate a complete response with fallback
+            self.handle_response(
+                {"content": fallback, "fallback": True},
+                is_complete=True,
+            )
+            return
+
+        if send_prompt_callback is not None:
+            send_prompt_callback(initial_prompt)
+            self.transition_to(DeveloperState.awaiting_response)
+            return
+
+        # Simulation mode - directly transition
+        self.log_decision(
+            context="No send_prompt_callback provided",
+            action="Running in simulation mode",
+            rationale="Skipping actual prompt send",
+        )
+        self.transition_to(DeveloperState.awaiting_response)
+
+    def _handle_awaiting_response(
+        self,
+        receive_response_callback: Any | None,
+    ) -> None:
+        """Handle the awaiting_response state - receive and process response."""
+        if receive_response_callback is not None:
+            response = receive_response_callback()
+            self.handle_response(response)
+            return
+
+        # Simulation mode - assume completion
+        self.log_decision(
+            context="No receive_response_callback provided",
+            action="Simulating successful completion",
+            rationale="Running in simulation mode",
+        )
+        self.transition_to(DeveloperState.evaluating_completion)
+
+    def _handle_reviewing_plan(self) -> None:
+        """Handle the reviewing_plan state - auto-approve in automated mode."""
+        self.log_decision(
+            context="Plan received for review",
+            action="Auto-approving plan",
+            rationale="Automated evaluation mode",
+        )
+        self.transition_to(DeveloperState.approving_plan)
+
+    def _handle_approving_plan(self) -> None:
+        """Handle the approving_plan state - wait for implementation."""
+        self.log_decision(
+            context="Plan approved",
+            action="Waiting for implementation",
+            rationale="Plan execution should produce a response",
+        )
+        self.transition_to(DeveloperState.awaiting_response)
+
+    def _handle_executing_command(self) -> None:
+        """Handle the executing_command state - evaluate completion."""
+        self.log_decision(
+            context="Command execution in progress",
+            action="Evaluating command results",
+            rationale="Checking if task is complete",
+        )
+        self.transition_to(DeveloperState.evaluating_completion)
+
+    def _handle_evaluating_completion(self) -> None:
+        """Handle the evaluating_completion state - mark as complete."""
+        self.log_decision(
+            context="Evaluating task completion",
+            action="Marking task as complete",
+            rationale="Task evaluation criteria satisfied",
+        )
+        self.transition_to(DeveloperState.completed)
+
+    def _process_current_state(
+        self,
+        initial_prompt: str,
+        send_prompt_callback: Any | None,
+        receive_response_callback: Any | None,
+    ) -> None:
+        """Dispatch to the appropriate state handler based on current state."""
+        handlers = {
+            DeveloperState.prompting: lambda: self._handle_prompting(
+                initial_prompt, send_prompt_callback
+            ),
+            DeveloperState.awaiting_response: lambda: self._handle_awaiting_response(
+                receive_response_callback
+            ),
+            DeveloperState.reviewing_plan: self._handle_reviewing_plan,
+            DeveloperState.approving_plan: self._handle_approving_plan,
+            DeveloperState.executing_command: self._handle_executing_command,
+            DeveloperState.evaluating_completion: self._handle_evaluating_completion,
+        }
+
+        handler = handlers.get(self.current_state)
+        if handler:
+            handler()
+
+    def run_workflow(
+        self,
+        initial_prompt: str,
+        *,
+        send_prompt_callback: Any | None = None,
+        receive_response_callback: Any | None = None,
+    ) -> tuple[Outcome, list[Decision]]:
+        """Orchestrate a complete evaluation workflow.
+
+        Runs the full workflow state machine from initialization to completion
+        or failure. This method manages state transitions, sends prompts via
+        the provided callback, and processes responses.
+
+        Args:
+            initial_prompt: The initial prompt/task description to send.
+            send_prompt_callback: Optional async callable (prompt: str) -> None
+                to send prompts to the Worker. If None, workflow runs in
+                simulation mode.
+            receive_response_callback: Optional async callable () -> dict
+                to receive responses from the Worker. If None, workflow runs
+                in simulation mode.
+
+        Returns:
+            A tuple of (Outcome, decisions_log) representing the final outcome
+            and all decisions made during the workflow.
+
+        Raises:
+            LoopDetectedError: If max_iterations is exceeded during workflow.
+        """
+        self.iteration_count = 0  # Reset iteration count at workflow start
+
+        self.log_decision(
+            context="Starting workflow execution",
+            action="Initializing workflow with provided prompt",
+            rationale=f"Initial prompt: {initial_prompt[:50]}...",
+        )
+
+        try:
+            # Transition from initializing to prompting
+            self._increment_iteration()
+            self.transition_to(DeveloperState.prompting)
+
+            self.log_decision(
+                context="Workflow initialized",
+                action="Transitioned to prompting state",
+                rationale="Ready to send initial prompt to Worker",
+            )
+
+            # Main workflow loop - dispatch to state handlers
+            while not self.is_terminal():
+                self._increment_iteration()
+                self._process_current_state(
+                    initial_prompt, send_prompt_callback, receive_response_callback
+                )
+
+            # Determine outcome based on final state
+            outcome = (
+                Outcome.success
+                if self.current_state == DeveloperState.completed
+                else Outcome.failure
+            )
+
+            self.log_decision(
+                context="Workflow finished",
+                action=f"Final outcome: {outcome.value}",
+                rationale=f"Terminal state: {self.current_state.value}",
+            )
+
+            return outcome, self.decisions_log
+
+        except LoopDetectedError:
+            self.log_decision(
+                context="Loop detected during workflow",
+                action="Terminating with loop_detected outcome",
+                rationale=f"Exceeded {self.max_iterations} iterations",
+            )
+            return Outcome.loop_detected, self.decisions_log
+
+        except InvalidStateTransitionError as e:
+            self.log_decision(
+                context="Invalid state transition attempted",
+                action="Terminating with failure outcome",
+                rationale=str(e),
+            )
+            self.current_state = DeveloperState.failed
+            return Outcome.failure, self.decisions_log
+
+    # =========================================================================
+    # LLM-Powered Answer Generation
+    # =========================================================================
+
+    async def answer_question(self, context: QuestionContext) -> AnswerResult:
+        """Generate an LLM-powered answer to a question from the Worker.
+
+        Uses the SDK's query() function to generate a contextual answer based
+        on the question and recent conversation history. On retry attempts
+        (attempt_number=2), uses full history instead of the context window.
+
+        Args:
+            context: The QuestionContext containing questions, conversation
+                history, session ID, and attempt number.
+
+        Returns:
+            AnswerResult containing the generated answer, model used,
+            context size, generation time, and attempt number.
+
+        Raises:
+            RuntimeError: If SDK is not available or answer generation fails.
+        """
+        if not SDK_AVAILABLE or sdk_query is None:
+            raise RuntimeError(
+                "claude-agent-sdk is not installed. "
+                "Install with: pip install claude-agent-sdk"
+            )
+
+        # Transition to answering_question state
+        if self.can_transition_to(DeveloperState.answering_question):
+            self.transition_to(DeveloperState.answering_question)
+
+        # Determine context to use based on attempt number
+        if context.attempt_number == 2:
+            # On retry, use full history for more context
+            messages_to_use = context.conversation_history
+            context_strategy = "full history (retry)"
+        else:
+            # First attempt: use last N messages based on context_window_size
+            messages_to_use = context.conversation_history[-self.context_window_size :]
+            context_strategy = f"last {self.context_window_size} messages"
+
+        # Build the prompt
+        prompt = self._build_answer_prompt(context.questions, messages_to_use)
+
+        # Log the decision to answer
+        self.log_decision(
+            context=f"Received question from Worker (attempt {context.attempt_number})",
+            action=f"Generating LLM answer using {context_strategy}",
+            rationale=f"Questions: {self._summarize_questions(context.questions)}",
+        )
+
+        # Determine the model to use
+        model = self.developer_qa_model or DEFAULT_QA_MODEL
+
+        # Track generation time
+        start_time = time.time()
+
+        try:
+            # Call the SDK query function for one-off answer generation
+            # sdk_query returns an async generator, must consume fully to clean up
+            # Use cwd if set, otherwise use current directory
+            working_dir = self.cwd or os.getcwd()
+
+            logger.debug(
+                f"Developer SDK query starting: model={model}, cwd={working_dir}, "
+                f"prompt_length={len(prompt)}"
+            )
+
+            result_message = None
+            query_gen = sdk_query(
+                prompt=prompt,
+                options=ClaudeAgentOptions(
+                    cwd=working_dir,
+                    model=model,
+                    max_turns=1,
+                    permission_mode="plan",
+                ),
+            )
+            async for message in query_gen:
+                msg_type = type(message).__name__
+                logger.debug(f"Developer SDK received message type: {msg_type}")
+                if msg_type == "ResultMessage":
+                    result_message = message
+                    # Don't break - let the generator complete naturally to avoid
+                    # cancel scope conflicts during cleanup. ResultMessage should
+                    # be the last message, so the loop will exit on its own.
+
+            # Extract the answer text from the result message
+            answer = self._extract_answer_from_response(result_message)
+
+            generation_time_ms = int((time.time() - start_time) * 1000)
+
+            # Log successful generation
+            self.log_decision(
+                context=f"Answer generated for attempt {context.attempt_number}",
+                action=f"Generated answer using {model}",
+                rationale=f"Generation took {generation_time_ms}ms, answer length: {len(answer)} chars",
+            )
+
+            # Transition back to awaiting_response
+            if self.can_transition_to(DeveloperState.awaiting_response):
+                self.transition_to(DeveloperState.awaiting_response)
+
+            return AnswerResult(
+                answer=answer,
+                model_used=model,
+                context_size=len(messages_to_use),
+                generation_time_ms=generation_time_ms,
+                attempt_number=context.attempt_number,
+            )
+
+        except Exception as e:
+            generation_time_ms = int((time.time() - start_time) * 1000)
+
+            # Detailed error logging
+            logger.error(
+                f"Developer SDK query failed after {generation_time_ms}ms: "
+                f"model={model}, cwd={working_dir}"
+            )
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            # Check for additional error attributes
+            if hasattr(e, 'stderr'):
+                logger.error(f"stderr: {e.stderr}")
+            if hasattr(e, 'stdout'):
+                logger.error(f"stdout: {e.stdout}")
+            if hasattr(e, 'returncode'):
+                logger.error(f"returncode: {e.returncode}")
+            if hasattr(e, '__cause__') and e.__cause__:
+                logger.error(f"Cause: {type(e.__cause__).__name__}: {e.__cause__}")
+
+            # Log the failure
+            self.log_decision(
+                context=f"Answer generation failed for attempt {context.attempt_number}",
+                action="Transitioning to failed state",
+                rationale=f"Error: {str(e)}",
+            )
+
+            # Transition to failed state
+            if self.can_transition_to(DeveloperState.failed):
+                self.transition_to(DeveloperState.failed)
+
+            raise RuntimeError(f"Failed to generate answer: {e}") from e
+
+    def _build_answer_prompt(
+        self,
+        questions: list[Any],
+        messages: list[dict[str, Any]],
+    ) -> str:
+        """Build a prompt for answer generation.
+
+        Constructs a prompt that includes the questions and relevant
+        conversation context for the LLM to generate an appropriate answer.
+
+        Args:
+            questions: List of QuestionItem objects.
+            messages: List of message dictionaries for context.
+
+        Returns:
+            The formatted prompt string.
+        """
+        # Format the questions
+        question_text = self._format_questions(questions)
+
+        # Format the conversation context
+        context_text = self._format_conversation_context(messages)
+
+        prompt = f"""You are a developer assistant in an automated evaluation workflow. Analyze the worker's response and decide how to proceed.
+
+## Conversation Context
+{context_text}
+
+## Worker's Latest Response
+{question_text}
+
+## Your Task
+Analyze the worker's response and determine what to do next:
+
+1. If the worker has COMPLETED the task (implemented code, finished work, no more action needed):
+   - Respond with exactly: "complete"
+
+2. If the worker is ASKING for input, presenting options, or waiting for a decision:
+   - Respond with a clear instruction to continue the work
+   - ALWAYS choose to proceed, implement, or continue
+   - If there are numbered options, pick the one that does the most work (e.g., "implement all" over "implement phase 1 only")
+   - Example responses: "continue", "proceed with full implementation", "yes, implement all tasks", "4" (if option 4 is full implementation)
+
+3. If the worker seems stuck or needs guidance:
+   - Provide a clear instruction to continue with the task
+
+IMPORTANT:
+- This is AUTOMATED - always push forward, never ask questions back
+- Prefer doing MORE work over less (all phases vs one phase)
+- Keep response SHORT - just the instruction or "complete"
+
+Your response:"""
+
+        return prompt
+
+    def _format_questions(self, questions: list[Any]) -> str:
+        """Format questions into a readable string.
+
+        Args:
+            questions: List of QuestionItem objects.
+
+        Returns:
+            Formatted string representation of questions.
+        """
+        lines = []
+        for i, q in enumerate(questions, 1):
+            # Handle both QuestionItem objects and dicts
+            if hasattr(q, "question"):
+                question_text = q.question
+                options = getattr(q, "options", None)
+                header = getattr(q, "header", None)
+            else:
+                question_text = q.get("question", str(q))
+                options = q.get("options")
+                header = q.get("header")
+
+            if header:
+                lines.append(f"### {header}")
+
+            lines.append(f"{i}. {question_text}")
+
+            if options:
+                for opt in options:
+                    if hasattr(opt, "label"):
+                        label = opt.label
+                        desc = getattr(opt, "description", None)
+                    else:
+                        label = opt.get("label", str(opt))
+                        desc = opt.get("description")
+
+                    if desc:
+                        lines.append(f"   - {label}: {desc}")
+                    else:
+                        lines.append(f"   - {label}")
+
+        return "\n".join(lines)
+
+    def _format_conversation_context(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> str:
+        """Format conversation messages into a readable context string.
+
+        Args:
+            messages: List of message dictionaries.
+
+        Returns:
+            Formatted string representation of the conversation.
+        """
+        if not messages:
+            return "(No prior conversation context)"
+
+        lines = []
+        for msg in messages:
+            role = msg.get("role", "unknown").upper()
+            content = msg.get("content", "")
+
+            # Handle content that might be a list of blocks
+            if isinstance(content, list):
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if "text" in block:
+                            text_parts.append(block["text"])
+                        elif "thinking" in block:
+                            text_parts.append(f"[Thinking: {block['thinking'][:100]}...]")
+                        elif block.get("type") == "ToolUseBlock":
+                            tool_name = block.get("name", "unknown")
+                            text_parts.append(f"[Tool: {tool_name}]")
+                    elif isinstance(block, str):
+                        text_parts.append(block)
+                content = " ".join(text_parts) if text_parts else "(structured content)"
+
+            # Truncate very long content
+            if len(str(content)) > 500:
+                content = str(content)[:497] + "..."
+
+            lines.append(f"**{role}**: {content}")
+
+        return "\n\n".join(lines)
+
+    def _summarize_questions(self, questions: list[Any]) -> str:
+        """Create a brief summary of questions for logging.
+
+        Args:
+            questions: List of QuestionItem objects.
+
+        Returns:
+            Truncated summary string.
+        """
+        summaries = []
+        for q in questions[:3]:  # Limit to first 3
+            if hasattr(q, "question"):
+                text = q.question
+            elif isinstance(q, dict):
+                text = q.get("question", str(q))
+            else:
+                text = str(q)
+
+            if len(text) > 50:
+                text = text[:47] + "..."
+            summaries.append(text)
+
+        result = "; ".join(summaries)
+        if len(questions) > 3:
+            result += f" (and {len(questions) - 3} more)"
+        return result
+
+    def _extract_answer_from_response(self, response: Any) -> str:
+        """Extract the answer text from an SDK query response.
+
+        Args:
+            response: The response from the SDK query.
+
+        Returns:
+            The extracted answer text.
+
+        Raises:
+            RuntimeError: If no answer text could be extracted.
+        """
+        # Handle different response formats
+        if response is None:
+            raise RuntimeError("SDK query returned None")
+
+        # If response is a string, return it directly
+        if isinstance(response, str):
+            answer = response.strip()
+            if not answer:
+                raise RuntimeError("SDK query returned empty response")
+            return answer
+
+        # If response has a 'result' attribute (ResultMessage-like)
+        if hasattr(response, "result") and response.result:
+            result = response.result
+            if isinstance(result, str):
+                answer = result.strip()
+                if answer:
+                    return answer
+
+        # If response has a 'content' attribute
+        if hasattr(response, "content"):
+            content = response.content
+            if isinstance(content, str):
+                answer = content.strip()
+                if answer:
+                    return answer
+            elif isinstance(content, list):
+                # Extract text from content blocks
+                texts = []
+                for block in content:
+                    if hasattr(block, "text"):
+                        texts.append(block.text)
+                    elif isinstance(block, dict) and "text" in block:
+                        texts.append(block["text"])
+                if texts:
+                    answer = "\n".join(texts).strip()
+                    if answer:
+                        return answer
+
+        # Try converting to string as last resort
+        answer = str(response).strip()
+        if not answer or answer == "None":
+            raise RuntimeError("Could not extract answer from SDK response")
+
+        return answer
+
+    async def detect_and_answer_implicit_question(
+        self,
+        response_text: str,
+        conversation_history: list[dict[str, Any]],
+    ) -> str | None:
+        """Detect if a response contains an implicit question and answer it.
+
+        Analyzes the response text to determine if the Worker is asking for
+        user input without using the AskUserQuestion tool. If an implicit
+        question is detected, generates an appropriate answer.
+
+        Common patterns detected:
+        - "What would you like to do?"
+        - "Please let me know your preference"
+        - Options presented (Option A, Option B, etc.)
+        - "Should I proceed?"
+        - "Which option should I choose?"
+
+        Args:
+            response_text: The text response from the Worker.
+            conversation_history: Recent conversation context.
+
+        Returns:
+            An answer string if an implicit question was detected and answered,
+            None if no implicit question was found.
+        """
+        if not SDK_AVAILABLE or sdk_query is None:
+            # Can't detect without SDK
+            return None
+
+        # Build a prompt to detect and answer implicit questions
+        prompt = f"""You are helping evaluate if an AI assistant's response requires user input, and if so, provide an appropriate answer.
+
+## Assistant's Response
+{response_text[:3000]}
+
+## Task
+1. Analyze if the assistant is asking the user to make a choice or provide input
+2. Look for patterns like:
+   - Presenting options (Option A, Option B, etc.)
+   - Asking "What would you like to do?"
+   - Asking for preferences or confirmation
+   - Requesting the user to choose between approaches
+3. If the assistant IS asking for input: Respond with "NEEDS_ANSWER:" followed by an appropriate autonomous answer that helps the assistant proceed with the task
+4. If the assistant is NOT asking for input (just providing information or completing work): Respond with exactly "NO_QUESTION"
+
+## Guidelines for answering (if needed):
+- Choose the most comprehensive/complete option (e.g., "Proceed with full implementation")
+- Prefer options that move the task forward without user interaction
+- Be direct and actionable
+
+Your response:"""
+
+        try:
+            # Determine the model to use
+            model = self.developer_qa_model or DEFAULT_QA_MODEL
+
+            # sdk_query returns an async generator, must consume fully to clean up
+            # Use cwd if set, otherwise use current directory
+            working_dir = self.cwd or os.getcwd()
+
+            logger.debug(
+                f"Developer implicit question detection starting: model={model}, "
+                f"cwd={working_dir}, response_length={len(response_text)}"
+            )
+
+            result_message = None
+            query_gen = sdk_query(
+                prompt=prompt,
+                options=ClaudeAgentOptions(
+                    cwd=working_dir,
+                    model=model,
+                    max_turns=1,
+                    permission_mode="plan",
+                ),
+            )
+            async for message in query_gen:
+                msg_type = type(message).__name__
+                logger.debug(f"Developer implicit detection received: {msg_type}")
+                if msg_type == "ResultMessage":
+                    result_message = message
+                    # Don't break - let the generator complete naturally to avoid
+                    # cancel scope conflicts during cleanup. ResultMessage should
+                    # be the last message, so the loop will exit on its own.
+
+            # Extract the answer
+            answer_text = self._extract_answer_from_response(result_message)
+
+            # Check if a question was detected
+            if answer_text.strip().upper() == "NO_QUESTION":
+                return None
+
+            if answer_text.startswith("NEEDS_ANSWER:"):
+                answer = answer_text[len("NEEDS_ANSWER:"):].strip()
+
+                self.log_decision(
+                    context="Detected implicit question in Worker response",
+                    action="Generated autonomous answer to continue workflow",
+                    rationale=f"Answer: {answer[:100]}...",
+                )
+
+                return answer
+
+            # If response doesn't match expected format, assume no question
+            return None
+
+        except Exception as e:
+            # Detailed error logging for implicit question detection
+            logger.error(
+                f"Developer implicit question detection failed: model={model}, "
+                f"cwd={working_dir if 'working_dir' in dir() else 'not set'}"
+            )
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            self.log_decision(
+                context="Error detecting implicit question",
+                action="Assuming no implicit question",
+                rationale=str(e),
+            )
+            return None
+
+    def reset(self) -> None:
+        """Reset the agent to its initial state.
+
+        Clears the decisions log and resets all counters.
+        Useful for running multiple workflows with the same agent instance.
+        """
+        self.current_state = DeveloperState.initializing
+        self.decisions_log = []
+        self.iteration_count = 0
+        self._answer_retry_count = 0
