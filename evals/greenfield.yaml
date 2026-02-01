@@ -16,7 +16,7 @@ defaults:
     - Glob
     - Grep
   model: sonnet
-  timeout_seconds: 300
+  timeout_seconds: 1500
 
 evaluations:
   # Simple utility function - direct implementation
@@ -141,6 +141,7 @@ evaluations:
     description: >
       Simulates the complete spectra workflow: specify, plan, tasks, implement.
       Tests multi-command sequential workflows for complex project development.
+      Direct implementation, no agent.
     task: >
       Build a task management CLI application with the following capabilities:
       1. Add, list, update, and delete tasks
@@ -155,8 +156,9 @@ evaluations:
       - multi-phase
       - python
       - cli
-    max_budget_usd: 20.0
-    timeout_seconds: 900
+    max_turns: 200
+    max_budget_usd: 50.0
+    timeout_seconds: 3600
     phases:
       - name: specify
         permission_mode: acceptEdits
@@ -178,6 +180,7 @@ evaluations:
     description: >
       Simulates the complete spectra workflow: specify, plan, tasks, implement.
       Tests multi-command sequential workflows for complex project development.
+      Agent implementation, no direct implementation.
     task: >
       Build a task management CLI application with the following capabilities:
       1. Add, list, update, and delete tasks
@@ -192,8 +195,9 @@ evaluations:
       - multi-phase
       - python
       - cli
-    max_budget_usd: 20.0
-    timeout_seconds: 900
+    max_turns: 200
+    max_budget_usd: 50.0
+    timeout_seconds: 3600
     phases:
       - name: specify
         permission_mode: acceptEdits

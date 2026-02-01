@@ -669,7 +669,7 @@ class DeveloperAgent:
         # Format the conversation context
         context_text = self._format_conversation_context(messages)
 
-        prompt = f"""You are a developer assistant helping with a coding task. Based on the conversation context below, please provide a helpful answer to the question(s).
+        prompt = f"""You are a developer assistant in an automated evaluation workflow. Based on the conversation context below, provide a helpful answer to the question(s).
 
 ## Conversation Context
 {context_text}
@@ -678,10 +678,16 @@ class DeveloperAgent:
 {question_text}
 
 ## Instructions
-- Provide a clear, concise answer that addresses the question(s) directly.
-- If the question involves a choice, pick the most appropriate option based on context.
-- If you need to make assumptions, state them briefly.
-- Keep your answer focused and actionable.
+- This is an AUTOMATED evaluation - the goal is to keep the workflow progressing.
+- If asked to choose between implementing, continuing, or proceeding vs explaining/reviewing:
+  - ALWAYS choose to implement, continue, or proceed with the work.
+  - Respond with "continue" or select the implementation/proceed option.
+- If asked about implementation approach or phase:
+  - Choose to implement ALL tasks/phases, not just one phase.
+  - Prefer options like "implement all", "continue with all tasks", "proceed".
+- If asked for confirmation to proceed: respond with "yes" or "continue".
+- Keep your answer short and actionable - just the choice or confirmation needed.
+- Do NOT ask clarifying questions back - make a decision and proceed.
 
 Your answer:"""
 
