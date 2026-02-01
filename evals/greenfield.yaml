@@ -136,8 +136,8 @@ evaluations:
   #       continue_session: true
 
   # Full spectra workflow simulation
-  - id: spectra-full-workflow
-    name: Spectra Full Workflow Simulation
+  - id: spectra-full-workflow-direct
+    name: Spectra Full Workflow Simulation (Direct)
     description: >
       Simulates the complete spectra workflow: specify, plan, tasks, implement.
       Tests multi-command sequential workflows for complex project development.
@@ -172,8 +172,44 @@ evaluations:
         prompt: "/spectra:tasks"
       - name: implement
         permission_mode: bypassPermissions
-        prompt: "/spectra:implement"
-
+        prompt: "/spectra:implement --direct, don't ask for user input, just implement the whole plan"
+  - id: spectra-full-workflow-agent
+    name: Spectra Full Workflow Simulation (Agent)
+    description: >
+      Simulates the complete spectra workflow: specify, plan, tasks, implement.
+      Tests multi-command sequential workflows for complex project development.
+    task: >
+      Build a task management CLI application with the following capabilities:
+      1. Add, list, update, and delete tasks
+      2. Mark tasks as complete/incomplete
+      3. Assign priorities (low, medium, high)
+      4. Filter and search tasks
+      5. Persist tasks to a JSON file
+      6. Support for due dates
+    tags:
+      - spectra
+      - complex
+      - multi-phase
+      - python
+      - cli
+    max_budget_usd: 20.0
+    timeout_seconds: 900
+    phases:
+      - name: specify
+        permission_mode: acceptEdits
+        prompt: >
+          /spectra:specify Build a task management CLI application that allows users to:
+          - Add, list, update, and delete tasks
+          - Mark tasks as complete/incomplete
+      - name: plan
+        permission_mode: acceptEdits
+        prompt: "/spectra:plan"
+      - name: tasks
+        permission_mode: acceptEdits
+        prompt: "/spectra:tasks"
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt: "/spectra:implement, don't ask for user input, just implement the whole plan"
   # # Bonus: TypeScript/Node.js project for language variety
   # - id: node-package-direct
   #   name: Node.js Utility Package (Direct)
