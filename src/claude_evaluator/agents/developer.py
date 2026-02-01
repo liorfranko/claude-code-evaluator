@@ -611,7 +611,12 @@ class DeveloperAgent:
             result_message = None
             query_gen = sdk_query(
                 prompt=prompt,
-                options=ClaudeAgentOptions(cwd=working_dir, model=model, max_turns=1),
+                options=ClaudeAgentOptions(
+                    cwd=working_dir,
+                    model=model,
+                    max_turns=1,
+                    permission_mode="plan",
+                ),
             )
             try:
                 async for message in query_gen:
@@ -951,7 +956,12 @@ Your response:"""
             result_message = None
             query_gen = sdk_query(
                 prompt=prompt,
-                options=ClaudeAgentOptions(cwd=working_dir, model=model, max_turns=1),
+                options=ClaudeAgentOptions(
+                    cwd=working_dir,
+                    model=model,
+                    max_turns=1,
+                    permission_mode="plan",
+                ),
             )
             try:
                 async for message in query_gen:
