@@ -171,7 +171,17 @@ evaluations:
         prompt: "/spectra:tasks"
       - name: implement
         permission_mode: bypassPermissions
-        prompt: "/spectra:implement --direct, don't ask for user input, just implement the whole plan"
+        prompt: >
+          /spectra:implement --direct
+
+          CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE:
+          1. DO NOT present options or ask for user input
+          2. DO NOT stop to explain constraints or limitations
+          3. DO NOT ask which phase to implement - implement ALL phases
+          4. Implement ALL tasks from tasks.md one by one without stopping
+          5. Keep going until every single task is marked [x] complete
+          6. If you encounter any issues, work around them and continue
+          7. This is an automated evaluation - there is NO user to respond to questions
   - id: spectra-full-workflow-agent
     name: Spectra Full Workflow Simulation (Agent)
     description: >

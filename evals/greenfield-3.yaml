@@ -48,9 +48,3 @@ evaluations:
           - Filter and search tasks
           - Persist tasks to a JSON file
           - Support for due dates
-
-          CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE:
-          1. Implement the complete feature end-to-end autonomously
-          2. Keep going until the feature is fully implemented and tested
-          3. If you encounter any issues, work around them and continue
-          4. This is an automated evaluation - questions will be answered automatically

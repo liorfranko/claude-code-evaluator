@@ -1,0 +1,55 @@
+name: greenfield-workflows
+description: >
+  Evaluate different workflow approaches for greenfield (new project) development.
+  Tests direct implementation, plan-then-implement, multi-command workflows, and
+  the full projspec specification-to-implementation pipeline.
+version: "1.0.0"
+
+defaults:
+  max_turns: 2000
+  max_budget_usd: 50.0
+  timeout_seconds: 36000
+  allowed_tools:
+    - Read
+    - Edit
+    - Write
+    - Bash
+    - Glob
+    - Grep
+  model: claude-sonnet-4-5@20250929
+
+evaluations:
+  # REST API project - plan then implement
+  - id: utility-function-plan-then-implement
+    name: Simple Utility Function (Direct)
+    description: >
+      Tests Claude's ability to first analyze an existing codebase and create
+      a plan, then implement a new API endpoint following existing patterns.
+      The two-phase approach ensures Claude understands the codebase before
+      making changes.
+    task: >
+      Build a task management CLI application with the following capabilities:
+      1. Add, list, update, and delete tasks
+      2. Mark tasks as complete/incomplete
+      3. Assign priorities (low, medium, high)
+      4. Filter and search tasks
+      5. Persist tasks to a JSON file
+      6. Support for due dates
+    tags:
+      - simple
+      - direct
+      - python
+      - utility
+      - plan-then-implement
+    phases:
+      - name: planning
+        permission_mode: plan
+        prompt_template: >
+          Build a task management CLI application that allows users to:
+          - Add, list, update, and delete tasks
+          - Mark tasks as complete/incomplete
+      - name: implementation
+        permission_mode: bypassPermissions
+        prompt_template: >
+          Now implement the following plan. Create all necessary files
+          in the current working directory.
