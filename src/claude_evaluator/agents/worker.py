@@ -1078,21 +1078,15 @@ class WorkerAgent:
             A short description of the tool action.
         """
         try:
-            # Handle common tools
+            # Handle common tools - show full paths/commands for clarity
             if tool_name == "Bash":
-                cmd = tool_input.get("command", "")
-                if len(cmd) > 60:
-                    cmd = cmd[:57] + "..."
-                return cmd
+                return tool_input.get("command", "")
             elif tool_name == "Read":
-                path = tool_input.get("file_path", "")
-                return path.split("/")[-1] if "/" in path else path
+                return tool_input.get("file_path", "")
             elif tool_name == "Write":
-                path = tool_input.get("file_path", "")
-                return path.split("/")[-1] if "/" in path else path
+                return tool_input.get("file_path", "")
             elif tool_name == "Edit":
-                path = tool_input.get("file_path", "")
-                return path.split("/")[-1] if "/" in path else path
+                return tool_input.get("file_path", "")
             elif tool_name == "Glob":
                 return tool_input.get("pattern", "")
             elif tool_name == "Grep":
