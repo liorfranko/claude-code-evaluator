@@ -64,6 +64,9 @@ class EvalDefaults:
         allowed_tools: Default allowed tools list.
         model: Default model (sonnet, opus, haiku).
         timeout_seconds: Default timeout per evaluation.
+        developer_qa_model: Model for developer Q&A interactions.
+        question_timeout_seconds: Timeout for developer Q&A questions (default 60).
+        context_window_size: Number of recent conversation turns for Q&A context (default 10).
     """
 
     max_turns: Optional[int] = None
@@ -71,6 +74,9 @@ class EvalDefaults:
     allowed_tools: Optional[list[str]] = None
     model: Optional[str] = None
     timeout_seconds: Optional[int] = None
+    developer_qa_model: Optional[str] = None
+    question_timeout_seconds: int = 60
+    context_window_size: int = 10
 
 
 @dataclass
@@ -90,6 +96,7 @@ class EvaluationConfig:
         max_turns: Override suite default.
         max_budget_usd: Override suite default.
         timeout_seconds: Override suite default.
+        developer_qa_model: Override suite default for developer Q&A model.
     """
 
     id: str
@@ -102,6 +109,8 @@ class EvaluationConfig:
     max_turns: Optional[int] = None
     max_budget_usd: Optional[float] = None
     timeout_seconds: Optional[int] = None
+    model: Optional[str] = None
+    developer_qa_model: Optional[str] = None
 
 
 @dataclass

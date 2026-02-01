@@ -73,7 +73,7 @@ class EvaluationReport:
             "task_description": self.task_description,
             "workflow_type": self.workflow_type.value,
             "outcome": self.outcome.value,
-            "total_runtime_ms": self.metrics.total_runtime_ms,
+            "total_runtime_seconds": round(self.metrics.total_runtime_ms / 1000, 2),
             "total_tokens": self.metrics.total_tokens,
             "total_cost_usd": self.metrics.total_cost_usd,
             "num_decisions": len(self.decisions),

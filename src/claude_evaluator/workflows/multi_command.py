@@ -6,9 +6,12 @@ is useful for complex evaluation scenarios that require multiple distinct
 commands to be executed in order.
 """
 
+import asyncio
+import logging
 from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
+from claude_evaluator.models.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
@@ -16,6 +19,9 @@ if TYPE_CHECKING:
     from claude_evaluator.models.metrics import Metrics
 
 __all__ = ["MultiCommandWorkflow"]
+
+# Maximum number of continuation turns when worker needs guidance
+MAX_CONTINUATIONS_PER_PHASE = 5
 
 
 class MultiCommandWorkflow(BaseWorkflow):
@@ -157,6 +163,18 @@ class MultiCommandWorkflow(BaseWorkflow):
         worker = evaluation.worker_agent
         worker.set_permission_mode(phase.permission_mode)
 
+        # Emit phase start event for verbose output
+        from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
+        worker._emit_progress(ProgressEvent(
+            event_type=ProgressEventType.PHASE_START,
+            message=f"Starting phase: {phase.name}",
+            data={
+                "phase_name": phase.name,
+                "phase_index": self._current_phase_index,
+                "total_phases": len(self._phases),
+            },
+        ))
+
         # Configure allowed tools if specified
         if phase.allowed_tools:
             worker.configure_tools(phase.allowed_tools)
@@ -178,14 +196,74 @@ class MultiCommandWorkflow(BaseWorkflow):
         )
 
         # Collect metrics from this phase
-        # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)
+
+        # Have developer agent analyze response and continue if needed
+        response = query_metrics.response
+        continuation_count = 0
+        developer = evaluation.developer_agent
+
+        # Only invoke developer continuation if developer has answer_question capability
+        # and there's a response to analyze
+        while (
+            continuation_count < MAX_CONTINUATIONS_PER_PHASE
+            and response
+            and hasattr(developer, "answer_question")
+        ):
+            continuation_count += 1
+
+            try:
+                # Build a QuestionContext for the developer to analyze the response
+                question_context = QuestionContext(
+                    questions=[
+                        QuestionItem(
+                            question=response,
+                            header="Worker Response",
+                            options=None,
+                        )
+                    ],
+                    conversation_history=query_metrics.messages,
+                    session_id=str(evaluation.id),
+                    attempt_number=1,
+                )
+
+                # Get developer's analysis and potential response
+                answer_result = await developer.answer_question(question_context)
+
+                # Log the developer's answer for visibility
+                logging.getLogger(__name__).info(
+                    f"Developer answered worker: {answer_result.answer}"
+                )
+
+                # Check if developer indicates task is complete (no follow-up needed)
+                answer_lower = answer_result.answer.lower().strip()
+                if answer_lower in ("complete", "done", "finished", "no follow-up needed"):
+                    break
+
+                # Continue the conversation with the developer's response
+                query_metrics = await worker.execute_query(
+                    query=answer_result.answer,
+                    phase=phase.name,
+                    resume_session=True,
+                )
+
+                # Collect continuation metrics
+                self.metrics_collector.add_query_metrics(query_metrics)
+                response = query_metrics.response
+
+            except (RuntimeError, AttributeError, asyncio.CancelledError, Exception) as e:
+                # SDK not available, answer_question not working, or other error - skip continuation
+                # Log the error for debugging but don't fail the evaluation
+                logging.getLogger(__name__).debug(
+                    f"Developer continuation skipped due to error: {type(e).__name__}: {e}"
+                )
+                break
 
         # Clear tool invocations for the next phase (if not continuing session)
         if not phase.continue_session:
             worker.clear_tool_invocations()
 
-        return query_metrics.response
+        return response
 
     def _build_prompt(
         self,

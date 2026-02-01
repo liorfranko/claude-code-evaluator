@@ -222,6 +222,7 @@ class TestDeveloperState:
         assert DeveloperState.initializing.value == "initializing"
         assert DeveloperState.prompting.value == "prompting"
         assert DeveloperState.awaiting_response.value == "awaiting_response"
+        assert DeveloperState.answering_question.value == "answering_question"
         assert DeveloperState.reviewing_plan.value == "reviewing_plan"
         assert DeveloperState.approving_plan.value == "approving_plan"
         assert DeveloperState.executing_command.value == "executing_command"
@@ -230,14 +231,15 @@ class TestDeveloperState:
         assert DeveloperState.failed.value == "failed"
 
     def test_member_count(self) -> None:
-        """Test that DeveloperState has exactly 9 members."""
-        assert len(DeveloperState) == 9
+        """Test that DeveloperState has exactly 10 members."""
+        assert len(DeveloperState) == 10
 
     def test_string_comparison(self) -> None:
         """Test that DeveloperState can be compared to strings."""
         assert DeveloperState.initializing == "initializing"
         assert DeveloperState.prompting == "prompting"
         assert DeveloperState.awaiting_response == "awaiting_response"
+        assert DeveloperState.answering_question == "answering_question"
         assert DeveloperState.reviewing_plan == "reviewing_plan"
         assert DeveloperState.approving_plan == "approving_plan"
         assert DeveloperState.executing_command == "executing_command"

@@ -5,14 +5,36 @@ orchestrating Claude Code during evaluation. The agent manages state transitions
 through the evaluation workflow and logs autonomous decisions.
 """
 
+import logging
+import os
+import time
+import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
+logger = logging.getLogger(__name__)
+
+from ..models.answer import AnswerResult
 from ..models.decision import Decision
 from ..models.enums import DeveloperState, Outcome
+from ..models.question import QuestionContext
+
+# Optional SDK import for LLM-powered answer generation
+try:
+    from claude_agent_sdk import query as sdk_query, ClaudeAgentOptions
+
+    SDK_AVAILABLE = True
+except ImportError:
+    sdk_query = None  # type: ignore
+    ClaudeAgentOptions = None  # type: ignore
+    SDK_AVAILABLE = False
 
 __all__ = ["DeveloperAgent", "InvalidStateTransitionError", "LoopDetectedError"]
+
+# Default model to use for Q&A when not specified
+# Note: claude-3-haiku@20240307 returns 404, use claude-haiku-4-5@20251001
+DEFAULT_QA_MODEL = "claude-haiku-4-5@20251001"
 
 # Define valid state transitions for the Developer agent state machine
 _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
@@ -27,6 +49,11 @@ _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
     DeveloperState.awaiting_response: {
         DeveloperState.reviewing_plan,
         DeveloperState.evaluating_completion,
+        DeveloperState.answering_question,
+        DeveloperState.failed,
+    },
+    DeveloperState.answering_question: {
+        DeveloperState.awaiting_response,
         DeveloperState.failed,
     },
     DeveloperState.reviewing_plan: {
@@ -82,6 +109,11 @@ class DeveloperAgent:
         decisions_log: Log of autonomous decisions made during evaluation.
         fallback_responses: Predefined responses for common questions (optional).
         max_iterations: Maximum loop iterations before forced termination.
+        developer_qa_model: Model identifier for Q&A (optional, uses DEFAULT_QA_MODEL if None).
+        context_window_size: Number of recent messages to include as context (1-100).
+        max_answer_retries: Maximum retries for rejected answers (0-5).
+        cwd: Working directory for SDK queries (optional, defaults to os.getcwd()).
+        _answer_retry_count: Internal counter for answer attempt tracking.
     """
 
     role: str = field(default="developer", init=False)
@@ -90,11 +122,30 @@ class DeveloperAgent:
     fallback_responses: Optional[dict[str, str]] = field(default=None)
     max_iterations: int = field(default=100)
     iteration_count: int = field(default=0, init=False)
+    developer_qa_model: Optional[str] = field(default=None)
+    context_window_size: int = field(default=10)
+    max_answer_retries: int = field(default=1)
+    cwd: Optional[str] = field(default=None)
+    _answer_retry_count: int = field(default=0, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Validate the initial state of the agent."""
         if self.max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
+
+        # Validate context_window_size is in valid range (1-100)
+        if not (1 <= self.context_window_size <= 100):
+            raise ValueError(
+                f"context_window_size must be between 1 and 100, "
+                f"got {self.context_window_size}"
+            )
+
+        # Validate max_answer_retries is in valid range (0-5)
+        if not (0 <= self.max_answer_retries <= 5):
+            raise ValueError(
+                f"max_answer_retries must be between 0 and 5, "
+                f"got {self.max_answer_retries}"
+            )
 
     def transition_to(self, new_state: DeveloperState) -> None:
         """Transition the agent to a new state.
@@ -499,12 +550,509 @@ class DeveloperAgent:
             self.current_state = DeveloperState.failed
             return Outcome.failure, self.decisions_log
 
+    # =========================================================================
+    # LLM-Powered Answer Generation
+    # =========================================================================
+
+    async def answer_question(self, context: QuestionContext) -> AnswerResult:
+        """Generate an LLM-powered answer to a question from the Worker.
+
+        Uses the SDK's query() function to generate a contextual answer based
+        on the question and recent conversation history. On retry attempts
+        (attempt_number=2), uses full history instead of the context window.
+
+        Args:
+            context: The QuestionContext containing questions, conversation
+                history, session ID, and attempt number.
+
+        Returns:
+            AnswerResult containing the generated answer, model used,
+            context size, generation time, and attempt number.
+
+        Raises:
+            RuntimeError: If SDK is not available or answer generation fails.
+        """
+        if not SDK_AVAILABLE or sdk_query is None:
+            raise RuntimeError(
+                "claude-agent-sdk is not installed. "
+                "Install with: pip install claude-agent-sdk"
+            )
+
+        # Transition to answering_question state
+        if self.can_transition_to(DeveloperState.answering_question):
+            self.transition_to(DeveloperState.answering_question)
+
+        # Determine context to use based on attempt number
+        if context.attempt_number == 2:
+            # On retry, use full history for more context
+            messages_to_use = context.conversation_history
+            context_strategy = "full history (retry)"
+        else:
+            # First attempt: use last N messages based on context_window_size
+            messages_to_use = context.conversation_history[-self.context_window_size :]
+            context_strategy = f"last {self.context_window_size} messages"
+
+        # Build the prompt
+        prompt = self._build_answer_prompt(context.questions, messages_to_use)
+
+        # Log the decision to answer
+        self.log_decision(
+            context=f"Received question from Worker (attempt {context.attempt_number})",
+            action=f"Generating LLM answer using {context_strategy}",
+            rationale=f"Questions: {self._summarize_questions(context.questions)}",
+        )
+
+        # Determine the model to use
+        model = self.developer_qa_model or DEFAULT_QA_MODEL
+
+        # Track generation time
+        start_time = time.time()
+
+        try:
+            # Call the SDK query function for one-off answer generation
+            # sdk_query returns an async generator, must consume fully to clean up
+            # Use cwd if set, otherwise use current directory
+            working_dir = self.cwd or os.getcwd()
+
+            logger.debug(
+                f"Developer SDK query starting: model={model}, cwd={working_dir}, "
+                f"prompt_length={len(prompt)}"
+            )
+
+            result_message = None
+            query_gen = sdk_query(
+                prompt=prompt,
+                options=ClaudeAgentOptions(
+                    cwd=working_dir,
+                    model=model,
+                    max_turns=1,
+                    permission_mode="plan",
+                ),
+            )
+            async for message in query_gen:
+                msg_type = type(message).__name__
+                logger.debug(f"Developer SDK received message type: {msg_type}")
+                if msg_type == "ResultMessage":
+                    result_message = message
+                    # Don't break - let the generator complete naturally to avoid
+                    # cancel scope conflicts during cleanup. ResultMessage should
+                    # be the last message, so the loop will exit on its own.
+
+            # Extract the answer text from the result message
+            answer = self._extract_answer_from_response(result_message)
+
+            generation_time_ms = int((time.time() - start_time) * 1000)
+
+            # Log successful generation
+            self.log_decision(
+                context=f"Answer generated for attempt {context.attempt_number}",
+                action=f"Generated answer using {model}",
+                rationale=f"Generation took {generation_time_ms}ms, answer length: {len(answer)} chars",
+            )
+
+            # Transition back to awaiting_response
+            if self.can_transition_to(DeveloperState.awaiting_response):
+                self.transition_to(DeveloperState.awaiting_response)
+
+            return AnswerResult(
+                answer=answer,
+                model_used=model,
+                context_size=len(messages_to_use),
+                generation_time_ms=generation_time_ms,
+                attempt_number=context.attempt_number,
+            )
+
+        except Exception as e:
+            generation_time_ms = int((time.time() - start_time) * 1000)
+
+            # Detailed error logging
+            logger.error(
+                f"Developer SDK query failed after {generation_time_ms}ms: "
+                f"model={model}, cwd={working_dir}"
+            )
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            # Check for additional error attributes
+            if hasattr(e, 'stderr'):
+                logger.error(f"stderr: {e.stderr}")
+            if hasattr(e, 'stdout'):
+                logger.error(f"stdout: {e.stdout}")
+            if hasattr(e, 'returncode'):
+                logger.error(f"returncode: {e.returncode}")
+            if hasattr(e, '__cause__') and e.__cause__:
+                logger.error(f"Cause: {type(e.__cause__).__name__}: {e.__cause__}")
+
+            # Log the failure
+            self.log_decision(
+                context=f"Answer generation failed for attempt {context.attempt_number}",
+                action="Transitioning to failed state",
+                rationale=f"Error: {str(e)}",
+            )
+
+            # Transition to failed state
+            if self.can_transition_to(DeveloperState.failed):
+                self.transition_to(DeveloperState.failed)
+
+            raise RuntimeError(f"Failed to generate answer: {e}") from e
+
+    def _build_answer_prompt(
+        self,
+        questions: list[Any],
+        messages: list[dict[str, Any]],
+    ) -> str:
+        """Build a prompt for answer generation.
+
+        Constructs a prompt that includes the questions and relevant
+        conversation context for the LLM to generate an appropriate answer.
+
+        Args:
+            questions: List of QuestionItem objects.
+            messages: List of message dictionaries for context.
+
+        Returns:
+            The formatted prompt string.
+        """
+        # Format the questions
+        question_text = self._format_questions(questions)
+
+        # Format the conversation context
+        context_text = self._format_conversation_context(messages)
+
+        prompt = f"""You are a developer assistant in an automated evaluation workflow. Analyze the worker's response and decide how to proceed.
+
+## Conversation Context
+{context_text}
+
+## Worker's Latest Response
+{question_text}
+
+## Your Task
+Analyze the worker's response and determine what to do next:
+
+1. If the worker has COMPLETED the task (implemented code, finished work, no more action needed):
+   - Respond with exactly: "complete"
+
+2. If the worker is ASKING for input, presenting options, or waiting for a decision:
+   - Respond with a clear instruction to continue the work
+   - ALWAYS choose to proceed, implement, or continue
+   - If there are numbered options, pick the one that does the most work (e.g., "implement all" over "implement phase 1 only")
+   - Example responses: "continue", "proceed with full implementation", "yes, implement all tasks", "4" (if option 4 is full implementation)
+
+3. If the worker seems stuck or needs guidance:
+   - Provide a clear instruction to continue with the task
+
+IMPORTANT:
+- This is AUTOMATED - always push forward, never ask questions back
+- Prefer doing MORE work over less (all phases vs one phase)
+- Keep response SHORT - just the instruction or "complete"
+
+Your response:"""
+
+        return prompt
+
+    def _format_questions(self, questions: list[Any]) -> str:
+        """Format questions into a readable string.
+
+        Args:
+            questions: List of QuestionItem objects.
+
+        Returns:
+            Formatted string representation of questions.
+        """
+        lines = []
+        for i, q in enumerate(questions, 1):
+            # Handle both QuestionItem objects and dicts
+            if hasattr(q, "question"):
+                question_text = q.question
+                options = getattr(q, "options", None)
+                header = getattr(q, "header", None)
+            else:
+                question_text = q.get("question", str(q))
+                options = q.get("options")
+                header = q.get("header")
+
+            if header:
+                lines.append(f"### {header}")
+
+            lines.append(f"{i}. {question_text}")
+
+            if options:
+                for opt in options:
+                    if hasattr(opt, "label"):
+                        label = opt.label
+                        desc = getattr(opt, "description", None)
+                    else:
+                        label = opt.get("label", str(opt))
+                        desc = opt.get("description")
+
+                    if desc:
+                        lines.append(f"   - {label}: {desc}")
+                    else:
+                        lines.append(f"   - {label}")
+
+        return "\n".join(lines)
+
+    def _format_conversation_context(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> str:
+        """Format conversation messages into a readable context string.
+
+        Args:
+            messages: List of message dictionaries.
+
+        Returns:
+            Formatted string representation of the conversation.
+        """
+        if not messages:
+            return "(No prior conversation context)"
+
+        lines = []
+        for msg in messages:
+            role = msg.get("role", "unknown").upper()
+            content = msg.get("content", "")
+
+            # Handle content that might be a list of blocks
+            if isinstance(content, list):
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if "text" in block:
+                            text_parts.append(block["text"])
+                        elif "thinking" in block:
+                            text_parts.append(f"[Thinking: {block['thinking'][:100]}...]")
+                        elif block.get("type") == "ToolUseBlock":
+                            tool_name = block.get("name", "unknown")
+                            text_parts.append(f"[Tool: {tool_name}]")
+                    elif isinstance(block, str):
+                        text_parts.append(block)
+                content = " ".join(text_parts) if text_parts else "(structured content)"
+
+            # Truncate very long content
+            if len(str(content)) > 500:
+                content = str(content)[:497] + "..."
+
+            lines.append(f"**{role}**: {content}")
+
+        return "\n\n".join(lines)
+
+    def _summarize_questions(self, questions: list[Any]) -> str:
+        """Create a brief summary of questions for logging.
+
+        Args:
+            questions: List of QuestionItem objects.
+
+        Returns:
+            Truncated summary string.
+        """
+        summaries = []
+        for q in questions[:3]:  # Limit to first 3
+            if hasattr(q, "question"):
+                text = q.question
+            elif isinstance(q, dict):
+                text = q.get("question", str(q))
+            else:
+                text = str(q)
+
+            if len(text) > 50:
+                text = text[:47] + "..."
+            summaries.append(text)
+
+        result = "; ".join(summaries)
+        if len(questions) > 3:
+            result += f" (and {len(questions) - 3} more)"
+        return result
+
+    def _extract_answer_from_response(self, response: Any) -> str:
+        """Extract the answer text from an SDK query response.
+
+        Args:
+            response: The response from the SDK query.
+
+        Returns:
+            The extracted answer text.
+
+        Raises:
+            RuntimeError: If no answer text could be extracted.
+        """
+        # Handle different response formats
+        if response is None:
+            raise RuntimeError("SDK query returned None")
+
+        # If response is a string, return it directly
+        if isinstance(response, str):
+            answer = response.strip()
+            if not answer:
+                raise RuntimeError("SDK query returned empty response")
+            return answer
+
+        # If response has a 'result' attribute (ResultMessage-like)
+        if hasattr(response, "result") and response.result:
+            result = response.result
+            if isinstance(result, str):
+                answer = result.strip()
+                if answer:
+                    return answer
+
+        # If response has a 'content' attribute
+        if hasattr(response, "content"):
+            content = response.content
+            if isinstance(content, str):
+                answer = content.strip()
+                if answer:
+                    return answer
+            elif isinstance(content, list):
+                # Extract text from content blocks
+                texts = []
+                for block in content:
+                    if hasattr(block, "text"):
+                        texts.append(block.text)
+                    elif isinstance(block, dict) and "text" in block:
+                        texts.append(block["text"])
+                if texts:
+                    answer = "\n".join(texts).strip()
+                    if answer:
+                        return answer
+
+        # Try converting to string as last resort
+        answer = str(response).strip()
+        if not answer or answer == "None":
+            raise RuntimeError("Could not extract answer from SDK response")
+
+        return answer
+
+    async def detect_and_answer_implicit_question(
+        self,
+        response_text: str,
+        conversation_history: list[dict[str, Any]],
+    ) -> Optional[str]:
+        """Detect if a response contains an implicit question and answer it.
+
+        Analyzes the response text to determine if the Worker is asking for
+        user input without using the AskUserQuestion tool. If an implicit
+        question is detected, generates an appropriate answer.
+
+        Common patterns detected:
+        - "What would you like to do?"
+        - "Please let me know your preference"
+        - Options presented (Option A, Option B, etc.)
+        - "Should I proceed?"
+        - "Which option should I choose?"
+
+        Args:
+            response_text: The text response from the Worker.
+            conversation_history: Recent conversation context.
+
+        Returns:
+            An answer string if an implicit question was detected and answered,
+            None if no implicit question was found.
+        """
+        if not SDK_AVAILABLE or sdk_query is None:
+            # Can't detect without SDK
+            return None
+
+        # Build a prompt to detect and answer implicit questions
+        prompt = f"""You are helping evaluate if an AI assistant's response requires user input, and if so, provide an appropriate answer.
+
+## Assistant's Response
+{response_text[:3000]}
+
+## Task
+1. Analyze if the assistant is asking the user to make a choice or provide input
+2. Look for patterns like:
+   - Presenting options (Option A, Option B, etc.)
+   - Asking "What would you like to do?"
+   - Asking for preferences or confirmation
+   - Requesting the user to choose between approaches
+3. If the assistant IS asking for input: Respond with "NEEDS_ANSWER:" followed by an appropriate autonomous answer that helps the assistant proceed with the task
+4. If the assistant is NOT asking for input (just providing information or completing work): Respond with exactly "NO_QUESTION"
+
+## Guidelines for answering (if needed):
+- Choose the most comprehensive/complete option (e.g., "Proceed with full implementation")
+- Prefer options that move the task forward without user interaction
+- Be direct and actionable
+
+Your response:"""
+
+        try:
+            # Determine the model to use
+            model = self.developer_qa_model or DEFAULT_QA_MODEL
+
+            # sdk_query returns an async generator, must consume fully to clean up
+            # Use cwd if set, otherwise use current directory
+            working_dir = self.cwd or os.getcwd()
+
+            logger.debug(
+                f"Developer implicit question detection starting: model={model}, "
+                f"cwd={working_dir}, response_length={len(response_text)}"
+            )
+
+            result_message = None
+            query_gen = sdk_query(
+                prompt=prompt,
+                options=ClaudeAgentOptions(
+                    cwd=working_dir,
+                    model=model,
+                    max_turns=1,
+                    permission_mode="plan",
+                ),
+            )
+            async for message in query_gen:
+                msg_type = type(message).__name__
+                logger.debug(f"Developer implicit detection received: {msg_type}")
+                if msg_type == "ResultMessage":
+                    result_message = message
+                    # Don't break - let the generator complete naturally to avoid
+                    # cancel scope conflicts during cleanup. ResultMessage should
+                    # be the last message, so the loop will exit on its own.
+
+            # Extract the answer
+            answer_text = self._extract_answer_from_response(result_message)
+
+            # Check if a question was detected
+            if answer_text.strip().upper() == "NO_QUESTION":
+                return None
+
+            if answer_text.startswith("NEEDS_ANSWER:"):
+                answer = answer_text[len("NEEDS_ANSWER:"):].strip()
+
+                self.log_decision(
+                    context="Detected implicit question in Worker response",
+                    action="Generated autonomous answer to continue workflow",
+                    rationale=f"Answer: {answer[:100]}...",
+                )
+
+                return answer
+
+            # If response doesn't match expected format, assume no question
+            return None
+
+        except Exception as e:
+            # Detailed error logging for implicit question detection
+            logger.error(
+                f"Developer implicit question detection failed: model={model}, "
+                f"cwd={working_dir if 'working_dir' in dir() else 'not set'}"
+            )
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            self.log_decision(
+                context="Error detecting implicit question",
+                action="Assuming no implicit question",
+                rationale=str(e),
+            )
+            return None
+
     def reset(self) -> None:
         """Reset the agent to its initial state.
 
-        Clears the decisions log and resets the iteration count.
+        Clears the decisions log and resets all counters.
         Useful for running multiple workflows with the same agent instance.
         """
         self.current_state = DeveloperState.initializing
         self.decisions_log = []
         self.iteration_count = 0
+        self._answer_retry_count = 0

@@ -99,6 +99,7 @@ class DeveloperState(str, Enum):
         initializing: Agent is setting up.
         prompting: Sending initial or follow-up prompt.
         awaiting_response: Waiting for Worker response.
+        answering_question: Responding to AskUserQuestionBlock from Worker.
         reviewing_plan: Reviewing plan output.
         approving_plan: Transitioning to implementation.
         executing_command: Running a command in sequence.
@@ -110,6 +111,7 @@ class DeveloperState(str, Enum):
     initializing = "initializing"
     prompting = "prompting"
     awaiting_response = "awaiting_response"
+    answering_question = "answering_question"
     reviewing_plan = "reviewing_plan"
     approving_plan = "approving_plan"
     executing_command = "executing_command"

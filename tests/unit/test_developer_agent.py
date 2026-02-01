@@ -229,6 +229,88 @@ class TestStateTransitions:
         for state in DeveloperState:
             assert agent.can_transition_to(state) is False
 
+    # Tests for answering_question state transitions
+    def test_valid_transition_awaiting_response_to_answering_question(self) -> None:
+        """Test valid transition from awaiting_response to answering_question.
+
+        This transition occurs when an AskUserQuestionBlock is received from the Worker.
+        """
+        agent = DeveloperAgent(current_state=DeveloperState.awaiting_response)
+
+        agent.transition_to(DeveloperState.answering_question)
+
+        assert agent.current_state == DeveloperState.answering_question
+
+    def test_valid_transition_answering_question_to_awaiting_response(self) -> None:
+        """Test valid transition from answering_question to awaiting_response.
+
+        This transition occurs when the Answer is successfully sent back to the Worker.
+        """
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        agent.transition_to(DeveloperState.awaiting_response)
+
+        assert agent.current_state == DeveloperState.awaiting_response
+
+    def test_valid_transition_answering_question_to_failed(self) -> None:
+        """Test valid transition from answering_question to failed.
+
+        This transition occurs when timeout or max retries are exceeded while
+        trying to answer a question from the Worker.
+        """
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        agent.transition_to(DeveloperState.failed)
+
+        assert agent.current_state == DeveloperState.failed
+
+    def test_invalid_transition_answering_question_to_completed(self) -> None:
+        """Test invalid transition from answering_question directly to completed."""
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        with pytest.raises(InvalidStateTransitionError) as exc_info:
+            agent.transition_to(DeveloperState.completed)
+
+        assert "Cannot transition from answering_question to completed" in str(exc_info.value)
+        assert agent.current_state == DeveloperState.answering_question
+
+    def test_invalid_transition_answering_question_to_prompting(self) -> None:
+        """Test invalid transition from answering_question to prompting."""
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        with pytest.raises(InvalidStateTransitionError) as exc_info:
+            agent.transition_to(DeveloperState.prompting)
+
+        assert "Cannot transition from answering_question to prompting" in str(exc_info.value)
+        assert agent.current_state == DeveloperState.answering_question
+
+    def test_invalid_transition_answering_question_to_reviewing_plan(self) -> None:
+        """Test invalid transition from answering_question to reviewing_plan."""
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        with pytest.raises(InvalidStateTransitionError) as exc_info:
+            agent.transition_to(DeveloperState.reviewing_plan)
+
+        assert "Cannot transition from answering_question to reviewing_plan" in str(exc_info.value)
+        assert agent.current_state == DeveloperState.answering_question
+
+    def test_can_transition_to_from_answering_question(self) -> None:
+        """Test can_transition_to returns correct values from answering_question state."""
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        # Valid transitions
+        assert agent.can_transition_to(DeveloperState.awaiting_response) is True
+        assert agent.can_transition_to(DeveloperState.failed) is True
+
+        # Invalid transitions
+        assert agent.can_transition_to(DeveloperState.completed) is False
+        assert agent.can_transition_to(DeveloperState.prompting) is False
+        assert agent.can_transition_to(DeveloperState.reviewing_plan) is False
+        assert agent.can_transition_to(DeveloperState.approving_plan) is False
+        assert agent.can_transition_to(DeveloperState.executing_command) is False
+        assert agent.can_transition_to(DeveloperState.evaluating_completion) is False
+        assert agent.can_transition_to(DeveloperState.initializing) is False
+
 
 class TestDecisionLogging:
     """Tests for decision logging functionality."""
@@ -402,12 +484,19 @@ class TestIsTerminal:
 
         assert agent.is_terminal() is False
 
+    def test_answering_question_is_not_terminal(self) -> None:
+        """Test that answering_question state is not terminal."""
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        assert agent.is_terminal() is False
+
     def test_all_non_terminal_states(self) -> None:
         """Test all non-terminal states return False."""
         non_terminal_states = [
             DeveloperState.initializing,
             DeveloperState.prompting,
             DeveloperState.awaiting_response,
+            DeveloperState.answering_question,
             DeveloperState.reviewing_plan,
             DeveloperState.approving_plan,
             DeveloperState.executing_command,
@@ -450,8 +539,9 @@ class TestGetValidTransitions:
 
         assert DeveloperState.reviewing_plan in valid
         assert DeveloperState.evaluating_completion in valid
+        assert DeveloperState.answering_question in valid
         assert DeveloperState.failed in valid
-        assert len(valid) == 3
+        assert len(valid) == 4
 
     def test_valid_transitions_from_completed(self) -> None:
         """Test no valid transitions from completed state."""
@@ -479,6 +569,21 @@ class TestGetValidTransitions:
         assert DeveloperState.awaiting_response in valid
         assert DeveloperState.evaluating_completion in valid
         assert DeveloperState.failed in valid
+
+    def test_valid_transitions_from_answering_question(self) -> None:
+        """Test valid transitions from answering_question state.
+
+        From answering_question, the agent can:
+        - Go to awaiting_response (Answer successfully sent)
+        - Go to failed (Timeout or max retries exceeded)
+        """
+        agent = DeveloperAgent(current_state=DeveloperState.answering_question)
+
+        valid = agent.get_valid_transitions()
+
+        assert DeveloperState.awaiting_response in valid
+        assert DeveloperState.failed in valid
+        assert len(valid) == 2
 
 
 class TestFallbackResponses:

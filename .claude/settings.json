@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
-    "projspec@projspec": true
+    "projspec@projspec": true,
+    "claude-code-improver@claude-code-improver": true
   }
 }

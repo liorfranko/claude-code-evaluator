@@ -5,32 +5,42 @@ commands and returns results. It supports both SDK and CLI execution modes
 with configurable permission levels and tool access.
 """
 
+import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
 from ..models.enums import ExecutionMode, PermissionMode
-from ..models.tool_invocation import ToolInvocation
+from ..models.progress import ProgressEvent, ProgressEventType
+from ..models.question import QuestionContext, QuestionItem, QuestionOption
 from ..models.query_metrics import QueryMetrics
+from ..models.tool_invocation import ToolInvocation
 
 # Optional SDK import - allows tests to run without SDK installed
 try:
     from claude_agent_sdk import (
-        query as sdk_query,
+        ClaudeSDKClient,
         ClaudeAgentOptions,
         ResultMessage,
         AssistantMessage,
         ToolUseBlock,
         ToolResultBlock,
+        PermissionResultAllow,
+        PermissionResultDeny,
+        ToolPermissionContext,
     )
     SDK_AVAILABLE = True
 except ImportError:
-    sdk_query = None  # type: ignore
+    ClaudeSDKClient = None  # type: ignore
     ClaudeAgentOptions = None  # type: ignore
     ResultMessage = None  # type: ignore
     AssistantMessage = None  # type: ignore
     ToolUseBlock = None  # type: ignore
     ToolResultBlock = None  # type: ignore
+    PermissionResultAllow = None  # type: ignore
+    PermissionResultDeny = None  # type: ignore
+    ToolPermissionContext = None  # type: ignore
     SDK_AVAILABLE = False
 
 __all__ = ["WorkerAgent", "SDK_AVAILABLE", "DEFAULT_MODEL"]
@@ -59,8 +69,18 @@ class WorkerAgent:
         max_turns: Maximum number of conversation turns per query.
         max_budget_usd: Maximum spend limit per query in USD (optional).
         model: Model identifier to use for SDK execution (optional, defaults to DEFAULT_MODEL).
+        on_question_callback: Async callback invoked when Claude asks a question.
+            Must return a string answer. If not set and a question is received,
+            a RuntimeError is raised.
+        on_progress_callback: Optional sync callback invoked for each progress event
+            during query execution (text output, tool invocations, etc.). Useful
+            for verbose output.
+        question_timeout_seconds: Timeout in seconds for waiting on question callback
+            response. Must be between 1-300. Defaults to 60.
         tool_invocations: List of tool invocations tracked during current query.
         _query_counter: Internal counter for query indexing.
+        _client: Internal ClaudeSDKClient instance for session management.
+        _question_attempt_counter: Internal counter for question attempt tracking.
     """
 
     execution_mode: ExecutionMode
@@ -73,9 +93,34 @@ class WorkerAgent:
     session_id: Optional[str] = None
     max_budget_usd: Optional[float] = None
     model: Optional[str] = None
+    on_question_callback: Optional[Callable[[QuestionContext], Awaitable[str]]] = None
+    on_implicit_question_callback: Optional[
+        Callable[[str, list[dict[str, Any]]], Awaitable[Optional[str]]]
+    ] = None
+    on_progress_callback: Optional[Callable[[ProgressEvent], None]] = None
+    question_timeout_seconds: int = 60
+    use_user_plugins: bool = False
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
     _query_counter: int = field(default=0, repr=False)
-    _last_session_id: Optional[str] = field(default=None, repr=False)
+    _client: Optional[Any] = field(default=None, repr=False)
+    _question_attempt_counter: int = field(default=0, repr=False)
+    _exit_plan_mode_triggered: bool = field(default=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Validate WorkerAgent initialization parameters."""
+        # Validate question_timeout_seconds is in valid range
+        if not (1 <= self.question_timeout_seconds <= 300):
+            raise ValueError(
+                f"question_timeout_seconds must be between 1 and 300, "
+                f"got {self.question_timeout_seconds}"
+            )
+
+        # Validate on_question_callback is async if provided
+        if self.on_question_callback is not None:
+            if not asyncio.iscoroutinefunction(self.on_question_callback):
+                raise TypeError(
+                    "on_question_callback must be an async function (coroutine function)"
+                )
 
     async def execute_query(
         self,
@@ -114,6 +159,14 @@ class WorkerAgent:
     ) -> QueryMetrics:
         """Execute a query using the Claude SDK.
 
+        Uses ClaudeSDKClient for multi-turn conversation support. When resume_session
+        is True and a client exists, the query continues in the same session context.
+        Otherwise, a new client is created.
+
+        The method implements proper error handling to ensure client cleanup on failure
+        when not resuming a session. When resuming, the client is preserved for potential
+        recovery or continued use.
+
         Args:
             query: The prompt to send to Claude Code.
             phase: Current workflow phase for tracking.
@@ -123,9 +176,9 @@ class WorkerAgent:
             QueryMetrics with execution results.
 
         Raises:
-            RuntimeError: If SDK is not available.
+            RuntimeError: If SDK is not available or no result message is received.
         """
-        if not SDK_AVAILABLE or sdk_query is None:
+        if not SDK_AVAILABLE or ClaudeSDKClient is None:
             raise RuntimeError(
                 "claude-agent-sdk is not installed. "
                 "Install with: pip install claude-agent-sdk"
@@ -134,23 +187,246 @@ class WorkerAgent:
         # Prepare for new query
         self.tool_invocations = []
         self._query_counter += 1
+        self._exit_plan_mode_triggered = False  # Reset ExitPlanMode flag
 
-        # Build SDK options and execute query
-        options = self._build_sdk_options(resume_session)
-        result_message, response_content, all_messages = await self._stream_sdk_messages(
-            query, options
-        )
+        # Determine if we should reuse existing client or create new one
+        if resume_session and self._client is not None:
+            # Continue conversation with existing client
+            # On error, preserve client for potential recovery
+            result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
+                query, self._client
+            )
+        else:
+            # Clean up existing client if any before creating new one
+            if self._client is not None:
+                await self._cleanup_client()
+
+            # Build SDK options and create new client session
+            options = self._build_sdk_options()
+            new_client = ClaudeSDKClient(options)
+
+            try:
+                await new_client.connect()
+                self._client = new_client
+
+                result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
+                    query, self._client
+                )
+            except Exception:
+                # Clean up the new client on connection or streaming failure
+                try:
+                    await new_client.disconnect()
+                except Exception:
+                    pass  # Ignore cleanup errors
+                # Clear the client reference if it was set
+                if self._client is new_client:
+                    self._client = None
+                raise
 
         # Build and return metrics
         return self._build_query_metrics(
             query, phase, result_message, response_content, all_messages
         )
 
-    def _build_sdk_options(self, resume_session: bool) -> Any:
-        """Build ClaudeAgentOptions for SDK execution.
+    def _emit_progress(self, event: ProgressEvent) -> None:
+        """Emit a progress event if a callback is configured.
 
         Args:
-            resume_session: If True, include session resumption.
+            event: The ProgressEvent to emit.
+        """
+        if self.on_progress_callback is not None:
+            self.on_progress_callback(event)
+
+    def _is_path_allowed(self, path: str) -> bool:
+        """Check if a file path is within allowed directories.
+
+        Validates that the path is within project_directory or additional_dirs.
+        This prevents the worker from accessing files outside the workspace.
+
+        Args:
+            path: The file path to check.
+
+        Returns:
+            True if the path is allowed, False otherwise.
+        """
+        from pathlib import Path
+
+        # Resolve the path to handle .. and symlinks
+        try:
+            resolved = Path(path).resolve()
+        except (OSError, ValueError):
+            return False
+
+        # Build list of allowed directories
+        allowed_dirs = [Path(self.project_directory).resolve()]
+        for dir_path in self.additional_dirs:
+            try:
+                allowed_dirs.append(Path(dir_path).resolve())
+            except (OSError, ValueError):
+                continue
+
+        # Check if path is within any allowed directory
+        for allowed_dir in allowed_dirs:
+            try:
+                resolved.relative_to(allowed_dir)
+                return True
+            except ValueError:
+                continue
+
+        return False
+
+    def _extract_paths_from_tool(
+        self,
+        tool_name: str,
+        input_data: dict[str, Any],
+    ) -> list[str]:
+        """Extract file paths from tool input data.
+
+        Args:
+            tool_name: Name of the tool.
+            input_data: Tool input parameters.
+
+        Returns:
+            List of file paths found in the input.
+        """
+        paths: list[str] = []
+
+        # File operation tools
+        if tool_name in ("Read", "Write", "Edit"):
+            if "file_path" in input_data:
+                paths.append(input_data["file_path"])
+
+        # Search tools
+        elif tool_name in ("Glob", "Grep", "LS"):
+            if "path" in input_data:
+                paths.append(input_data["path"])
+
+        # Notebook tools
+        elif tool_name == "NotebookEdit":
+            if "notebook_path" in input_data:
+                paths.append(input_data["notebook_path"])
+
+        # Task tool - check prompt for file paths (heuristic)
+        elif tool_name == "Task":
+            # Don't restrict Task tool - it spawns subagents
+            pass
+
+        return paths
+
+    async def _handle_tool_permission(
+        self,
+        tool_name: str,
+        input_data: dict[str, Any],
+        context: Any,
+    ) -> Any:
+        """Handle tool permission requests for interactive tools.
+
+        Auto-approves ExitPlanMode and answers AskUserQuestion using
+        the developer agent callback. Also restricts file access to
+        allowed directories (project_directory and additional_dirs).
+
+        Args:
+            tool_name: Name of the tool being called.
+            input_data: Input parameters for the tool.
+            context: Tool permission context from SDK.
+
+        Returns:
+            PermissionResultAllow or PermissionResultDeny based on validation.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Check file paths for file operation tools
+        paths = self._extract_paths_from_tool(tool_name, input_data)
+        for path in paths:
+            if not self._is_path_allowed(path):
+                logger.warning(
+                    f"Denying {tool_name} access to path outside allowed directories: {path}"
+                )
+                return PermissionResultDeny(
+                    message=f"Access denied: {path} is outside the allowed workspace. "
+                    f"Only files within {self.project_directory} and additional_dirs are accessible."
+                )
+
+        if tool_name == "ExitPlanMode":
+            # Approve ExitPlanMode and immediately interrupt to end this query.
+            # This allows Claude to complete planning naturally while preventing
+            # it from continuing to implement in the same query.
+            logger.info("Approving ExitPlanMode - interrupting to end phase")
+            self._exit_plan_mode_triggered = True
+
+            # Schedule interrupt to stop Claude from continuing after this tool
+            # We need to do this in a task since we can't await in the callback
+            import asyncio
+            if self._client is not None:
+                asyncio.create_task(self._interrupt_after_delay())
+
+            return PermissionResultAllow()
+
+        if tool_name == "AskUserQuestion":
+            # Generate answers for each question using developer callback
+            questions = input_data.get("questions", [])
+            answers: dict[str, str] = {}
+
+            if self.on_question_callback is not None:
+                # Build context and get answer from developer
+                from ..models.question import QuestionContext, QuestionItem, QuestionOption
+
+                question_items = []
+                for q in questions:
+                    options = [
+                        QuestionOption(
+                            label=opt.get("label", ""),
+                            description=opt.get("description", ""),
+                        )
+                        for opt in q.get("options", [])
+                    ]
+                    question_items.append(QuestionItem(
+                        question=q.get("question", ""),
+                        header=q.get("header", ""),
+                        options=options,
+                    ))
+
+                context = QuestionContext(
+                    questions=question_items,
+                    conversation_history=[],
+                    session_id="permission-callback",
+                    attempt_number=1,
+                )
+
+                try:
+                    answer = await self.on_question_callback(context)
+                    # Map answer to each question
+                    for q in questions:
+                        answers[q.get("question", "")] = answer
+                    logger.info(f"Developer answered AskUserQuestion: {answer}")
+                except Exception as e:
+                    logger.warning(f"Failed to get developer answer: {e}")
+                    # Default to first option for each question
+                    for q in questions:
+                        options = q.get("options", [])
+                        if options:
+                            answers[q.get("question", "")] = options[0].get("label", "Yes")
+            else:
+                # No callback - default to first option
+                for q in questions:
+                    options = q.get("options", [])
+                    if options:
+                        answers[q.get("question", "")] = options[0].get("label", "Yes")
+
+            logger.info(f"Returning answers for AskUserQuestion: {answers}")
+            return PermissionResultAllow(
+                updated_input={
+                    "questions": questions,
+                    "answers": answers,
+                }
+            )
+
+        # Allow all other tools
+        return PermissionResultAllow()
+
+    def _build_sdk_options(self) -> Any:
+        """Build ClaudeAgentOptions for SDK execution.
 
         Returns:
             Configured ClaudeAgentOptions instance.
@@ -161,6 +437,7 @@ class WorkerAgent:
             PermissionMode.bypassPermissions: "bypassPermissions",
         }
 
+        # Build options with optional setting_sources for user plugins
         return ClaudeAgentOptions(
             cwd=self.project_directory,
             add_dirs=self.additional_dirs if self.additional_dirs else [],
@@ -169,56 +446,389 @@ class WorkerAgent:
             max_turns=self.max_turns,
             max_budget_usd=self.max_budget_usd,
             model=self.model or DEFAULT_MODEL,
-            resume=self._last_session_id if resume_session and self._last_session_id else None,
+            setting_sources=["user"] if self.use_user_plugins else None,
+            can_use_tool=self._handle_tool_permission,
         )
 
-    async def _stream_sdk_messages(
+    async def _interrupt_after_delay(self) -> None:
+        """Interrupt the client after a brief delay.
+
+        This is used to stop Claude from continuing execution after ExitPlanMode
+        is called. We use a small delay to allow the current tool to complete
+        before interrupting.
+        """
+        import asyncio
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Small delay to let the current tool result be processed
+            await asyncio.sleep(0.1)
+            if self._client is not None and self._exit_plan_mode_triggered:
+                logger.info("Interrupting client after ExitPlanMode")
+                await self._client.interrupt()
+        except Exception as e:
+            logger.debug(f"Interrupt after ExitPlanMode failed (may be expected): {e}")
+
+    async def _cleanup_client(self) -> None:
+        """Disconnect and clear the current client.
+
+        Safely disconnects the current client, ignoring any errors that occur
+        during disconnection. This ensures cleanup always completes even if
+        the client is in an invalid state.
+        """
+        if self._client is not None:
+            try:
+                await self._client.disconnect()
+            except Exception:
+                pass  # Ignore disconnect errors during cleanup
+            finally:
+                self._client = None
+
+    async def _stream_sdk_messages_with_client(
         self,
         query: str,
-        options: Any,
+        client: Any,
     ) -> tuple[Any, Any, list[dict[str, Any]]]:
-        """Stream and process messages from SDK execution.
+        """Stream and process messages from ClaudeSDKClient.
+
+        Uses the client's query() and receive_response() methods to send
+        a prompt and process the streaming response. Handles AskUserQuestionBlock
+        by invoking the on_question_callback and sending the answer back.
 
         Args:
             query: The prompt to send.
-            options: The ClaudeAgentOptions to use.
+            client: The ClaudeSDKClient instance to use.
 
         Returns:
             Tuple of (result_message, response_content, all_messages).
 
         Raises:
-            RuntimeError: If no result message is received.
+            RuntimeError: If no result message is received or if a question
+                is received but no callback is configured.
+            asyncio.TimeoutError: If question callback times out.
         """
         result_message = None
         response_content = None
         pending_tool_uses: dict[str, ToolInvocation] = {}
         all_messages: list[dict[str, Any]] = []
 
-        async for message in sdk_query(prompt=query, options=options):
-            message_type = type(message).__name__
+        # Reset question attempt counter at the start of each query
+        self._question_attempt_counter = 0
 
-            if message_type == "AssistantMessage" and hasattr(message, "content"):
-                response_content = self._process_assistant_message(
-                    message, pending_tool_uses, all_messages
+        # Send query through client
+        await client.query(query)
+
+        # Process streaming response with question handling loop
+        while True:
+            question_block = None
+
+            async for message in client.receive_response():
+                message_type = type(message).__name__
+
+                if message_type == "AssistantMessage" and hasattr(message, "content"):
+                    response_content = self._process_assistant_message(
+                        message, pending_tool_uses, all_messages
+                    )
+                    # Check for question blocks
+                    question_block = self._find_question_block(message)
+                elif message_type == "UserMessage" and hasattr(message, "content"):
+                    self._process_user_message(message, pending_tool_uses, all_messages)
+                elif message_type == "SystemMessage":
+                    self._process_system_message(message, all_messages)
+                elif message_type == "ResultMessage":
+                    result_message = message
+
+            # If ExitPlanMode was triggered, end the query gracefully
+            # This allows the planning phase to complete without continuing to implement
+            if self._exit_plan_mode_triggered:
+                import logging
+                logging.getLogger(__name__).info(
+                    "ExitPlanMode triggered - ending query to complete phase"
                 )
-            elif message_type == "UserMessage" and hasattr(message, "content"):
-                self._process_user_message(message, pending_tool_uses, all_messages)
-            elif message_type == "SystemMessage":
-                self._process_system_message(message, all_messages)
-            elif message_type == "ResultMessage":
-                result_message = message
+                break
 
+            # If we found a question block, handle it and continue the loop
+            if question_block is not None:
+                answer = await self._handle_question_block(
+                    question_block, all_messages, client
+                )
+                # Send answer back to continue the conversation
+                await client.query(answer)
+                # Continue the loop to process the response to our answer
+                continue
+
+            # Check for implicit questions in the response text
+            if (
+                result_message is not None
+                and self.on_implicit_question_callback is not None
+                and response_content
+            ):
+                implicit_answer = await self._handle_implicit_question(
+                    response_content, all_messages
+                )
+                if implicit_answer is not None:
+                    # Log and send the answer to continue
+                    self._emit_progress(ProgressEvent(
+                        event_type=ProgressEventType.TEXT,
+                        message=f"Developer answered implicit question: {implicit_answer[:100]}",
+                    ))
+                    await client.query(implicit_answer)
+                    result_message = None  # Reset to wait for new result
+                    continue
+
+            # No question found, exit the loop
+            break
+
+        # If ExitPlanMode triggered early exit, we may not have a ResultMessage
+        # In this case, create a synthetic one to allow the phase to complete
         if result_message is None:
-            raise RuntimeError("No result message received from SDK")
+            if self._exit_plan_mode_triggered:
+                import logging
+                logging.getLogger(__name__).info(
+                    "Creating synthetic result for ExitPlanMode early exit"
+                )
+                # Create a minimal result-like object with the essential fields
+                from dataclasses import dataclass
+
+                @dataclass
+                class SyntheticResultMessage:
+                    """Synthetic result message for early phase completion."""
+                    subtype: str = "exit_plan_mode"
+                    duration_ms: int = 0
+                    duration_api_ms: int = 0
+                    is_error: bool = False
+                    num_turns: int = 1
+                    session_id: str = ""
+                    total_cost_usd: float | None = None
+                    usage: dict | None = None
+                    # result is None so that response_content (the actual plan) is used
+                    result: str | None = None
+
+                result_message = SyntheticResultMessage()
+            else:
+                raise RuntimeError("No result message received from SDK")
 
         return result_message, response_content, all_messages
+
+    def _find_question_block(self, message: Any) -> Any | None:
+        """Find an AskUserQuestionBlock in an AssistantMessage.
+
+        Args:
+            message: The AssistantMessage to search.
+
+        Returns:
+            The AskUserQuestionBlock if found, None otherwise.
+        """
+        if not hasattr(message, "content"):
+            return None
+
+        for block in message.content:
+            if type(block).__name__ == "AskUserQuestionBlock":
+                # Emit question progress event
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.QUESTION,
+                    message="Claude is asking a question...",
+                ))
+                return block
+        return None
+
+    async def _handle_question_block(
+        self,
+        block: Any,
+        all_messages: list[dict[str, Any]],
+        client: Any,
+    ) -> str:
+        """Handle an AskUserQuestionBlock by invoking the callback.
+
+        Builds a QuestionContext from the block and invokes the configured
+        callback with a timeout.
+
+        Args:
+            block: The AskUserQuestionBlock to handle.
+            all_messages: Current conversation history.
+            client: The ClaudeSDKClient instance (for session_id).
+
+        Returns:
+            The answer string from the callback.
+
+        Raises:
+            RuntimeError: If no callback is configured.
+            asyncio.TimeoutError: If callback times out.
+        """
+        if self.on_question_callback is None:
+            raise RuntimeError(
+                "Received a question from Claude but no on_question_callback is configured. "
+                "Set on_question_callback to handle questions during evaluation."
+            )
+
+        # Increment attempt counter
+        self._question_attempt_counter += 1
+
+        # Build QuestionContext from the block
+        context = self._build_question_context(block, all_messages, client)
+
+        # Invoke callback with timeout
+        try:
+            answer = await asyncio.wait_for(
+                self.on_question_callback(context),
+                timeout=self.question_timeout_seconds,
+            )
+            return answer
+        except asyncio.TimeoutError:
+            raise asyncio.TimeoutError(
+                f"Question callback timed out after {self.question_timeout_seconds} seconds. "
+                f"Question: {self._summarize_questions(block)}"
+            )
+
+    async def _handle_implicit_question(
+        self,
+        response_text: str,
+        all_messages: list[dict[str, Any]],
+    ) -> Optional[str]:
+        """Handle potential implicit questions in the response text.
+
+        Checks if the response contains questions asked in plain text
+        (without using AskUserQuestion tool) and generates an answer
+        if needed.
+
+        Args:
+            response_text: The text content of the response.
+            all_messages: Current conversation history.
+
+        Returns:
+            An answer string if an implicit question was detected,
+            None otherwise.
+        """
+        if self.on_implicit_question_callback is None:
+            return None
+
+        try:
+            answer = await asyncio.wait_for(
+                self.on_implicit_question_callback(response_text, all_messages),
+                timeout=self.question_timeout_seconds,
+            )
+            return answer
+        except asyncio.TimeoutError:
+            # Log but don't raise - treat as no implicit question
+            return None
+        except Exception:
+            # Any error in detection - treat as no implicit question
+            return None
+
+    def _build_question_context(
+        self,
+        block: Any,
+        all_messages: list[dict[str, Any]],
+        client: Any,
+    ) -> QuestionContext:
+        """Build a QuestionContext from an AskUserQuestionBlock.
+
+        Args:
+            block: The AskUserQuestionBlock containing questions.
+            all_messages: Current conversation history.
+            client: The ClaudeSDKClient instance (for session_id).
+
+        Returns:
+            A populated QuestionContext instance.
+        """
+        # Extract questions from the block
+        raw_questions = getattr(block, "questions", [])
+        question_items: list[QuestionItem] = []
+
+        for raw_q in raw_questions:
+            # Handle both dict and object representations
+            if isinstance(raw_q, dict):
+                question_text = raw_q.get("question", "")
+                raw_options = raw_q.get("options", [])
+                header = raw_q.get("header")
+            else:
+                question_text = getattr(raw_q, "question", "")
+                raw_options = getattr(raw_q, "options", [])
+                header = getattr(raw_q, "header", None)
+
+            # Build QuestionOption list if options exist
+            options: list[QuestionOption] | None = None
+            if raw_options:
+                options = []
+                for raw_opt in raw_options:
+                    if isinstance(raw_opt, dict):
+                        label = raw_opt.get("label", "")
+                        description = raw_opt.get("description")
+                    else:
+                        label = getattr(raw_opt, "label", "")
+                        description = getattr(raw_opt, "description", None)
+                    if label:  # Only add if label is non-empty
+                        options.append(QuestionOption(label=label, description=description))
+
+                # Ensure we have at least 2 options if any options exist
+                if len(options) < 2:
+                    options = None
+
+            if question_text:  # Only add if question is non-empty
+                question_items.append(
+                    QuestionItem(
+                        question=question_text,
+                        options=options,
+                        header=header,
+                    )
+                )
+
+        # If no valid questions found, create a fallback question
+        if not question_items:
+            question_items.append(
+                QuestionItem(question="Claude is asking for clarification.")
+            )
+
+        # Get session ID from client or use fallback
+        session_id = getattr(client, "session_id", None) or self.session_id or "unknown"
+
+        # Determine attempt number (clamped to 1 or 2 per QuestionContext validation)
+        attempt_number = min(self._question_attempt_counter, 2)
+
+        return QuestionContext(
+            questions=question_items,
+            conversation_history=all_messages.copy(),
+            session_id=session_id,
+            attempt_number=attempt_number,
+        )
+
+    def _summarize_questions(self, block: Any) -> str:
+        """Create a summary of questions for error messages.
+
+        Args:
+            block: The AskUserQuestionBlock to summarize.
+
+        Returns:
+            A truncated string representation of the questions.
+        """
+        raw_questions = getattr(block, "questions", [])
+        if not raw_questions:
+            return "(no questions)"
+
+        summaries = []
+        for raw_q in raw_questions[:3]:  # Limit to first 3 questions
+            if isinstance(raw_q, dict):
+                q_text = raw_q.get("question", "")
+            else:
+                q_text = getattr(raw_q, "question", "")
+            if q_text:
+                # Truncate long questions
+                if len(q_text) > 100:
+                    q_text = q_text[:97] + "..."
+                summaries.append(q_text)
+
+        result = "; ".join(summaries)
+        if len(raw_questions) > 3:
+            result += f" (and {len(raw_questions) - 3} more)"
+        return result
 
     def _process_assistant_message(
         self,
         message: Any,
         pending_tool_uses: dict[str, ToolInvocation],
         all_messages: list[dict[str, Any]],
-    ) -> Any:
+    ) -> str | None:
         """Process an AssistantMessage from the SDK stream.
 
         Args:
@@ -227,21 +837,50 @@ class WorkerAgent:
             all_messages: List to append serialized message to.
 
         Returns:
-            The message content for response tracking.
+            The text content from the message for response tracking,
+            or None if no text content is present.
         """
         msg_record = self._serialize_message(message, "assistant")
         all_messages.append(msg_record)
 
+        text_parts: list[str] = []
         for block in message.content:
-            if type(block).__name__ == "ToolUseBlock":
+            block_type = type(block).__name__
+            if block_type == "ToolUseBlock":
                 invocation = self._on_tool_use(
                     tool_name=block.name,
                     tool_use_id=block.id,
                     tool_input=block.input,
                 )
                 pending_tool_uses[block.id] = invocation
+                # Emit tool start progress event with tool details
+                tool_detail = self._get_tool_detail(block.name, block.input)
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.TOOL_START,
+                    message=f"Tool: {block.name}",
+                    data={
+                        "tool_name": block.name,
+                        "tool_use_id": block.id,
+                        "tool_detail": tool_detail,
+                    },
+                ))
+            elif block_type == "TextBlock" and hasattr(block, "text"):
+                text_parts.append(block.text)
+                # Emit text progress event (truncated for display)
+                text_preview = block.text[:100] + "..." if len(block.text) > 100 else block.text
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.TEXT,
+                    message=text_preview,
+                ))
+            elif block_type == "ThinkingBlock" and hasattr(block, "thinking"):
+                # Emit thinking progress event
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.THINKING,
+                    message="Thinking...",
+                ))
 
-        return message.content
+        # Return joined text content or None if no text
+        return "\n".join(text_parts) if text_parts else None
 
     def _process_user_message(
         self,
@@ -275,6 +914,18 @@ class WorkerAgent:
                 invocation.is_error = getattr(block, "is_error", False) or False
                 invocation.success = not invocation.is_error
 
+                # Emit tool completion progress event
+                status = "error" if invocation.is_error else "success"
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.TOOL_END,
+                    message=f"Tool {invocation.tool_name}: {status}",
+                    data={
+                        "tool_name": invocation.tool_name,
+                        "tool_use_id": tool_use_id,
+                        "success": invocation.success,
+                    },
+                ))
+
     def _process_system_message(
         self,
         message: Any,
@@ -288,11 +939,6 @@ class WorkerAgent:
         """
         msg_record = self._serialize_message(message, "system")
         all_messages.append(msg_record)
-
-        # Extract session_id from init message for session resumption
-        if hasattr(message, "subtype") and message.subtype == "init":
-            if hasattr(message, "data") and isinstance(message.data, dict):
-                self._last_session_id = message.data.get("session_id")
 
     def _build_query_metrics(
         self,
@@ -414,6 +1060,57 @@ class WorkerAgent:
             return input_str
         return input_str[:max_length - 3] + "..."
 
+    def _get_tool_detail(
+        self,
+        tool_name: str,
+        tool_input: dict[str, Any],
+    ) -> str:
+        """Extract a human-readable detail from tool input.
+
+        Provides context about what the tool is doing based on
+        common tool input patterns.
+
+        Args:
+            tool_name: Name of the tool being invoked.
+            tool_input: Input parameters for the tool.
+
+        Returns:
+            A short description of the tool action.
+        """
+        try:
+            # Handle common tools - show full paths/commands for clarity
+            if tool_name == "Bash":
+                return tool_input.get("command", "")
+            elif tool_name == "Read":
+                return tool_input.get("file_path", "")
+            elif tool_name == "Write":
+                return tool_input.get("file_path", "")
+            elif tool_name == "Edit":
+                return tool_input.get("file_path", "")
+            elif tool_name == "Glob":
+                return tool_input.get("pattern", "")
+            elif tool_name == "Grep":
+                pattern = tool_input.get("pattern", "")
+                return f'"{pattern}"' if pattern else ""
+            elif tool_name == "Skill":
+                return tool_input.get("skill", "")
+            elif tool_name == "Task":
+                return tool_input.get("description", "")[:40]
+            elif tool_name == "TodoWrite":
+                todos = tool_input.get("todos", [])
+                return f"{len(todos)} items"
+            else:
+                # For unknown tools, try to get a meaningful field
+                for key in ["name", "path", "file_path", "command", "query", "prompt"]:
+                    if key in tool_input:
+                        val = str(tool_input[key])
+                        if len(val) > 40:
+                            val = val[:37] + "..."
+                        return val
+                return ""
+        except Exception:
+            return ""
+
     def _serialize_message(
         self,
         message: Any,
@@ -508,17 +1205,22 @@ class WorkerAgent:
         """Clear the list of tracked tool invocations."""
         self.tool_invocations = []
 
-    def get_last_session_id(self) -> Optional[str]:
-        """Get the session ID from the last query execution.
+    def has_active_client(self) -> bool:
+        """Check if there is an active ClaudeSDKClient for session resumption.
 
         Returns:
-            The session ID if available, None otherwise.
+            True if a client exists for session continuation, False otherwise.
         """
-        return self._last_session_id
+        return self._client is not None
 
-    def clear_session(self) -> None:
-        """Clear the stored session ID to start fresh."""
-        self._last_session_id = None
+    async def clear_session(self) -> None:
+        """Disconnect and clear the stored client to start a fresh session.
+
+        This method safely disconnects the current client and clears the reference,
+        allowing a new session to be started on the next query. Any errors during
+        disconnection are silently ignored to ensure cleanup always completes.
+        """
+        await self._cleanup_client()
 
     def set_permission_mode(self, mode: PermissionMode) -> None:
         """Update the permission mode for subsequent executions.
