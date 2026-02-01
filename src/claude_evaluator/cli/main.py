@@ -23,10 +23,17 @@ logger = get_logger(__name__)
 
 
 class CommandDispatcher:
-    """Dispatches CLI commands to appropriate handlers."""
+    """Dispatches CLI commands to appropriate handlers.
+
+    Attributes:
+        _suite_cmd: Command handler for running suites.
+        _eval_cmd: Command handler for running individual evaluations.
+        _validate_cmd: Command handler for validating suites.
+
+    """
 
     def __init__(self) -> None:
-        """Initialize the command dispatcher."""
+        """Initialize the command dispatcher with all command handlers."""
         self._suite_cmd = RunSuiteCommand()
         self._eval_cmd = RunEvaluationCommand()
         self._validate_cmd = ValidateSuiteCommand()

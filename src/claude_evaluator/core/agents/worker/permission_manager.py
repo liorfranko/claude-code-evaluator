@@ -142,8 +142,10 @@ class PermissionManager:
         for path in paths:
             if not self.is_path_allowed(path):
                 logger.warning(
-                    f"Denying {tool_name} access to path outside "
-                    f"allowed directories: {path}"
+                    "tool_access_denied",
+                    tool_name=tool_name,
+                    path=path,
+                    reason="path_outside_allowed_directories",
                 )
                 return False, path
         return True, None

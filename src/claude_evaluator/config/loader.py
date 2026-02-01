@@ -12,8 +12,13 @@ from typing import Any, TypeAlias
 
 import yaml
 
-from ..models.enums import PermissionMode
-from .models import EvalDefaults, EvaluationConfig, EvaluationSuite, Phase
+from claude_evaluator.config.models import (
+    EvalDefaults,
+    EvaluationConfig,
+    EvaluationSuite,
+    Phase,
+)
+from claude_evaluator.models.enums import PermissionMode
 
 # Type alias for unvalidated data from YAML parsing
 UnvalidatedData: TypeAlias = Any

@@ -11,7 +11,10 @@ import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 from claude_evaluator.config.defaults import (
     CONTEXT_WINDOW_MAX,
@@ -40,14 +43,18 @@ ReceiveResponseCallback: TypeAlias = Callable[[], dict[str, Any]]
 logger = get_logger(__name__)
 
 # Optional SDK import for LLM-powered answer generation
+# Type annotations for optional SDK imports
+sdk_query: "Callable[..., Any] | None"
+ClaudeAgentOptions: "type[Any] | None"
+
 try:
     from claude_agent_sdk import ClaudeAgentOptions
     from claude_agent_sdk import query as sdk_query
 
     SDK_AVAILABLE = True
 except ImportError:
-    sdk_query = None  # type: ignore
-    ClaudeAgentOptions = None  # type: ignore
+    sdk_query = None
+    ClaudeAgentOptions = None
     SDK_AVAILABLE = False
 
 __all__ = ["DeveloperAgent"]
