@@ -19,9 +19,8 @@ defaults:
   model: claude-sonnet-4-5@20250929
 
 evaluations:
-  # REST API project - plan then implement
-  - id: utility-function-plan-then-implement
-    name: Simple Utility Function (Direct)
+  - id: task-manager-plan-then-implement
+    name: Task Management CLI (Plan Then Implement)
     description: >
       Tests Claude's ability to first analyze an existing codebase and create
       a plan, then implement a new API endpoint following existing patterns.
@@ -51,5 +50,9 @@ evaluations:
       - name: implementation
         permission_mode: bypassPermissions
         prompt_template: >
-          Now implement the following plan. Create all necessary files
-          in the current working directory.
+          Implement the following plan that was created in the planning phase:
+
+          {previous_result}
+
+          Create all necessary files in the current working directory.
+          Do not ask for approval - just implement the plan autonomously.
