@@ -17,17 +17,18 @@ from ..models.question import QuestionContext
 
 # Optional SDK import for LLM-powered answer generation
 try:
-    from claude_agent_sdk import query as sdk_query
+    from claude_agent_sdk import query as sdk_query, ClaudeAgentOptions
 
     SDK_AVAILABLE = True
 except ImportError:
     sdk_query = None  # type: ignore
+    ClaudeAgentOptions = None  # type: ignore
     SDK_AVAILABLE = False
 
 __all__ = ["DeveloperAgent", "InvalidStateTransitionError", "LoopDetectedError"]
 
 # Default model to use for Q&A when not specified
-DEFAULT_QA_MODEL = "claude-haiku-4-5@20251001"
+DEFAULT_QA_MODEL = "claude-3-haiku@20240307"
 
 # Define valid state transitions for the Developer agent state machine
 _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
@@ -601,13 +602,23 @@ class DeveloperAgent:
 
         try:
             # Call the SDK query function for one-off answer generation
-            response = await sdk_query(
+            # sdk_query returns an async generator, must consume fully to clean up
+            result_message = None
+            query_gen = sdk_query(
                 prompt=prompt,
-                model=model,
+                options=ClaudeAgentOptions(model=model, max_turns=1),
             )
+            try:
+                async for message in query_gen:
+                    if type(message).__name__ == "ResultMessage":
+                        result_message = message
+                        # Don't break - consume remaining messages to clean up properly
+            finally:
+                # Ensure the generator is properly closed
+                await query_gen.aclose()
 
-            # Extract the answer text from the response
-            answer = self._extract_answer_from_response(response)
+            # Extract the answer text from the result message
+            answer = self._extract_answer_from_response(result_message)
 
             generation_time_ms = int((time.time() - start_time) * 1000)
 
@@ -929,13 +940,23 @@ Your response:"""
             # Determine the model to use
             model = self.developer_qa_model or DEFAULT_QA_MODEL
 
-            response = await sdk_query(
+            # sdk_query returns an async generator, must consume fully to clean up
+            result_message = None
+            query_gen = sdk_query(
                 prompt=prompt,
-                model=model,
+                options=ClaudeAgentOptions(model=model, max_turns=1),
             )
+            try:
+                async for message in query_gen:
+                    if type(message).__name__ == "ResultMessage":
+                        result_message = message
+                        # Don't break - consume remaining messages to clean up properly
+            finally:
+                # Ensure the generator is properly closed
+                await query_gen.aclose()
 
             # Extract the answer
-            answer_text = self._extract_answer_from_response(response)
+            answer_text = self._extract_answer_from_response(result_message)
 
             # Check if a question was detected
             if answer_text.strip().upper() == "NO_QUESTION":

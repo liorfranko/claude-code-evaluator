@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from ..models.enums import ExecutionMode, PermissionMode
+from ..models.progress import ProgressEvent, ProgressEventType
 from ..models.question import QuestionContext, QuestionItem, QuestionOption
 from ..models.query_metrics import QueryMetrics
 from ..models.tool_invocation import ToolInvocation
@@ -65,6 +66,9 @@ class WorkerAgent:
         on_question_callback: Async callback invoked when Claude asks a question.
             Must return a string answer. If not set and a question is received,
             a RuntimeError is raised.
+        on_progress_callback: Optional sync callback invoked for each progress event
+            during query execution (text output, tool invocations, etc.). Useful
+            for verbose output.
         question_timeout_seconds: Timeout in seconds for waiting on question callback
             response. Must be between 1-300. Defaults to 60.
         tool_invocations: List of tool invocations tracked during current query.
@@ -87,6 +91,7 @@ class WorkerAgent:
     on_implicit_question_callback: Optional[
         Callable[[str, list[dict[str, Any]]], Awaitable[Optional[str]]]
     ] = None
+    on_progress_callback: Optional[Callable[[ProgressEvent], None]] = None
     question_timeout_seconds: int = 60
     use_user_plugins: bool = False
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
@@ -214,6 +219,15 @@ class WorkerAgent:
         return self._build_query_metrics(
             query, phase, result_message, response_content, all_messages
         )
+
+    def _emit_progress(self, event: ProgressEvent) -> None:
+        """Emit a progress event if a callback is configured.
+
+        Args:
+            event: The ProgressEvent to emit.
+        """
+        if self.on_progress_callback is not None:
+            self.on_progress_callback(event)
 
     def _build_sdk_options(self) -> Any:
         """Build ClaudeAgentOptions for SDK execution.
@@ -355,6 +369,11 @@ class WorkerAgent:
 
         for block in message.content:
             if type(block).__name__ == "AskUserQuestionBlock":
+                # Emit question progress event
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.QUESTION,
+                    message="Claude is asking a question...",
+                ))
                 return block
         return None
 
@@ -578,8 +597,26 @@ class WorkerAgent:
                     tool_input=block.input,
                 )
                 pending_tool_uses[block.id] = invocation
+                # Emit tool start progress event
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.TOOL_START,
+                    message=f"Tool: {block.name}",
+                    data={"tool_name": block.name, "tool_use_id": block.id},
+                ))
             elif block_type == "TextBlock" and hasattr(block, "text"):
                 text_parts.append(block.text)
+                # Emit text progress event (truncated for display)
+                text_preview = block.text[:100] + "..." if len(block.text) > 100 else block.text
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.TEXT,
+                    message=text_preview,
+                ))
+            elif block_type == "ThinkingBlock" and hasattr(block, "thinking"):
+                # Emit thinking progress event
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.THINKING,
+                    message="Thinking...",
+                ))
 
         # Return joined text content or None if no text
         return "\n".join(text_parts) if text_parts else None
@@ -615,6 +652,18 @@ class WorkerAgent:
                 )
                 invocation.is_error = getattr(block, "is_error", False) or False
                 invocation.success = not invocation.is_error
+
+                # Emit tool completion progress event
+                status = "error" if invocation.is_error else "success"
+                self._emit_progress(ProgressEvent(
+                    event_type=ProgressEventType.TOOL_END,
+                    message=f"Tool {invocation.tool_name}: {status}",
+                    data={
+                        "tool_name": invocation.tool_name,
+                        "tool_use_id": tool_use_id,
+                        "success": invocation.success,
+                    },
+                ))
 
     def _process_system_message(
         self,

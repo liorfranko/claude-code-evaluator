@@ -32,6 +32,7 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
+from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.report.models import EvaluationReport
@@ -160,6 +161,42 @@ For more information, see the documentation.
     return parser
 
 
+def create_progress_callback():
+    """Create a progress callback for verbose output.
+
+    Returns:
+        A callback function that prints progress events.
+    """
+    # Track tool invocations to show tool names on completion
+    _active_tools: dict[str, str] = {}
+
+    def progress_callback(event: ProgressEvent) -> None:
+        """Print progress events to stdout."""
+        if event.event_type == ProgressEventType.TOOL_START:
+            tool_name = event.data.get("tool_name", "unknown") if event.data else "unknown"
+            tool_id = event.data.get("tool_use_id", "") if event.data else ""
+            _active_tools[tool_id] = tool_name
+            print(f"  → {tool_name}")
+        elif event.event_type == ProgressEventType.TOOL_END:
+            success = event.data.get("success", True) if event.data else True
+            tool_name = event.data.get("tool_name", "tool") if event.data else "tool"
+            status = "✓" if success else "✗"
+            print(f"  ← {tool_name} {status}")
+        elif event.event_type == ProgressEventType.TEXT:
+            # Only print non-empty text, and truncate for readability
+            if event.message.strip():
+                text = event.message.replace("\n", " ").strip()
+                if len(text) > 80:
+                    text = text[:77] + "..."
+                print(f"  💬 {text}")
+        elif event.event_type == ProgressEventType.THINKING:
+            print("  🤔 Thinking...")
+        elif event.event_type == ProgressEventType.QUESTION:
+            print("  ❓ Claude is asking a question...")
+
+    return progress_callback
+
+
 def validate_output_path(output_path: str) -> Optional[str]:
     """Validate that output path is within safe boundaries.
 
@@ -247,6 +284,7 @@ async def run_evaluation(
     verbose: bool = False,
     phases: Optional[list[Phase]] = None,
     model: Optional[str] = None,
+    max_turns: Optional[int] = None,
 ) -> EvaluationReport:
     """Run a single evaluation.
 
@@ -257,6 +295,8 @@ async def run_evaluation(
         timeout_seconds: Maximum execution time in seconds (optional).
         verbose: Whether to print progress.
         phases: Phases for multi-command workflow (optional).
+        model: Model identifier to use (optional).
+        max_turns: Maximum turns per query for the SDK (optional, defaults to 200).
 
     Returns:
         The generated EvaluationReport.
@@ -352,6 +392,9 @@ async def run_evaluation(
     # Include /tmp for temporary file operations
     # Enable user plugins to make custom skills (like spectra) available
     claude_plans_dir = str(Path.home() / ".claude" / "plans")
+    # Create progress callback if verbose mode is enabled
+    progress_callback = create_progress_callback() if verbose else None
+
     worker = WorkerAgent(
         execution_mode=ExecutionMode.sdk,
         project_directory=str(workspace_path),
@@ -360,6 +403,8 @@ async def run_evaluation(
         additional_dirs=[claude_plans_dir, "/tmp"],
         use_user_plugins=True,
         model=model,
+        max_turns=max_turns if max_turns is not None else 200,
+        on_progress_callback=progress_callback,
     )
 
     # Create evaluation
@@ -512,6 +557,7 @@ async def run_suite(
                 verbose=verbose,
                 phases=config.phases,
                 model=config.model,
+                max_turns=config.max_turns,
             )
             reports.append(report)
         except Exception as e:
