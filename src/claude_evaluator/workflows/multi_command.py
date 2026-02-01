@@ -6,9 +6,11 @@ is useful for complex evaluation scenarios that require multiple distinct
 commands to be executed in order.
 """
 
+import re
 from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
+from claude_evaluator.models.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
@@ -16,6 +18,25 @@ if TYPE_CHECKING:
     from claude_evaluator.models.metrics import Metrics
 
 __all__ = ["MultiCommandWorkflow"]
+
+# Maximum number of continuation turns when worker asks implicit questions
+MAX_IMPLICIT_QUESTION_CONTINUATIONS = 5
+
+# Patterns that indicate the worker is asking for user input (implicit question)
+IMPLICIT_QUESTION_PATTERNS = [
+    r"which\s+(option|approach|would you)",
+    r"what\s+would\s+you\s+(like|prefer)",
+    r"please\s+(let\s+me\s+know|choose|select)",
+    r"pick\s+one",
+    r"option\s+[1-5a-e]:",
+    r"\*\*option\s+[1-5a-e]\*\*",
+    r"would\s+you\s+like\s+(me\s+)?to",
+    r"do\s+you\s+want\s+(me\s+)?to",
+    r"should\s+i\s+proceed",
+    r"shall\s+i\s+(start|continue|proceed)",
+    r"let\s+me\s+know\s+(which|what|how|if)",
+    r"waiting\s+for\s+your\s+(input|decision|choice)",
+]
 
 
 class MultiCommandWorkflow(BaseWorkflow):
@@ -178,14 +199,55 @@ class MultiCommandWorkflow(BaseWorkflow):
         )
 
         # Collect metrics from this phase
-        # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)
+
+        # Check if response contains an implicit question and continue if needed
+        response = query_metrics.response
+        continuation_count = 0
+
+        while (
+            continuation_count < MAX_IMPLICIT_QUESTION_CONTINUATIONS
+            and response
+            and self._contains_implicit_question(response)
+        ):
+            continuation_count += 1
+
+            # Get developer agent to generate a response
+            developer = evaluation.developer_agent
+
+            # Build a QuestionContext with the response as context
+            question_context = QuestionContext(
+                questions=[
+                    QuestionItem(
+                        question=response,
+                        header="Worker Response",
+                        options=None,  # No pre-defined options
+                    )
+                ],
+                conversation_history=query_metrics.messages,
+                session_id=str(evaluation.id),
+                attempt_number=1,
+            )
+
+            # Get developer's answer
+            answer_result = await developer.answer_question(question_context)
+
+            # Continue the conversation with the developer's answer
+            query_metrics = await worker.execute_query(
+                query=answer_result.answer,
+                phase=phase.name,
+                resume_session=True,  # Always resume for continuation
+            )
+
+            # Collect continuation metrics
+            self.metrics_collector.add_query_metrics(query_metrics)
+            response = query_metrics.response
 
         # Clear tool invocations for the next phase (if not continuing session)
         if not phase.continue_session:
             worker.clear_tool_invocations()
 
-        return query_metrics.response
+        return response
 
     def _build_prompt(
         self,
@@ -228,3 +290,28 @@ class MultiCommandWorkflow(BaseWorkflow):
         self._phase_results.clear()
         self._current_phase_index = 0
         self.reset_metrics()
+
+    def _contains_implicit_question(self, response: str) -> bool:
+        """Check if a response contains an implicit question asking for user input.
+
+        This detects cases where the worker presents options or asks what the user
+        wants to do, without using the AskUserQuestion tool.
+
+        Args:
+            response: The worker's response text.
+
+        Returns:
+            True if the response appears to be asking for user input.
+        """
+        if not response:
+            return False
+
+        # Convert to lowercase for pattern matching
+        response_lower = response.lower()
+
+        # Check each pattern
+        for pattern in IMPLICIT_QUESTION_PATTERNS:
+            if re.search(pattern, response_lower):
+                return True
+
+        return False

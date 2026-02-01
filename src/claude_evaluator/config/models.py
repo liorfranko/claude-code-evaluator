@@ -109,6 +109,7 @@ class EvaluationConfig:
     max_turns: Optional[int] = None
     max_budget_usd: Optional[float] = None
     timeout_seconds: Optional[int] = None
+    model: Optional[str] = None
     developer_qa_model: Optional[str] = None
 
 

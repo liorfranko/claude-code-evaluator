@@ -15,7 +15,7 @@ defaults:
     - Bash
     - Glob
     - Grep
-  model: sonnet
+  model: claude-sonnet-4-5@20250929
   timeout_seconds: 1500
 
 evaluations:

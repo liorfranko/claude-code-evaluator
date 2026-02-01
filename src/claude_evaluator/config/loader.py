@@ -248,6 +248,10 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
         if evaluation.developer_qa_model is None and defaults.developer_qa_model is not None:
             evaluation.developer_qa_model = defaults.developer_qa_model
 
+        # Apply model default if not overridden
+        if evaluation.model is None and defaults.model is not None:
+            evaluation.model = defaults.model
+
     return suite
 
 
@@ -415,6 +419,7 @@ def _parse_evaluation(
         max_turns=_optional_int(data, "max_turns", context),
         max_budget_usd=_optional_number(data, "max_budget_usd", context),
         timeout_seconds=_optional_int(data, "timeout_seconds", context),
+        model=_optional_string(data, "model", context),
         developer_qa_model=_optional_string(data, "developer_qa_model", context),
     )
 

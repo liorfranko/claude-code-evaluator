@@ -246,6 +246,7 @@ async def run_evaluation(
     timeout_seconds: Optional[int] = None,
     verbose: bool = False,
     phases: Optional[list[Phase]] = None,
+    model: Optional[str] = None,
 ) -> EvaluationReport:
     """Run a single evaluation.
 
@@ -358,6 +359,7 @@ async def run_evaluation(
         permission_mode=PermissionMode.acceptEdits,
         additional_dirs=[claude_plans_dir, "/tmp"],
         use_user_plugins=True,
+        model=model,
     )
 
     # Create evaluation
@@ -509,6 +511,7 @@ async def run_suite(
                 timeout_seconds=config.timeout_seconds,
                 verbose=verbose,
                 phases=config.phases,
+                model=config.model,
             )
             reports.append(report)
         except Exception as e:
