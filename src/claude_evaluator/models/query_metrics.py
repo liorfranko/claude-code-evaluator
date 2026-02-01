@@ -1,17 +1,19 @@
-"""QueryMetrics dataclass for claude-evaluator.
+"""QueryMetrics model for claude-evaluator.
 
-This module defines the QueryMetrics dataclass which contains metrics
+This module defines the QueryMetrics model which contains metrics
 for a single query/response exchange with Claude Code.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
+
+from pydantic import Field
+
+from claude_evaluator.models.base import BaseSchema
 
 __all__ = ["QueryMetrics"]
 
 
-@dataclass
-class QueryMetrics:
+class QueryMetrics(BaseSchema):
     """Metrics for a single query/response exchange with Claude Code.
 
     Captures performance and cost metrics for individual queries made
@@ -37,6 +39,6 @@ class QueryMetrics:
     output_tokens: int
     cost_usd: float
     num_turns: int
-    phase: Optional[str] = None
-    response: Optional[str] = None
-    messages: list[dict[str, Any]] = field(default_factory=list)
+    phase: str | None = None
+    response: str | None = None
+    messages: list[dict[str, Any]] = Field(default_factory=list)

@@ -1,13 +1,14 @@
 """Report models for claude-evaluator.
 
-This module defines the EvaluationReport dataclass which represents
+This module defines the EvaluationReport model which represents
 a complete evaluation report with metrics, timeline, and decisions.
 """
 
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
+from pydantic import Field
+
+from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import Outcome, WorkflowType
 from claude_evaluator.models.metrics import Metrics
@@ -16,8 +17,7 @@ from claude_evaluator.models.timeline_event import TimelineEvent
 __all__ = ["EvaluationReport"]
 
 
-@dataclass
-class EvaluationReport:
+class EvaluationReport(BaseSchema):
     """Complete evaluation report containing all collected data.
 
     An EvaluationReport aggregates all information from an evaluation run
@@ -43,8 +43,8 @@ class EvaluationReport:
     metrics: Metrics
     timeline: list[TimelineEvent]
     decisions: list[Decision]
-    generated_at: datetime = field(default_factory=datetime.now)
-    errors: list[str] = field(default_factory=list)
+    generated_at: datetime = Field(default_factory=datetime.now)
+    errors: list[str] = Field(default_factory=list)
 
     def has_errors(self) -> bool:
         """Check if the evaluation encountered any errors.

@@ -55,7 +55,11 @@ class TestAnswerResultValidConstruction:
         assert result.attempt_number == 10
 
     def test_valid_construction_with_multiline_answer(self) -> None:
-        """Test that multiline answers are valid."""
+        """Test that multiline answers are valid.
+
+        Note: Pydantic's str_strip_whitespace=True strips trailing whitespace
+        from string fields, so the trailing newline is removed.
+        """
         multiline_answer = """This is a multiline answer.
 
 It has multiple paragraphs.
@@ -72,7 +76,8 @@ And some code:
             attempt_number=2,
         )
 
-        assert result.answer == multiline_answer
+        # Trailing whitespace is stripped by Pydantic
+        assert result.answer == multiline_answer.strip()
 
     def test_valid_construction_with_unicode_answer(self) -> None:
         """Test that unicode content in answer is valid."""

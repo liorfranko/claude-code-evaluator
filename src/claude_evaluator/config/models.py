@@ -1,20 +1,19 @@
 """Configuration models for YAML-based evaluation definitions.
 
-This module defines dataclasses for parsing and representing evaluation
+This module defines models for parsing and representing evaluation
 configurations from YAML files. These models support multi-phase evaluation
 workflows with configurable permissions, tool access, and resource limits.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
 
-from ..models.enums import PermissionMode
+from pydantic import Field
 
-if TYPE_CHECKING:
-    from ..models.report import EvaluationReport
+from claude_evaluator.models.base import BaseSchema
+from claude_evaluator.models.enums import PermissionMode
+from claude_evaluator.report.models import EvaluationReport
 
 __all__ = [
     "Phase",
@@ -26,8 +25,7 @@ __all__ = [
 ]
 
 
-@dataclass
-class Phase:
+class Phase(BaseSchema):
     """Configuration for a single execution phase within an evaluation.
 
     Phases allow multi-step evaluation workflows where each phase can have
@@ -45,15 +43,14 @@ class Phase:
 
     name: str
     permission_mode: PermissionMode
-    prompt: Optional[str] = None
-    prompt_template: Optional[str] = None
-    allowed_tools: Optional[list[str]] = None
-    max_turns: Optional[int] = None
+    prompt: str | None = None
+    prompt_template: str | None = None
+    allowed_tools: list[str] | None = None
+    max_turns: int | None = None
     continue_session: bool = True
 
 
-@dataclass
-class EvalDefaults:
+class EvalDefaults(BaseSchema):
     """Default settings inherited by all evaluations in a suite.
 
     These defaults can be overridden at the individual evaluation level.
@@ -69,18 +66,17 @@ class EvalDefaults:
         context_window_size: Number of recent conversation turns for Q&A context (default 10).
     """
 
-    max_turns: Optional[int] = None
-    max_budget_usd: Optional[float] = None
-    allowed_tools: Optional[list[str]] = None
-    model: Optional[str] = None
-    timeout_seconds: Optional[int] = None
-    developer_qa_model: Optional[str] = None
+    max_turns: int | None = None
+    max_budget_usd: float | None = None
+    allowed_tools: list[str] | None = None
+    model: str | None = None
+    timeout_seconds: int | None = None
+    developer_qa_model: str | None = None
     question_timeout_seconds: int = 60
     context_window_size: int = 10
 
 
-@dataclass
-class EvaluationConfig:
+class EvaluationConfig(BaseSchema):
     """Configuration for a single evaluation within a suite.
 
     Defines the task, execution phases, and resource limits for an evaluation.
@@ -102,19 +98,18 @@ class EvaluationConfig:
     id: str
     name: str
     task: str
-    phases: list[Phase] = field(default_factory=list)
-    description: Optional[str] = None
-    tags: Optional[list[str]] = None
+    phases: list[Phase] = Field(default_factory=list)
+    description: str | None = None
+    tags: list[str] | None = None
     enabled: bool = True
-    max_turns: Optional[int] = None
-    max_budget_usd: Optional[float] = None
-    timeout_seconds: Optional[int] = None
-    model: Optional[str] = None
-    developer_qa_model: Optional[str] = None
+    max_turns: int | None = None
+    max_budget_usd: float | None = None
+    timeout_seconds: int | None = None
+    model: str | None = None
+    developer_qa_model: str | None = None
 
 
-@dataclass
-class EvaluationSuite:
+class EvaluationSuite(BaseSchema):
     """A collection of related evaluations with shared defaults.
 
     Suites group evaluations that test related functionality and share
@@ -129,14 +124,13 @@ class EvaluationSuite:
     """
 
     name: str
-    evaluations: list[EvaluationConfig] = field(default_factory=list)
-    description: Optional[str] = None
-    version: Optional[str] = None
-    defaults: Optional[EvalDefaults] = None
+    evaluations: list[EvaluationConfig] = Field(default_factory=list)
+    description: str | None = None
+    version: str | None = None
+    defaults: EvalDefaults | None = None
 
 
-@dataclass
-class SuiteSummary:
+class SuiteSummary(BaseSchema):
     """Aggregated summary statistics for a suite run.
 
     Attributes:
@@ -160,8 +154,7 @@ class SuiteSummary:
     total_cost_usd: float
 
 
-@dataclass
-class SuiteRunResult:
+class SuiteRunResult(BaseSchema):
     """Complete result of running an evaluation suite.
 
     Contains all individual evaluation results and aggregate summary.
@@ -179,7 +172,7 @@ class SuiteRunResult:
     suite_name: str
     run_id: str
     started_at: datetime
-    results: list[EvaluationReport] = field(default_factory=list)
-    suite_version: Optional[str] = None
-    completed_at: Optional[datetime] = None
-    summary: Optional[SuiteSummary] = None
+    results: list[EvaluationReport] = Field(default_factory=list)
+    suite_version: str | None = None
+    completed_at: datetime | None = None
+    summary: SuiteSummary | None = None

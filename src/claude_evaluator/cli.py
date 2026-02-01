@@ -8,16 +8,11 @@ various output and configuration options.
 import argparse
 import asyncio
 import json
-import logging
 import subprocess
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 from claude_evaluator import __version__
 from claude_evaluator.agents.developer import DeveloperAgent
@@ -25,6 +20,7 @@ from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.config import load_suite
 from claude_evaluator.config.models import EvaluationConfig, Phase
 from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.logging_config import configure_logging, get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     ExecutionMode,
@@ -32,8 +28,8 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.metrics import Metrics
+from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.report.models import EvaluationReport
 from claude_evaluator.workflows import (
@@ -44,6 +40,8 @@ from claude_evaluator.workflows import (
 )
 
 __all__ = ["main", "create_parser", "run_evaluation", "run_suite"]
+
+logger = get_logger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -173,7 +171,9 @@ def create_progress_callback():
     def progress_callback(event: ProgressEvent) -> None:
         """Print progress events to stdout."""
         if event.event_type == ProgressEventType.TOOL_START:
-            tool_name = event.data.get("tool_name", "unknown") if event.data else "unknown"
+            tool_name = (
+                event.data.get("tool_name", "unknown") if event.data else "unknown"
+            )
             tool_id = event.data.get("tool_use_id", "") if event.data else ""
             tool_detail = event.data.get("tool_detail", "") if event.data else ""
             _active_tools[tool_id] = tool_name
@@ -198,7 +198,9 @@ def create_progress_callback():
         elif event.event_type == ProgressEventType.QUESTION:
             print("  ❓ Claude is asking a question...")
         elif event.event_type == ProgressEventType.PHASE_START:
-            phase_name = event.data.get("phase_name", "unknown") if event.data else "unknown"
+            phase_name = (
+                event.data.get("phase_name", "unknown") if event.data else "unknown"
+            )
             phase_index = event.data.get("phase_index", 0) if event.data else 0
             total_phases = event.data.get("total_phases", 1) if event.data else 1
             print()
@@ -209,7 +211,7 @@ def create_progress_callback():
     return progress_callback
 
 
-def validate_output_path(output_path: str) -> Optional[str]:
+def validate_output_path(output_path: str) -> str | None:
     """Validate that output path is within safe boundaries.
 
     Prevents directory traversal attacks by ensuring the path
@@ -244,7 +246,7 @@ def validate_output_path(output_path: str) -> Optional[str]:
         return f"Error: Invalid output path '{output_path}': {e}"
 
 
-def validate_args(args: argparse.Namespace) -> Optional[str]:
+def validate_args(args: argparse.Namespace) -> str | None:
     """Validate CLI arguments for consistency.
 
     Args:
@@ -292,11 +294,11 @@ async def run_evaluation(
     task: str,
     workflow_type: WorkflowType,
     output_dir: Path,
-    timeout_seconds: Optional[int] = None,
+    timeout_seconds: int | None = None,
     verbose: bool = False,
-    phases: Optional[list[Phase]] = None,
-    model: Optional[str] = None,
-    max_turns: Optional[int] = None,
+    phases: list[Phase] | None = None,
+    model: str | None = None,
+    max_turns: int | None = None,
 ) -> EvaluationReport:
     """Run a single evaluation.
 
@@ -477,7 +479,11 @@ async def run_evaluation(
             f"Evaluation timed out after {e.timeout_seconds} seconds.\n"
             f"  Tip: Increase the timeout using --timeout or timeout_seconds in your YAML config."
         )
-        logger.warning(f"Evaluation {evaluation.id} timed out after {e.timeout_seconds}s")
+        logger.warning(
+            "evaluation_timeout",
+            evaluation_id=str(evaluation.id),
+            timeout_seconds=e.timeout_seconds,
+        )
 
         if not evaluation.is_terminal():
             evaluation.fail(str(e))
@@ -487,7 +493,12 @@ async def run_evaluation(
 
     except Exception as e:
         # Log error always, print to console if verbose
-        logger.error(f"Evaluation {evaluation.id} failed: {e}", exc_info=True)
+        logger.error(
+            "evaluation_failed",
+            evaluation_id=str(evaluation.id),
+            error=str(e),
+            exc_info=True,
+        )
 
         # Only call fail() if not already in a terminal state
         # (workflow may have already called on_execution_error)
@@ -514,7 +525,7 @@ async def run_evaluation(
 async def run_suite(
     suite_path: Path,
     output_dir: Path,
-    eval_filter: Optional[str] = None,
+    eval_filter: str | None = None,
     verbose: bool = False,
 ) -> list[EvaluationReport]:
     """Run all evaluations in a suite.
@@ -574,7 +585,12 @@ async def run_suite(
             reports.append(report)
         except Exception as e:
             # Log the error and create a failed report to track this evaluation
-            logger.error(f"Error running evaluation '{config.id}': {e}", exc_info=True)
+            logger.error(
+                "evaluation_run_error",
+                evaluation_id=config.id,
+                error=str(e),
+                exc_info=True,
+            )
             print(f"Error running evaluation '{config.id}': {e}")
 
             # Create a minimal failed report so it's tracked in results
@@ -723,7 +739,7 @@ def format_results(reports: list[EvaluationReport], json_output: bool = False) -
     return "\n".join(lines)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Main entry point for the CLI.
 
     Args:
@@ -791,7 +807,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     except Exception as e:
         # Always log the full exception for debugging
-        logger.exception(f"Fatal error: {e}")
+        logger.exception("fatal_error", error=str(e))
         print(f"Error: {e}", file=sys.stderr)
         if args.verbose:
             import traceback
@@ -806,19 +822,7 @@ def _setup_logging(verbose: bool = False) -> None:
     Args:
         verbose: Whether to enable debug-level logging to console.
     """
-    log_level = logging.DEBUG if verbose else logging.WARNING
-
-    # Configure root logger
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stderr),
-        ],
-    )
-
-    # Set our logger level
-    logger.setLevel(log_level)
+    configure_logging(verbose=verbose, json_output=False)
 
 
 if __name__ == "__main__":

@@ -63,10 +63,15 @@ class TestQuestionOption:
             QuestionOption(label=" \t\n ")
 
     def test_label_with_leading_trailing_whitespace_is_valid(self) -> None:
-        """Test that label with content plus leading/trailing whitespace is valid."""
+        """Test that label with content plus leading/trailing whitespace is valid.
+
+        Note: Pydantic's str_strip_whitespace=True automatically strips
+        leading/trailing whitespace from string fields.
+        """
         option = QuestionOption(label="  Valid Label  ")
 
-        assert option.label == "  Valid Label  "
+        # Whitespace is stripped by Pydantic
+        assert option.label == "Valid Label"
 
 
 class TestQuestionItem:
@@ -173,10 +178,15 @@ class TestQuestionItem:
             )
 
     def test_question_with_leading_trailing_whitespace_is_valid(self) -> None:
-        """Test that question with content plus leading/trailing whitespace is valid."""
+        """Test that question with content plus leading/trailing whitespace is valid.
+
+        Note: Pydantic's str_strip_whitespace=True automatically strips
+        leading/trailing whitespace from string fields.
+        """
         item = QuestionItem(question="  Valid question?  ")
 
-        assert item.question == "  Valid question?  "
+        # Whitespace is stripped by Pydantic
+        assert item.question == "Valid question?"
 
 
 class TestQuestionContext:

@@ -8,7 +8,7 @@ comprehensive validation.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -45,9 +45,7 @@ def _require_string(data: dict[str, Any], field: str, context: str) -> str:
     return value.strip()
 
 
-def _optional_int(
-    data: dict[str, Any], field: str, context: str
-) -> Optional[int]:
+def _optional_int(data: dict[str, Any], field: str, context: str) -> int | None:
     """Validate and extract an optional integer field.
 
     Args:
@@ -67,9 +65,7 @@ def _optional_int(
     return value
 
 
-def _optional_number(
-    data: dict[str, Any], field: str, context: str
-) -> Optional[float]:
+def _optional_number(data: dict[str, Any], field: str, context: str) -> float | None:
     """Validate and extract an optional number (int or float) field.
 
     Args:
@@ -89,9 +85,7 @@ def _optional_number(
     return float(value) if value is not None else None
 
 
-def _optional_string(
-    data: dict[str, Any], field: str, context: str
-) -> Optional[str]:
+def _optional_string(data: dict[str, Any], field: str, context: str) -> str | None:
     """Validate and extract an optional string field.
 
     Args:
@@ -136,7 +130,7 @@ def _optional_bool(
 
 def _optional_string_list(
     data: dict[str, Any], field: str, context: str
-) -> Optional[list[str]]:
+) -> list[str] | None:
     """Validate and extract an optional list of strings field.
 
     Args:
@@ -245,7 +239,10 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
             evaluation.timeout_seconds = defaults.timeout_seconds
 
         # Apply developer_qa_model default if not overridden
-        if evaluation.developer_qa_model is None and defaults.developer_qa_model is not None:
+        if (
+            evaluation.developer_qa_model is None
+            and defaults.developer_qa_model is not None
+        ):
             evaluation.developer_qa_model = defaults.developer_qa_model
 
         # Apply model default if not overridden
@@ -294,7 +291,9 @@ def load_suite(path: Path | str) -> EvaluationSuite:
         raise ValueError(f"Empty YAML file: {path}")
 
     if not isinstance(data, dict):
-        raise ValueError(f"Invalid YAML structure: expected mapping, got {type(data).__name__}")
+        raise ValueError(
+            f"Invalid YAML structure: expected mapping, got {type(data).__name__}"
+        )
 
     suite = _parse_suite(data, path)
     return apply_defaults(suite)
@@ -462,5 +461,7 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
         prompt_template=_optional_string(data, "prompt_template", context),
         allowed_tools=_optional_string_list(data, "allowed_tools", context),
         max_turns=_optional_int(data, "max_turns", context),
-        continue_session=_optional_bool(data, "continue_session", context, default=True),
+        continue_session=_optional_bool(
+            data, "continue_session", context, default=True
+        ),
     )

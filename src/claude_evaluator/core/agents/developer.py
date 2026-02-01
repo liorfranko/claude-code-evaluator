@@ -668,13 +668,13 @@ class DeveloperAgent:
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
             # Check for additional error attributes
-            if hasattr(e, 'stderr'):
+            if hasattr(e, "stderr"):
                 logger.error(f"stderr: {e.stderr}")
-            if hasattr(e, 'stdout'):
+            if hasattr(e, "stdout"):
                 logger.error(f"stdout: {e.stdout}")
-            if hasattr(e, 'returncode'):
+            if hasattr(e, "returncode"):
                 logger.error(f"returncode: {e.returncode}")
-            if hasattr(e, '__cause__') and e.__cause__:
+            if hasattr(e, "__cause__") and e.__cause__:
                 logger.error(f"Cause: {type(e.__cause__).__name__}: {e.__cause__}")
 
             # Log the failure
@@ -815,7 +815,9 @@ Your response:"""
                         if "text" in block:
                             text_parts.append(block["text"])
                         elif "thinking" in block:
-                            text_parts.append(f"[Thinking: {block['thinking'][:100]}...]")
+                            text_parts.append(
+                                f"[Thinking: {block['thinking'][:100]}...]"
+                            )
                         elif block.get("type") == "ToolUseBlock":
                             tool_name = block.get("name", "unknown")
                             text_parts.append(f"[Tool: {tool_name}]")
@@ -1009,7 +1011,7 @@ Your response:"""
                 return None
 
             if answer_text.startswith("NEEDS_ANSWER:"):
-                answer = answer_text[len("NEEDS_ANSWER:"):].strip()
+                answer = answer_text[len("NEEDS_ANSWER:") :].strip()
 
                 self.log_decision(
                     context="Detected implicit question in Worker response",

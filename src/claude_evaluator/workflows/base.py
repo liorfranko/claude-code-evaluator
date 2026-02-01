@@ -6,11 +6,16 @@ process, managing the execution of tasks and collection of metrics.
 """
 
 import asyncio
-import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
+
+from claude_evaluator.logging_config import get_logger
+from claude_evaluator.workflows.exceptions import (
+    QuestionHandlingError,
+    WorkflowTimeoutError,
+)
 
 if TYPE_CHECKING:
     from claude_evaluator.agents.developer import DeveloperAgent
@@ -22,40 +27,7 @@ if TYPE_CHECKING:
 
 __all__ = ["BaseWorkflow", "WorkflowTimeoutError", "QuestionHandlingError"]
 
-logger = logging.getLogger(__name__)
-
-
-class QuestionHandlingError(Exception):
-    """Raised when an error occurs during question handling in a workflow.
-
-    This exception wraps errors that occur when the DeveloperAgent attempts
-    to answer a question from the WorkerAgent, providing additional context
-    about the failure.
-
-    Attributes:
-        original_error: The original exception that caused the failure.
-        question_context: Brief description of the question that caused the failure.
-    """
-
-    def __init__(
-        self,
-        message: str,
-        original_error: Optional[Exception] = None,
-        question_context: Optional[str] = None,
-    ):
-        self.original_error = original_error
-        self.question_context = question_context
-        super().__init__(message)
-
-
-class WorkflowTimeoutError(Exception):
-    """Raised when a workflow execution exceeds its timeout."""
-
-    def __init__(self, timeout_seconds: int, message: Optional[str] = None):
-        self.timeout_seconds = timeout_seconds
-        super().__init__(
-            message or f"Workflow execution exceeded timeout of {timeout_seconds} seconds"
-        )
+logger = get_logger(__name__)
 
 
 class BaseWorkflow(ABC):
@@ -91,7 +63,7 @@ class BaseWorkflow(ABC):
     def __init__(
         self,
         metrics_collector: "MetricsCollector",
-        defaults: Optional["EvalDefaults"] = None,
+        defaults: "EvalDefaults | None" = None,
     ) -> None:
         """Initialize the workflow with a metrics collector and optional defaults.
 
@@ -105,7 +77,7 @@ class BaseWorkflow(ABC):
         self._metrics_collector = metrics_collector
         self._question_timeout_seconds: int = 60
         self._context_window_size: int = 10
-        self._developer_qa_model: Optional[str] = None
+        self._developer_qa_model: str | None = None
 
         if defaults is not None:
             self._question_timeout_seconds = defaults.question_timeout_seconds
@@ -123,7 +95,7 @@ class BaseWorkflow(ABC):
         return self._context_window_size
 
     @property
-    def developer_qa_model(self) -> Optional[str]:
+    def developer_qa_model(self) -> str | None:
         """Get the developer Q&A model setting."""
         return self._developer_qa_model
 
@@ -228,7 +200,7 @@ class BaseWorkflow(ABC):
     async def execute_with_timeout(
         self,
         evaluation: "Evaluation",
-        timeout_seconds: Optional[int] = None,
+        timeout_seconds: int | None = None,
     ) -> "Metrics":
         """Execute the workflow with an optional timeout.
 
@@ -255,8 +227,9 @@ class BaseWorkflow(ABC):
                 return await self.execute(evaluation)
         except asyncio.TimeoutError:
             logger.warning(
-                f"Workflow execution timed out after {timeout_seconds} seconds "
-                f"for evaluation {evaluation.id}"
+                "workflow_timeout",
+                timeout_seconds=timeout_seconds,
+                evaluation_id=str(evaluation.id),
             )
             # Set end time and save partial metrics before failing
             self._metrics_collector.set_end_time(self._current_time_ms())
@@ -268,7 +241,7 @@ class BaseWorkflow(ABC):
                 evaluation.fail(
                     f"Workflow execution exceeded timeout of {timeout_seconds} seconds"
                 )
-            raise WorkflowTimeoutError(timeout_seconds)
+            raise WorkflowTimeoutError(timeout_seconds) from None
 
     def create_question_callback(
         self,
@@ -308,20 +281,25 @@ class BaseWorkflow(ABC):
             """
             try:
                 logger.debug(
-                    f"Received question from Worker (session: {context.session_id}, "
-                    f"attempt: {context.attempt_number})"
+                    "question_received",
+                    session_id=context.session_id,
+                    attempt_number=context.attempt_number,
                 )
                 result = await developer_agent.answer_question(context)
                 logger.info(
-                    f"Developer answered question: '{result.answer}' "
-                    f"(model: {result.model_used}, took {result.generation_time_ms}ms)"
+                    "developer_answered",
+                    answer=result.answer,
+                    model=result.model_used,
+                    duration_ms=result.generation_time_ms,
                 )
                 return result.answer
             except Exception as e:
                 # Summarize the question for error context
                 question_summary = self._summarize_questions(context)
                 logger.error(
-                    f"Failed to handle question: {e}. Question: {question_summary}"
+                    "question_handling_failed",
+                    error=str(e),
+                    question=question_summary,
                 )
                 raise QuestionHandlingError(
                     f"Failed to generate answer for question: {e}",
@@ -368,15 +346,16 @@ class BaseWorkflow(ABC):
         )
 
         logger.debug(
-            f"Configured worker for questions: timeout={self._question_timeout_seconds}s, "
-            f"context_size={self._context_window_size}, "
-            f"qa_model={self._developer_qa_model or 'default'}"
+            "worker_configured_for_questions",
+            timeout_seconds=self._question_timeout_seconds,
+            context_size=self._context_window_size,
+            qa_model=self._developer_qa_model or "default",
         )
 
     def _create_implicit_question_callback(
         self,
         developer_agent: "DeveloperAgent",
-    ) -> Callable[[str, list[dict[str, Any]]], Awaitable[Optional[str]]]:
+    ) -> Callable[[str, list[dict[str, Any]]], Awaitable[str | None]]:
         """Create a callback for detecting and answering implicit questions.
 
         Implicit questions are questions asked in plain text without using
@@ -388,13 +367,13 @@ class BaseWorkflow(ABC):
 
         Returns:
             An async callback function with signature
-            (response_text, conversation_history) -> Optional[str].
+            (response_text, conversation_history) -> str | None.
         """
 
         async def implicit_question_callback(
             response_text: str,
             conversation_history: list[dict[str, Any]],
-        ) -> Optional[str]:
+        ) -> str | None:
             """Detect and answer implicit questions in the response.
 
             Args:
@@ -446,7 +425,7 @@ class BaseWorkflow(ABC):
         """
         try:
             await evaluation.worker_agent.clear_session()
-            logger.debug("Worker session cleaned up successfully")
+            logger.debug("worker_session_cleanup_complete")
         except Exception as e:
             # Log but don't raise - cleanup is best effort
-            logger.warning(f"Error during worker cleanup: {e}")
+            logger.warning("worker_cleanup_error", error=str(e))

@@ -5,7 +5,7 @@ two-phase workflow: first planning in read-only mode, then implementation
 with edit permissions. This mirrors Claude Code's plan mode workflow.
 """
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.workflows.base import BaseWorkflow
@@ -77,9 +77,9 @@ class PlanThenImplementWorkflow(BaseWorkflow):
     def __init__(
         self,
         metrics_collector: "MetricsCollector",
-        planning_prompt_template: Optional[str] = None,
-        implementation_prompt_template: Optional[str] = None,
-        defaults: Optional["EvalDefaults"] = None,
+        planning_prompt_template: str | None = None,
+        implementation_prompt_template: str | None = None,
+        defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
     ) -> None:
         """Initialize the workflow with optional custom prompt templates.
@@ -104,7 +104,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         self._implementation_prompt_template = (
             implementation_prompt_template or self.DEFAULT_IMPLEMENTATION_PROMPT
         )
-        self._planning_response: Optional[str] = None
+        self._planning_response: str | None = None
         self._enable_question_handling = enable_question_handling
 
     @property
@@ -123,7 +123,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         return self._implementation_prompt_template
 
     @property
-    def planning_response(self) -> Optional[str]:
+    def planning_response(self) -> str | None:
         """Get the response from the planning phase, if available."""
         return self._planning_response
 
@@ -199,15 +199,18 @@ class PlanThenImplementWorkflow(BaseWorkflow):
 
         # Emit phase start event for verbose output
         from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-        worker._emit_progress(ProgressEvent(
-            event_type=ProgressEventType.PHASE_START,
-            message="Starting phase: planning",
-            data={
-                "phase_name": "planning",
-                "phase_index": 0,
-                "total_phases": 2,
-            },
-        ))
+
+        worker._emit_progress(
+            ProgressEvent(
+                event_type=ProgressEventType.PHASE_START,
+                message="Starting phase: planning",
+                data={
+                    "phase_name": "planning",
+                    "phase_index": 0,
+                    "total_phases": 2,
+                },
+            )
+        )
 
         # Format the planning prompt with the task description
         planning_prompt = self._planning_prompt_template.format(
@@ -249,15 +252,18 @@ class PlanThenImplementWorkflow(BaseWorkflow):
 
         # Emit phase start event for verbose output
         from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-        worker._emit_progress(ProgressEvent(
-            event_type=ProgressEventType.PHASE_START,
-            message="Starting phase: implementation",
-            data={
-                "phase_name": "implementation",
-                "phase_index": 1,
-                "total_phases": 2,
-            },
-        ))
+
+        worker._emit_progress(
+            ProgressEvent(
+                event_type=ProgressEventType.PHASE_START,
+                message="Starting phase: implementation",
+                data={
+                    "phase_name": "implementation",
+                    "phase_index": 1,
+                    "total_phases": 2,
+                },
+            )
+        )
 
         # Build implementation prompt - Claude will read the plan file
         implementation_prompt = self._implementation_prompt_template

@@ -54,14 +54,18 @@ class WorkflowTimeoutError(WorkflowError):
 
     def __init__(
         self,
-        message: str,
-        timeout_seconds: int | None = None,
+        timeout_seconds: int,
+        message: str | None = None,
     ) -> None:
         """Initialize the exception.
 
         Args:
-            message: Human-readable error description.
             timeout_seconds: The configured timeout value.
+            message: Optional human-readable error description.
+                If not provided, a default message is generated.
         """
-        super().__init__(message)
         self.timeout_seconds = timeout_seconds
+        super().__init__(
+            message
+            or f"Workflow execution exceeded timeout of {timeout_seconds} seconds"
+        )

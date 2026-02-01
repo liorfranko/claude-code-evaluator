@@ -4,8 +4,6 @@ This module defines the MetricsCollector class which aggregates metrics
 from multiple queries and tool invocations during an evaluation run.
 """
 
-from typing import Optional
-
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
 
@@ -29,9 +27,9 @@ class MetricsCollector:
     def __init__(self) -> None:
         """Initialize empty metrics collector."""
         self._queries: list[QueryMetrics] = []
-        self._current_phase: Optional[str] = None
-        self._start_time_ms: Optional[int] = None
-        self._end_time_ms: Optional[int] = None
+        self._current_phase: str | None = None
+        self._start_time_ms: int | None = None
+        self._end_time_ms: int | None = None
 
     def add_query_metrics(self, query_metrics: QueryMetrics) -> None:
         """Add a query's metrics to the collector.
@@ -117,9 +115,14 @@ class MetricsCollector:
                     content = message.get("content", [])
                     if isinstance(content, list):
                         for block in content:
-                            if isinstance(block, dict) and block.get("type") == "ToolUseBlock":
+                            if (
+                                isinstance(block, dict)
+                                and block.get("type") == "ToolUseBlock"
+                            ):
                                 tool_name = block.get("name", "unknown")
-                                tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
+                                tool_counts[tool_name] = (
+                                    tool_counts.get(tool_name, 0) + 1
+                                )
 
         # Calculate total runtime
         total_runtime_ms = 0

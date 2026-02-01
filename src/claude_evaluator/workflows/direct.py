@@ -5,7 +5,7 @@ direct implementation without planning phases. It executes a task in a single
 shot with acceptEdits permission mode.
 """
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.workflows.base import BaseWorkflow
@@ -48,7 +48,7 @@ class DirectWorkflow(BaseWorkflow):
     def __init__(
         self,
         metrics_collector: "MetricsCollector",
-        defaults: Optional["EvalDefaults"] = None,
+        defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
     ) -> None:
         """Initialize the DirectWorkflow.
@@ -106,16 +106,22 @@ class DirectWorkflow(BaseWorkflow):
             worker.set_permission_mode(PermissionMode.acceptEdits)
 
             # Emit phase start event for verbose output
-            from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-            worker._emit_progress(ProgressEvent(
-                event_type=ProgressEventType.PHASE_START,
-                message="Starting phase: implementation",
-                data={
-                    "phase_name": "implementation",
-                    "phase_index": 0,
-                    "total_phases": 1,
-                },
-            ))
+            from claude_evaluator.models.progress import (
+                ProgressEvent,
+                ProgressEventType,
+            )
+
+            worker._emit_progress(
+                ProgressEvent(
+                    event_type=ProgressEventType.PHASE_START,
+                    message="Starting phase: implementation",
+                    data={
+                        "phase_name": "implementation",
+                        "phase_index": 0,
+                        "total_phases": 1,
+                    },
+                )
+            )
 
             # Execute the task prompt directly
             query_metrics = await worker.execute_query(

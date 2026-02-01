@@ -13,15 +13,18 @@ from claude_evaluator.agents.exceptions import (
     LoopDetectedError,
 )
 
+
 # Lazy imports to avoid circular dependency
 # Users should import directly from claude_evaluator.core.agents
 def __getattr__(name: str) -> object:
     """Lazy import for backward compatibility."""
     if name == "DeveloperAgent":
         from claude_evaluator.core.agents.developer import DeveloperAgent
+
         return DeveloperAgent
     elif name == "WorkerAgent":
         from claude_evaluator.core.agents.worker import WorkerAgent
+
         return WorkerAgent
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

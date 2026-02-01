@@ -37,6 +37,7 @@ try:
         ToolResultBlock,
         ToolUseBlock,
     )
+
     SDK_AVAILABLE = True
 except ImportError:
     ClaudeSDKClient = None  # type: ignore
@@ -200,9 +201,11 @@ class WorkerAgent:
         if resume_session and self._client is not None:
             # Continue conversation with existing client
             # On error, preserve client for potential recovery
-            result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
-                query, self._client
-            )
+            (
+                result_message,
+                response_content,
+                all_messages,
+            ) = await self._stream_sdk_messages_with_client(query, self._client)
         else:
             # Clean up existing client if any before creating new one
             if self._client is not None:
@@ -216,9 +219,11 @@ class WorkerAgent:
                 await new_client.connect()
                 self._client = new_client
 
-                result_message, response_content, all_messages = await self._stream_sdk_messages_with_client(
-                    query, self._client
-                )
+                (
+                    result_message,
+                    response_content,
+                    all_messages,
+                ) = await self._stream_sdk_messages_with_client(query, self._client)
             except Exception:
                 # Clean up the new client on connection or streaming failure
                 try:
@@ -362,6 +367,7 @@ class WorkerAgent:
             # Schedule interrupt to stop Claude from continuing after this tool
             # We need to do this in a task since we can't await in the callback
             import asyncio
+
             if self._client is not None:
                 asyncio.create_task(self._interrupt_after_delay())
 
@@ -389,11 +395,13 @@ class WorkerAgent:
                         )
                         for opt in q.get("options", [])
                     ]
-                    question_items.append(QuestionItem(
-                        question=q.get("question", ""),
-                        header=q.get("header", ""),
-                        options=options,
-                    ))
+                    question_items.append(
+                        QuestionItem(
+                            question=q.get("question", ""),
+                            header=q.get("header", ""),
+                            options=options,
+                        )
+                    )
 
                 context = QuestionContext(
                     questions=question_items,
@@ -414,7 +422,9 @@ class WorkerAgent:
                     for q in questions:
                         options = q.get("options", [])
                         if options:
-                            answers[q.get("question", "")] = options[0].get("label", "Yes")
+                            answers[q.get("question", "")] = options[0].get(
+                                "label", "Yes"
+                            )
             else:
                 # No callback - default to first option
                 for q in questions:
@@ -573,10 +583,12 @@ class WorkerAgent:
                 )
                 if implicit_answer is not None:
                     # Log and send the answer to continue
-                    self._emit_progress(ProgressEvent(
-                        event_type=ProgressEventType.TEXT,
-                        message=f"Developer answered implicit question: {implicit_answer[:100]}",
-                    ))
+                    self._emit_progress(
+                        ProgressEvent(
+                            event_type=ProgressEventType.TEXT,
+                            message=f"Developer answered implicit question: {implicit_answer[:100]}",
+                        )
+                    )
                     await client.query(implicit_answer)
                     result_message = None  # Reset to wait for new result
                     continue
@@ -598,6 +610,7 @@ class WorkerAgent:
                 @dataclass
                 class SyntheticResultMessage:
                     """Synthetic result message for early phase completion."""
+
                     subtype: str = "exit_plan_mode"
                     duration_ms: int = 0
                     duration_api_ms: int = 0
@@ -630,10 +643,12 @@ class WorkerAgent:
         for block in message.content:
             if type(block).__name__ == "AskUserQuestionBlock":
                 # Emit question progress event
-                self._emit_progress(ProgressEvent(
-                    event_type=ProgressEventType.QUESTION,
-                    message="Claude is asking a question...",
-                ))
+                self._emit_progress(
+                    ProgressEvent(
+                        event_type=ProgressEventType.QUESTION,
+                        message="Claude is asking a question...",
+                    )
+                )
                 return block
         return None
 
@@ -763,7 +778,9 @@ class WorkerAgent:
                         label = getattr(raw_opt, "label", "")
                         description = getattr(raw_opt, "description", None)
                     if label:  # Only add if label is non-empty
-                        options.append(QuestionOption(label=label, description=description))
+                        options.append(
+                            QuestionOption(label=label, description=description)
+                        )
 
                 # Ensure we have at least 2 options if any options exist
                 if len(options) < 2:
@@ -859,29 +876,37 @@ class WorkerAgent:
                 pending_tool_uses[block.id] = invocation
                 # Emit tool start progress event with tool details
                 tool_detail = self._get_tool_detail(block.name, block.input)
-                self._emit_progress(ProgressEvent(
-                    event_type=ProgressEventType.TOOL_START,
-                    message=f"Tool: {block.name}",
-                    data={
-                        "tool_name": block.name,
-                        "tool_use_id": block.id,
-                        "tool_detail": tool_detail,
-                    },
-                ))
+                self._emit_progress(
+                    ProgressEvent(
+                        event_type=ProgressEventType.TOOL_START,
+                        message=f"Tool: {block.name}",
+                        data={
+                            "tool_name": block.name,
+                            "tool_use_id": block.id,
+                            "tool_detail": tool_detail,
+                        },
+                    )
+                )
             elif block_type == "TextBlock" and hasattr(block, "text"):
                 text_parts.append(block.text)
                 # Emit text progress event (truncated for display)
-                text_preview = block.text[:100] + "..." if len(block.text) > 100 else block.text
-                self._emit_progress(ProgressEvent(
-                    event_type=ProgressEventType.TEXT,
-                    message=text_preview,
-                ))
+                text_preview = (
+                    block.text[:100] + "..." if len(block.text) > 100 else block.text
+                )
+                self._emit_progress(
+                    ProgressEvent(
+                        event_type=ProgressEventType.TEXT,
+                        message=text_preview,
+                    )
+                )
             elif block_type == "ThinkingBlock" and hasattr(block, "thinking"):
                 # Emit thinking progress event
-                self._emit_progress(ProgressEvent(
-                    event_type=ProgressEventType.THINKING,
-                    message="Thinking...",
-                ))
+                self._emit_progress(
+                    ProgressEvent(
+                        event_type=ProgressEventType.THINKING,
+                        message="Thinking...",
+                    )
+                )
 
         # Return joined text content or None if no text
         return "\n".join(text_parts) if text_parts else None
@@ -920,15 +945,17 @@ class WorkerAgent:
 
                 # Emit tool completion progress event
                 status = "error" if invocation.is_error else "success"
-                self._emit_progress(ProgressEvent(
-                    event_type=ProgressEventType.TOOL_END,
-                    message=f"Tool {invocation.tool_name}: {status}",
-                    data={
-                        "tool_name": invocation.tool_name,
-                        "tool_use_id": tool_use_id,
-                        "success": invocation.success,
-                    },
-                ))
+                self._emit_progress(
+                    ProgressEvent(
+                        event_type=ProgressEventType.TOOL_END,
+                        message=f"Tool {invocation.tool_name}: {status}",
+                        data={
+                            "tool_name": invocation.tool_name,
+                            "tool_use_id": tool_use_id,
+                            "success": invocation.success,
+                        },
+                    )
+                )
 
     def _process_system_message(
         self,
@@ -969,7 +996,9 @@ class WorkerAgent:
         output_tokens = usage.get("output_tokens", 0)
 
         # Use result field if available, otherwise use captured content
-        final_response = result_message.result if result_message.result else response_content
+        final_response = (
+            result_message.result if result_message.result else response_content
+        )
 
         return QueryMetrics(
             query_index=self._query_counter,
@@ -1062,7 +1091,7 @@ class WorkerAgent:
         input_str = str(tool_input)
         if len(input_str) <= max_length:
             return input_str
-        return input_str[:max_length - 3] + "..."
+        return input_str[: max_length - 3] + "..."
 
     def _get_tool_detail(
         self,

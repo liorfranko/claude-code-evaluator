@@ -4,10 +4,10 @@ This module defines the ProgressEvent and ProgressEventType used to report
 streaming progress from the WorkerAgent during evaluation execution.
 """
 
-from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
+from claude_evaluator.models.base import BaseSchema
 
 __all__ = ["ProgressEvent", "ProgressEventType"]
 
@@ -37,8 +37,7 @@ class ProgressEventType(Enum):
     PHASE_START = "phase_start"
 
 
-@dataclass
-class ProgressEvent:
+class ProgressEvent(BaseSchema):
     """A progress event emitted during evaluation execution.
 
     Attributes:
@@ -49,4 +48,4 @@ class ProgressEvent:
 
     event_type: ProgressEventType
     message: str
-    data: Optional[Any] = None
+    data: Any | None = None

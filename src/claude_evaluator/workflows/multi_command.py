@@ -7,18 +7,21 @@ commands to be executed in order.
 """
 
 import asyncio
-import logging
 from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
+from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
     from claude_evaluator.evaluation import Evaluation
+    from claude_evaluator.metrics.collector import MetricsCollector
     from claude_evaluator.models.metrics import Metrics
 
 __all__ = ["MultiCommandWorkflow"]
+
+logger = get_logger(__name__)
 
 # Maximum number of continuation turns when worker needs guidance
 MAX_CONTINUATIONS_PER_PHASE = 5
@@ -63,7 +66,7 @@ class MultiCommandWorkflow(BaseWorkflow):
 
     def __init__(
         self,
-        metrics_collector: "MetricsCollector",  # type: ignore[name-defined]
+        metrics_collector: "MetricsCollector",
         phases: list[Phase],
     ) -> None:
         """Initialize the workflow with phases to execute.
@@ -165,15 +168,18 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         # Emit phase start event for verbose output
         from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-        worker._emit_progress(ProgressEvent(
-            event_type=ProgressEventType.PHASE_START,
-            message=f"Starting phase: {phase.name}",
-            data={
-                "phase_name": phase.name,
-                "phase_index": self._current_phase_index,
-                "total_phases": len(self._phases),
-            },
-        ))
+
+        worker._emit_progress(
+            ProgressEvent(
+                event_type=ProgressEventType.PHASE_START,
+                message=f"Starting phase: {phase.name}",
+                data={
+                    "phase_name": phase.name,
+                    "phase_index": self._current_phase_index,
+                    "total_phases": len(self._phases),
+                },
+            )
+        )
 
         # Configure allowed tools if specified
         if phase.allowed_tools:
@@ -231,13 +237,19 @@ class MultiCommandWorkflow(BaseWorkflow):
                 answer_result = await developer.answer_question(question_context)
 
                 # Log the developer's answer for visibility
-                logging.getLogger(__name__).info(
-                    f"Developer answered worker: {answer_result.answer}"
+                logger.info(
+                    "developer_answered_worker",
+                    answer=answer_result.answer,
                 )
 
                 # Check if developer indicates task is complete (no follow-up needed)
                 answer_lower = answer_result.answer.lower().strip()
-                if answer_lower in ("complete", "done", "finished", "no follow-up needed"):
+                if answer_lower in (
+                    "complete",
+                    "done",
+                    "finished",
+                    "no follow-up needed",
+                ):
                     break
 
                 # Continue the conversation with the developer's response
@@ -251,11 +263,18 @@ class MultiCommandWorkflow(BaseWorkflow):
                 self.metrics_collector.add_query_metrics(query_metrics)
                 response = query_metrics.response
 
-            except (RuntimeError, AttributeError, asyncio.CancelledError, Exception) as e:
+            except (
+                RuntimeError,
+                AttributeError,
+                asyncio.CancelledError,
+                Exception,
+            ) as e:
                 # SDK not available, answer_question not working, or other error - skip continuation
                 # Log the error for debugging but don't fail the evaluation
-                logging.getLogger(__name__).debug(
-                    f"Developer continuation skipped due to error: {type(e).__name__}: {e}"
+                logger.debug(
+                    "developer_continuation_skipped",
+                    error_type=type(e).__name__,
+                    error=str(e),
                 )
                 break
 
