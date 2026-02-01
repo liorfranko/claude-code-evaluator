@@ -312,9 +312,9 @@ class BaseWorkflow(ABC):
                     f"attempt: {context.attempt_number})"
                 )
                 result = await developer_agent.answer_question(context)
-                logger.debug(
-                    f"Generated answer using {result.model_used} "
-                    f"(took {result.generation_time_ms}ms)"
+                logger.info(
+                    f"Developer answered question: '{result.answer}' "
+                    f"(model: {result.model_used}, took {result.generation_time_ms}ms)"
                 )
                 return result.answer
             except Exception as e:

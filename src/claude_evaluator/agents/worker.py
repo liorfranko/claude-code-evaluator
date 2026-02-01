@@ -26,6 +26,8 @@ try:
         AssistantMessage,
         ToolUseBlock,
         ToolResultBlock,
+        PermissionResultAllow,
+        ToolPermissionContext,
     )
     SDK_AVAILABLE = True
 except ImportError:
@@ -35,6 +37,8 @@ except ImportError:
     AssistantMessage = None  # type: ignore
     ToolUseBlock = None  # type: ignore
     ToolResultBlock = None  # type: ignore
+    PermissionResultAllow = None  # type: ignore
+    ToolPermissionContext = None  # type: ignore
     SDK_AVAILABLE = False
 
 __all__ = ["WorkerAgent", "SDK_AVAILABLE", "DEFAULT_MODEL"]
@@ -229,6 +233,95 @@ class WorkerAgent:
         if self.on_progress_callback is not None:
             self.on_progress_callback(event)
 
+    async def _handle_tool_permission(
+        self,
+        tool_name: str,
+        input_data: dict[str, Any],
+        context: Any,
+    ) -> Any:
+        """Handle tool permission requests for interactive tools.
+
+        Auto-approves ExitPlanMode and answers AskUserQuestion using
+        the developer agent callback.
+
+        Args:
+            tool_name: Name of the tool being called.
+            input_data: Input parameters for the tool.
+            context: Tool permission context from SDK.
+
+        Returns:
+            PermissionResultAllow with appropriate response.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if tool_name == "ExitPlanMode":
+            # Auto-approve plan mode exit
+            logger.info("Auto-approving ExitPlanMode")
+            return PermissionResultAllow()
+
+        if tool_name == "AskUserQuestion":
+            # Generate answers for each question using developer callback
+            questions = input_data.get("questions", [])
+            answers: dict[str, str] = {}
+
+            if self.on_question_callback is not None:
+                # Build context and get answer from developer
+                from ..models.question import QuestionContext, QuestionItem, QuestionOption
+
+                question_items = []
+                for q in questions:
+                    options = [
+                        QuestionOption(
+                            label=opt.get("label", ""),
+                            description=opt.get("description", ""),
+                        )
+                        for opt in q.get("options", [])
+                    ]
+                    question_items.append(QuestionItem(
+                        question=q.get("question", ""),
+                        header=q.get("header", ""),
+                        options=options,
+                    ))
+
+                context = QuestionContext(
+                    questions=question_items,
+                    conversation_history=[],
+                    session_id="permission-callback",
+                    attempt_number=1,
+                )
+
+                try:
+                    answer = await self.on_question_callback(context)
+                    # Map answer to each question
+                    for q in questions:
+                        answers[q.get("question", "")] = answer
+                    logger.info(f"Developer answered AskUserQuestion: {answer}")
+                except Exception as e:
+                    logger.warning(f"Failed to get developer answer: {e}")
+                    # Default to first option for each question
+                    for q in questions:
+                        options = q.get("options", [])
+                        if options:
+                            answers[q.get("question", "")] = options[0].get("label", "Yes")
+            else:
+                # No callback - default to first option
+                for q in questions:
+                    options = q.get("options", [])
+                    if options:
+                        answers[q.get("question", "")] = options[0].get("label", "Yes")
+
+            logger.info(f"Returning answers for AskUserQuestion: {answers}")
+            return PermissionResultAllow(
+                updated_input={
+                    "questions": questions,
+                    "answers": answers,
+                }
+            )
+
+        # Allow all other tools
+        return PermissionResultAllow()
+
     def _build_sdk_options(self) -> Any:
         """Build ClaudeAgentOptions for SDK execution.
 
@@ -251,6 +344,7 @@ class WorkerAgent:
             max_budget_usd=self.max_budget_usd,
             model=self.model or DEFAULT_MODEL,
             setting_sources=["user"] if self.use_user_plugins else None,
+            can_use_tool=self._handle_tool_permission,
         )
 
     async def _cleanup_client(self) -> None:
