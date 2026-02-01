@@ -3647,7 +3647,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
 
         # Patch the SDK client class
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", TrackingClaudeSDKClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", TrackingClaudeSDKClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Execute query - this should create a new client
@@ -3697,7 +3697,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", SequenceTrackingClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", SequenceTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Sequence test query")
@@ -3760,7 +3760,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         # Before evaluation, no client should exist
         assert worker._client is None, "Client should be None before evaluation"
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", StorageTestClient):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", StorageTestClient):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Storage test query")
 
@@ -3808,7 +3808,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", ConnectionStateClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", ConnectionStateClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Connection state test")
@@ -3860,7 +3860,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", CountingClient):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", CountingClient):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First evaluation
                 await worker.execute_query("First evaluation", resume_session=False)
@@ -3916,7 +3916,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", ReuseTrackingClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", ReuseTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First query creates a client
@@ -3970,7 +3970,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", FailingConnectClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailingConnectClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 with pytest.raises(
@@ -4037,7 +4037,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", VerificationClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", VerificationClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("T706 verification query")
@@ -4136,7 +4136,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", DisconnectTrackingClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", DisconnectTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Execute a successful query
@@ -4194,7 +4194,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", FailingConnectClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailingConnectClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 with pytest.raises(ConnectionError, match="T707: Connection failed"):
@@ -4253,7 +4253,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", FailingStreamClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailingStreamClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 with pytest.raises(RuntimeError, match="T707: Streaming failed"):
@@ -4309,7 +4309,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", DoubleFailureClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", DoubleFailureClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 try:
@@ -4389,7 +4389,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", TrackingClient):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", TrackingClient):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First query - creates client 1
                 await worker.execute_query("First query", resume_session=False)
@@ -4451,7 +4451,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", LeakTrackingClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", LeakTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 5 sequential evaluations with cleanup
@@ -4517,7 +4517,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", IdempotentTestClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", IdempotentTestClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Test query")
@@ -4571,7 +4571,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         # Before any query
         assert worker.has_active_client() is False, "No client before query"
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", StateTestClient):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", StateTestClient):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Test query")
 
@@ -4641,7 +4641,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
             ComprehensiveVerificationClient,
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4758,7 +4758,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
             LeakTrackingSequentialClient,
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4827,7 +4827,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", AccumulationTrackingClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", AccumulationTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 10 sequential evaluations
@@ -4903,7 +4903,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", QuestionLeakTrackingClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", QuestionLeakTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 10 sequential evaluations, each with a question
@@ -4977,7 +4977,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         failure_count = 0
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", FailureLeakTrackingClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailureLeakTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 30 sequential evaluations with some failures
@@ -5040,7 +5040,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", SimpleClient):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", SimpleClient):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 for i in range(10):
                     # Before query, add some tool invocations to simulate previous state
@@ -5117,7 +5117,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", CounterCheckClient
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", CounterCheckClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 5 sequential evaluations, each with a question
@@ -5188,7 +5188,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.agents.worker.ClaudeSDKClient", ComprehensiveT708Client
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", ComprehensiveT708Client
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 55 sequential evaluations (exceeding 50 requirement)
