@@ -60,18 +60,6 @@ class TestCreateParser:
         args = parser.parse_args(["--suite", "test.yaml"])
         assert args.output == "evaluations"
 
-    def test_parser_has_max_turns_option(self) -> None:
-        """Test that parser has --max-turns option."""
-        parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml", "--max-turns", "50"])
-        assert args.max_turns == 50
-
-    def test_parser_has_max_budget_option(self) -> None:
-        """Test that parser has --max-budget option."""
-        parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml", "--max-budget", "10.5"])
-        assert args.max_budget == 10.5
-
     def test_parser_has_timeout_option(self) -> None:
         """Test that parser has --timeout option."""
         parser = create_parser()

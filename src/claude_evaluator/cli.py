@@ -9,6 +9,7 @@ import argparse
 import asyncio
 import json
 import logging
+import subprocess
 import sys
 import tempfile
 from datetime import datetime
@@ -22,14 +23,16 @@ from claude_evaluator import __version__
 from claude_evaluator.agents.developer import DeveloperAgent
 from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.config import load_suite
-from claude_evaluator.config.models import EvaluationConfig, EvaluationSuite, Phase
+from claude_evaluator.config.models import EvaluationConfig, Phase
 from claude_evaluator.evaluation import Evaluation
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     ExecutionMode,
+    Outcome,
     PermissionMode,
     WorkflowType,
 )
+from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.report.models import EvaluationReport
 from claude_evaluator.workflows import (
@@ -125,20 +128,6 @@ For more information, see the documentation.
     )
 
     # Resource limits
-    parser.add_argument(
-        "--max-turns",
-        type=int,
-        metavar="N",
-        help="Maximum conversation turns per evaluation",
-    )
-
-    parser.add_argument(
-        "--max-budget",
-        type=float,
-        metavar="USD",
-        help="Maximum cost in USD per evaluation",
-    )
-
     parser.add_argument(
         "--timeout",
         type=int,
@@ -254,8 +243,6 @@ async def run_evaluation(
     task: str,
     workflow_type: WorkflowType,
     output_dir: Path,
-    max_turns: Optional[int] = None,
-    max_budget: Optional[float] = None,
     timeout_seconds: Optional[int] = None,
     verbose: bool = False,
     phases: Optional[list[Phase]] = None,
@@ -266,8 +253,6 @@ async def run_evaluation(
         task: The task description to evaluate.
         workflow_type: The type of workflow to use.
         output_dir: Directory to save the report.
-        max_turns: Maximum conversation turns (optional).
-        max_budget: Maximum cost in USD (optional).
         timeout_seconds: Maximum execution time in seconds (optional).
         verbose: Whether to print progress.
         phases: Phases for multi-command workflow (optional).
@@ -286,6 +271,79 @@ async def run_evaluation(
     # Create workspace subfolder inside the evaluation folder
     workspace_path = eval_folder / "workspace"
     workspace_path.mkdir(parents=True, exist_ok=True)
+
+    # Initialize workspace as a git repository
+    # Required for plugins like spectra that need git for branch/worktree management
+    subprocess.run(
+        ["git", "init"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    # Create an initial commit so git operations like branch creation work
+    subprocess.run(
+        ["git", "config", "user.email", "evaluator@test.local"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Claude Evaluator"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    # Create .gitkeep and initial commit
+    gitkeep_path = workspace_path / ".gitkeep"
+    gitkeep_path.touch()
+    subprocess.run(
+        ["git", "add", "."],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    # Add a dummy remote so git push doesn't fail
+    # Create a bare repo to act as the remote (must be absolute path for git)
+    bare_repo_path = (eval_folder / "remote.git").resolve()
+    subprocess.run(
+        ["git", "init", "--bare", str(bare_repo_path)],
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare_repo_path)],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    # Get the current branch name (could be 'main' or 'master' depending on git config)
+    branch_result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=workspace_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    current_branch = branch_result.stdout.strip()
+    if verbose:
+        print(f"Git branch: {current_branch}")
+    # Push initial commit to establish tracking
+    push_result = subprocess.run(
+        ["git", "push", "-u", "origin", current_branch],
+        cwd=workspace_path,
+        capture_output=True,
+        text=True,
+    )
+    if push_result.returncode != 0:
+        raise RuntimeError(
+            f"Git push failed for branch '{current_branch}': {push_result.stderr}"
+        )
 
     # Create agents
     developer = DeveloperAgent()
@@ -398,8 +456,6 @@ async def run_suite(
     suite_path: Path,
     output_dir: Path,
     eval_filter: Optional[str] = None,
-    max_turns: Optional[int] = None,
-    max_budget: Optional[float] = None,
     verbose: bool = False,
 ) -> list[EvaluationReport]:
     """Run all evaluations in a suite.
@@ -408,8 +464,6 @@ async def run_suite(
         suite_path: Path to the YAML suite file.
         output_dir: Directory to save reports.
         eval_filter: Optional evaluation ID to run only that one.
-        max_turns: Maximum conversation turns (optional override).
-        max_budget: Maximum cost in USD (optional override).
         verbose: Whether to print progress.
 
     Returns:
@@ -447,19 +501,12 @@ async def run_suite(
         # Determine workflow type from phases
         workflow_type = _determine_workflow_type(config)
 
-        # Apply overrides
-        effective_max_turns = max_turns or config.max_turns
-        effective_max_budget = max_budget or config.max_budget_usd
-        effective_timeout = config.timeout_seconds  # Use config timeout
-
         try:
             report = await run_evaluation(
                 task=config.task,
                 workflow_type=workflow_type,
                 output_dir=output_dir,
-                max_turns=effective_max_turns,
-                max_budget=effective_max_budget,
-                timeout_seconds=effective_timeout,
+                timeout_seconds=config.timeout_seconds,
                 verbose=verbose,
                 phases=config.phases,
             )
@@ -470,10 +517,6 @@ async def run_suite(
             print(f"Error running evaluation '{config.id}': {e}")
 
             # Create a minimal failed report so it's tracked in results
-            from claude_evaluator.models.enums import Outcome
-            from claude_evaluator.models.metrics import Metrics
-            from claude_evaluator.report.models import EvaluationReport
-
             failed_report = EvaluationReport(
                 evaluation_id=config.id,
                 task_description=config.task,
@@ -487,7 +530,6 @@ async def run_suite(
                     total_cost_usd=0.0,
                     prompt_count=0,
                     turn_count=0,
-                    tool_invocations=[],
                     tokens_by_phase={},
                 ),
                 timeline=[],
@@ -564,10 +606,7 @@ def format_results(reports: list[EvaluationReport], json_output: bool = False) -
         Formatted string output.
     """
     if json_output:
-        generator = ReportGenerator()
-        results = []
-        for report in reports:
-            results.append(report.get_summary())
+        results = [report.get_summary() for report in reports]
         return json.dumps(results, indent=2, default=str)
 
     # Text output
@@ -653,8 +692,6 @@ def main(argv: Optional[list[str]] = None) -> int:
                     suite_path=Path(args.suite),
                     output_dir=output_dir,
                     eval_filter=args.eval,
-                    max_turns=args.max_turns,
-                    max_budget=args.max_budget,
                     verbose=args.verbose,
                 )
             )
@@ -666,9 +703,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                     task=args.task,
                     workflow_type=workflow_type,
                     output_dir=output_dir,
-                    max_turns=args.max_turns,
                     timeout_seconds=args.timeout,
-                    max_budget=args.max_budget,
                     verbose=args.verbose,
                 )
             )
