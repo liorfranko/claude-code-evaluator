@@ -629,20 +629,14 @@ class DeveloperAgent:
                     permission_mode="plan",
                 ),
             )
-            try:
-                async for message in query_gen:
-                    msg_type = type(message).__name__
-                    logger.debug(f"Developer SDK received message type: {msg_type}")
-                    if msg_type == "ResultMessage":
-                        result_message = message
-                        # Break immediately - continuing causes exit code 1 error
-                        break
-            finally:
-                # Ensure the generator is properly closed
-                try:
-                    await query_gen.aclose()
-                except Exception as close_err:
-                    logger.debug(f"Generator close error (ignored): {close_err}")
+            async for message in query_gen:
+                msg_type = type(message).__name__
+                logger.debug(f"Developer SDK received message type: {msg_type}")
+                if msg_type == "ResultMessage":
+                    result_message = message
+                    # Don't break - let the generator complete naturally to avoid
+                    # cancel scope conflicts during cleanup. ResultMessage should
+                    # be the last message, so the loop will exit on its own.
 
             # Extract the answer text from the result message
             answer = self._extract_answer_from_response(result_message)
@@ -1005,20 +999,14 @@ Your response:"""
                     permission_mode="plan",
                 ),
             )
-            try:
-                async for message in query_gen:
-                    msg_type = type(message).__name__
-                    logger.debug(f"Developer implicit detection received: {msg_type}")
-                    if msg_type == "ResultMessage":
-                        result_message = message
-                        # Break immediately - continuing causes exit code 1 error
-                        break
-            finally:
-                # Ensure the generator is properly closed
-                try:
-                    await query_gen.aclose()
-                except Exception as close_err:
-                    logger.debug(f"Generator close error (ignored): {close_err}")
+            async for message in query_gen:
+                msg_type = type(message).__name__
+                logger.debug(f"Developer implicit detection received: {msg_type}")
+                if msg_type == "ResultMessage":
+                    result_message = message
+                    # Don't break - let the generator complete naturally to avoid
+                    # cancel scope conflicts during cleanup. ResultMessage should
+                    # be the last message, so the loop will exit on its own.
 
             # Extract the answer
             answer_text = self._extract_answer_from_response(result_message)
