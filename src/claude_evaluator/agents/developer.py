@@ -669,27 +669,35 @@ class DeveloperAgent:
         # Format the conversation context
         context_text = self._format_conversation_context(messages)
 
-        prompt = f"""You are a developer assistant in an automated evaluation workflow. Based on the conversation context below, provide a helpful answer to the question(s).
+        prompt = f"""You are a developer assistant in an automated evaluation workflow. Analyze the worker's response and decide how to proceed.
 
 ## Conversation Context
 {context_text}
 
-## Question(s) to Answer
+## Worker's Latest Response
 {question_text}
 
-## Instructions
-- This is an AUTOMATED evaluation - the goal is to keep the workflow progressing.
-- If asked to choose between implementing, continuing, or proceeding vs explaining/reviewing:
-  - ALWAYS choose to implement, continue, or proceed with the work.
-  - Respond with "continue" or select the implementation/proceed option.
-- If asked about implementation approach or phase:
-  - Choose to implement ALL tasks/phases, not just one phase.
-  - Prefer options like "implement all", "continue with all tasks", "proceed".
-- If asked for confirmation to proceed: respond with "yes" or "continue".
-- Keep your answer short and actionable - just the choice or confirmation needed.
-- Do NOT ask clarifying questions back - make a decision and proceed.
+## Your Task
+Analyze the worker's response and determine what to do next:
 
-Your answer:"""
+1. If the worker has COMPLETED the task (implemented code, finished work, no more action needed):
+   - Respond with exactly: "complete"
+
+2. If the worker is ASKING for input, presenting options, or waiting for a decision:
+   - Respond with a clear instruction to continue the work
+   - ALWAYS choose to proceed, implement, or continue
+   - If there are numbered options, pick the one that does the most work (e.g., "implement all" over "implement phase 1 only")
+   - Example responses: "continue", "proceed with full implementation", "yes, implement all tasks", "4" (if option 4 is full implementation)
+
+3. If the worker seems stuck or needs guidance:
+   - Provide a clear instruction to continue with the task
+
+IMPORTANT:
+- This is AUTOMATED - always push forward, never ask questions back
+- Prefer doing MORE work over less (all phases vs one phase)
+- Keep response SHORT - just the instruction or "complete"
+
+Your response:"""
 
         return prompt
 

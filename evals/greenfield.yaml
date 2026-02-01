@@ -6,8 +6,9 @@ description: >
 version: "1.0.0"
 
 defaults:
-  max_turns: 15
-  max_budget_usd: 10.0
+  max_turns: 2000
+  max_budget_usd: 50.0
+  timeout_seconds: 36000
   allowed_tools:
     - Read
     - Edit
@@ -16,7 +17,6 @@ defaults:
     - Glob
     - Grep
   model: claude-sonnet-4-5@20250929
-  timeout_seconds: 1500
 
 evaluations:
   # Simple utility function - direct implementation
@@ -156,21 +156,18 @@ evaluations:
       - multi-phase
       - python
       - cli
-    max_turns: 200
-    max_budget_usd: 50.0
-    timeout_seconds: 3600
     phases:
       - name: specify
-        permission_mode: acceptEdits
+        permission_mode: bypassPermissions
         prompt: >
           /spectra:specify Build a task management CLI application that allows users to:
           - Add, list, update, and delete tasks
           - Mark tasks as complete/incomplete
       - name: plan
-        permission_mode: acceptEdits
+        permission_mode: bypassPermissions
         prompt: "/spectra:plan"
       - name: tasks
-        permission_mode: acceptEdits
+        permission_mode: bypassPermissions
         prompt: "/spectra:tasks"
       - name: implement
         permission_mode: bypassPermissions
@@ -195,9 +192,6 @@ evaluations:
       - multi-phase
       - python
       - cli
-    max_turns: 200
-    max_budget_usd: 50.0
-    timeout_seconds: 3600
     phases:
       - name: specify
         permission_mode: acceptEdits
