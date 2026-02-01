@@ -85,6 +85,7 @@ class WorkerAgent:
     model: Optional[str] = None
     on_question_callback: Optional[Callable[[QuestionContext], Awaitable[str]]] = None
     question_timeout_seconds: int = 60
+    use_user_plugins: bool = False
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
     _query_counter: int = field(default=0, repr=False)
     _client: Optional[Any] = field(default=None, repr=False)
@@ -223,6 +224,7 @@ class WorkerAgent:
             PermissionMode.bypassPermissions: "bypassPermissions",
         }
 
+        # Build options with optional setting_sources for user plugins
         return ClaudeAgentOptions(
             cwd=self.project_directory,
             add_dirs=self.additional_dirs if self.additional_dirs else [],
@@ -231,6 +233,7 @@ class WorkerAgent:
             max_turns=self.max_turns,
             max_budget_usd=self.max_budget_usd,
             model=self.model or DEFAULT_MODEL,
+            setting_sources=["user"] if self.use_user_plugins else None,
         )
 
     async def _cleanup_client(self) -> None:

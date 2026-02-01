@@ -44,58 +44,58 @@ evaluations:
   #       prompt_template: "{task}"
 
   # REST API project - plan then implement
-  - id: utility-function-plan-then-implement
-    name: Simple Utility Function (Direct)
-    description: >
-      Single-prompt direct implementation of a utility function.
-      Tests the most basic greenfield workflow without planning phases.
-    task: >
-      Create a Python module with a function that validates email addresses.
-      The function should:
-      1. Accept a string parameter
-      2. Return True if the email is valid, False otherwise
-      3. Handle edge cases like empty strings, missing @ symbol, invalid domains
-      4. Include type hints and docstrings
-      5. Create unit tests in a separate test file
-    tags:
-      - simple
-      - direct
-      - python
-      - utility
-      - plan-then-implement
-    max_budget_usd: 15.0
-    timeout_seconds: 450
-    phases:
-      - name: planning
-        permission_mode: plan
-        prompt_template: >
-          You are starting a NEW greenfield project in an EMPTY workspace directory.
-          There is no existing codebase to explore - you will create everything from scratch.
+  # - id: utility-function-plan-then-implement
+  #   name: Simple Utility Function (Direct)
+  #   description: >
+  #     Single-prompt direct implementation of a utility function.
+  #     Tests the most basic greenfield workflow without planning phases.
+  #   task: >
+  #     Create a Python module with a function that validates email addresses.
+  #     The function should:
+  #     1. Accept a string parameter
+  #     2. Return True if the email is valid, False otherwise
+  #     3. Handle edge cases like empty strings, missing @ symbol, invalid domains
+  #     4. Include type hints and docstrings
+  #     5. Create unit tests in a separate test file
+  #   tags:
+  #     - simple
+  #     - direct
+  #     - python
+  #     - utility
+  #     - plan-then-implement
+  #   max_budget_usd: 15.0
+  #   timeout_seconds: 450
+  #   phases:
+  #     - name: planning
+  #       permission_mode: plan
+  #       prompt_template: >
+  #         You are starting a NEW greenfield project in an EMPTY workspace directory.
+  #         There is no existing codebase to explore - you will create everything from scratch.
 
-          Create a detailed implementation plan for the following task.
-          Include: file structure, code organization, implementation steps, and test strategy.
+  #         Create a detailed implementation plan for the following task.
+  #         Include: file structure, code organization, implementation steps, and test strategy.
 
-          IMPORTANT:
-          - Do NOT use ExitPlanMode or EnterPlanMode tools
-          - Do NOT use Task tool to explore - the workspace is empty
-          - Just output your plan as text in your response
-          - The workspace is empty and ready for you to create new files
+  #         IMPORTANT:
+  #         - Do NOT use ExitPlanMode or EnterPlanMode tools
+  #         - Do NOT use Task tool to explore - the workspace is empty
+  #         - Just output your plan as text in your response
+  #         - The workspace is empty and ready for you to create new files
 
-          Task: {task}
-      - name: implementation
-        permission_mode: acceptEdits
-        prompt_template: >
-          Now implement the following plan. Create all necessary files
-          in the current working directory.
+  #         Task: {task}
+  #     - name: implementation
+  #       permission_mode: acceptEdits
+  #       prompt_template: >
+  #         Now implement the following plan. Create all necessary files
+  #         in the current working directory.
 
-          PLAN FROM PREVIOUS PHASE:
-          {previous_result}
+  #         PLAN FROM PREVIOUS PHASE:
+  #         {previous_result}
 
-          IMPORTANT:
-          - Create all files directly in the current workspace directory
-          - Do NOT ask for user input or approval - just implement autonomously
-          - Ensure the code is functional and follows best practices
-          - Run tests if applicable to verify your implementation
+  #         IMPORTANT:
+  #         - Create all files directly in the current workspace directory
+  #         - Do NOT ask for user input or approval - just implement autonomously
+  #         - Ensure the code is functional and follows best practices
+  #         - Run tests if applicable to verify your implementation
 
   # # CLI tool - iterative build-test-refine
   # - id: cli-tool-iterative
@@ -135,51 +135,44 @@ evaluations:
   #         Ensure all tests pass before completing.
   #       continue_session: true
 
-  # # Full projspec workflow simulation
-  # - id: projspec-full-workflow
-  #   name: Projspec Full Workflow Simulation
-  #   description: >
-  #     Simulates the complete projspec workflow: specify, plan, tasks, implement.
-  #     Tests multi-command sequential workflows for complex project development.
-  #   task: >
-  #     Build a task management CLI application with the following capabilities:
-  #     1. Add, list, update, and delete tasks
-  #     2. Mark tasks as complete/incomplete
-  #     3. Assign priorities (low, medium, high)
-  #     4. Filter and search tasks
-  #     5. Persist tasks to a JSON file
-  #     6. Support for due dates
-  #   tags:
-  #     - projspec
-  #     - complex
-  #     - multi-phase
-  #     - python
-  #     - cli
-  #   max_budget_usd: 20.0
-  #   timeout_seconds: 600
-  #   phases:
-  #     - name: specify
-  #       permission_mode: acceptEdits
-  #       prompt: >
-  #         /projspec:specify Build a task management CLI application that allows users to:
-  #         - Add, list, update, and delete tasks
-  #         - Mark tasks as complete/incomplete
-  #         - Assign priorities (low, medium, high)
-  #         - Filter and search tasks
-  #         - Persist tasks to a JSON file
-  #         - Support for due dates
-  #     - name: plan
-  #       permission_mode: acceptEdits
-  #       prompt: "/projspec:plan"
-  #       continue_session: true
-  #     - name: tasks
-  #       permission_mode: acceptEdits
-  #       prompt: "/projspec:tasks"
-  #       continue_session: true
-  #     - name: implement
-  #       permission_mode: bypassPermissions
-  #       prompt: "/projspec:implement"
-  #       continue_session: true
+  # Full spectra workflow simulation
+  - id: spectra-full-workflow
+    name: Spectra Full Workflow Simulation
+    description: >
+      Simulates the complete spectra workflow: specify, plan, tasks, implement.
+      Tests multi-command sequential workflows for complex project development.
+    task: >
+      Build a task management CLI application with the following capabilities:
+      1. Add, list, update, and delete tasks
+      2. Mark tasks as complete/incomplete
+      3. Assign priorities (low, medium, high)
+      4. Filter and search tasks
+      5. Persist tasks to a JSON file
+      6. Support for due dates
+    tags:
+      - spectra
+      - complex
+      - multi-phase
+      - python
+      - cli
+    max_budget_usd: 20.0
+    timeout_seconds: 900
+    phases:
+      - name: specify
+        permission_mode: acceptEdits
+        prompt: >
+          /spectra:specify Build a task management CLI application that allows users to:
+          - Add, list, update, and delete tasks
+          - Mark tasks as complete/incomplete
+      - name: plan
+        permission_mode: acceptEdits
+        prompt: "/spectra:plan"
+      - name: tasks
+        permission_mode: acceptEdits
+        prompt: "/spectra:tasks"
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt: "/spectra:implement"
 
   # # Bonus: TypeScript/Node.js project for language variety
   # - id: node-package-direct

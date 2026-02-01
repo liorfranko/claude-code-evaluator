@@ -291,6 +291,7 @@ async def run_evaluation(
     developer = DeveloperAgent()
     # Include ~/.claude/plans so Claude can read plan files it creates during planning phase
     # Include /tmp for temporary file operations
+    # Enable user plugins to make custom skills (like spectra) available
     claude_plans_dir = str(Path.home() / ".claude" / "plans")
     worker = WorkerAgent(
         execution_mode=ExecutionMode.sdk,
@@ -298,6 +299,7 @@ async def run_evaluation(
         active_session=False,
         permission_mode=PermissionMode.acceptEdits,
         additional_dirs=[claude_plans_dir, "/tmp"],
+        use_user_plugins=True,
     )
 
     # Create evaluation
