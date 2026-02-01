@@ -17,7 +17,6 @@ from claude_evaluator.cli.formatters import format_results
 from claude_evaluator.cli.parser import create_parser
 from claude_evaluator.cli.validators import validate_args
 from claude_evaluator.logging_config import configure_logging, get_logger
-from claude_evaluator.models.enums import WorkflowType
 
 __all__ = ["main", "CommandDispatcher"]
 
