@@ -602,7 +602,8 @@ class WorkerAgent:
                     session_id: str = ""
                     total_cost_usd: float | None = None
                     usage: dict | None = None
-                    result: str | None = "ExitPlanMode triggered - phase complete"
+                    # result is None so that response_content (the actual plan) is used
+                    result: str | None = None
 
                 result_message = SyntheticResultMessage()
             else:
