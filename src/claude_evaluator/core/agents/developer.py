@@ -11,10 +11,7 @@ import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, TypeAlias
-
-if TYPE_CHECKING:
-    from types import ModuleType
+from typing import Any, TypeAlias
 
 from claude_evaluator.config.defaults import (
     CONTEXT_WINDOW_MAX,
@@ -382,6 +379,11 @@ class DeveloperAgent:
 
         Checks for fallback responses first, then sends via callback or
         simulates in simulation mode.
+
+        Args:
+            initial_prompt: The prompt text to send.
+            send_prompt_callback: Callback to send the prompt, or None for simulation.
+
         """
         # Check for fallback response first
         fallback = self.get_fallback_response(initial_prompt)
@@ -416,7 +418,12 @@ class DeveloperAgent:
         self,
         receive_response_callback: ReceiveResponseCallback | None,
     ) -> None:
-        """Handle the awaiting_response state - receive and process response."""
+        """Handle the awaiting_response state - receive and process response.
+
+        Args:
+            receive_response_callback: Callback to receive response, or None for simulation.
+
+        """
         if receive_response_callback is not None:
             response = receive_response_callback()
             self.handle_response(response)
@@ -472,7 +479,14 @@ class DeveloperAgent:
         send_prompt_callback: SendPromptCallback | None,
         receive_response_callback: ReceiveResponseCallback | None,
     ) -> None:
-        """Dispatch to the appropriate state handler based on current state."""
+        """Dispatch to the appropriate state handler based on current state.
+
+        Args:
+            initial_prompt: The initial prompt for prompting state.
+            send_prompt_callback: Callback to send prompts, or None for simulation.
+            receive_response_callback: Callback to receive responses, or None for simulation.
+
+        """
         handlers = {
             DeveloperState.prompting: lambda: self._handle_prompting(
                 initial_prompt, send_prompt_callback
@@ -644,8 +658,10 @@ class DeveloperAgent:
             working_dir = self.cwd or os.getcwd()
 
             logger.debug(
-                f"Developer SDK query starting: model={model}, cwd={working_dir}, "
-                f"prompt_length={len(prompt)}"
+                "developer_sdk_query_starting",
+                model=model,
+                cwd=working_dir,
+                prompt_length=len(prompt),
             )
 
             result_message = None
@@ -660,7 +676,7 @@ class DeveloperAgent:
             )
             async for message in query_gen:
                 msg_type = type(message).__name__
-                logger.debug(f"Developer SDK received message type: {msg_type}")
+                logger.debug("developer_sdk_received_message", message_type=msg_type)
                 if msg_type == "ResultMessage":
                     result_message = message
                     # Don't break - let the generator complete naturally to avoid
@@ -696,22 +712,28 @@ class DeveloperAgent:
 
             # Detailed error logging
             logger.error(
-                f"Developer SDK query failed after {generation_time_ms}ms: "
-                f"model={model}, cwd={working_dir}"
+                "developer_sdk_query_failed",
+                duration_ms=generation_time_ms,
+                model=model,
+                cwd=working_dir,
+                exception_type=type(e).__name__,
+                exception_message=str(e),
+                traceback=traceback.format_exc(),
             )
-            logger.error(f"Exception type: {type(e).__name__}")
-            logger.error(f"Exception message: {str(e)}")
-            logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
-            # Check for additional error attributes
+            # Log additional error attributes if available
+            extra_attrs: dict[str, Any] = {}
             if hasattr(e, "stderr"):
-                logger.error(f"stderr: {e.stderr}")
+                extra_attrs["stderr"] = e.stderr
             if hasattr(e, "stdout"):
-                logger.error(f"stdout: {e.stdout}")
+                extra_attrs["stdout"] = e.stdout
             if hasattr(e, "returncode"):
-                logger.error(f"returncode: {e.returncode}")
+                extra_attrs["returncode"] = e.returncode
             if hasattr(e, "__cause__") and e.__cause__:
-                logger.error(f"Cause: {type(e.__cause__).__name__}: {e.__cause__}")
+                extra_attrs["cause_type"] = type(e.__cause__).__name__
+                extra_attrs["cause_message"] = str(e.__cause__)
+            if extra_attrs:
+                logger.error("developer_sdk_query_error_details", **extra_attrs)
 
             # Log the failure
             self.log_decision(
@@ -1022,8 +1044,10 @@ Your response:"""
             working_dir = self.cwd or os.getcwd()
 
             logger.debug(
-                f"Developer implicit question detection starting: model={model}, "
-                f"cwd={working_dir}, response_length={len(response_text)}"
+                "developer_implicit_question_detection_starting",
+                model=model,
+                cwd=working_dir,
+                response_length=len(response_text),
             )
 
             result_message = None
@@ -1038,7 +1062,9 @@ Your response:"""
             )
             async for message in query_gen:
                 msg_type = type(message).__name__
-                logger.debug(f"Developer implicit detection received: {msg_type}")
+                logger.debug(
+                    "developer_implicit_detection_received", message_type=msg_type
+                )
                 if msg_type == "ResultMessage":
                     result_message = message
                     # Don't break - let the generator complete naturally to avoid
@@ -1069,12 +1095,13 @@ Your response:"""
         except Exception as e:
             # Detailed error logging for implicit question detection
             logger.error(
-                f"Developer implicit question detection failed: model={model}, "
-                f"cwd={working_dir if 'working_dir' in dir() else 'not set'}"
+                "developer_implicit_question_detection_failed",
+                model=model,
+                cwd=working_dir if "working_dir" in dir() else "not set",
+                exception_type=type(e).__name__,
+                exception_message=str(e),
+                traceback=traceback.format_exc(),
             )
-            logger.error(f"Exception type: {type(e).__name__}")
-            logger.error(f"Exception message: {str(e)}")
-            logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
             self.log_decision(
                 context="Error detecting implicit question",
@@ -1088,6 +1115,7 @@ Your response:"""
 
         Clears the decisions log and resets all counters.
         Useful for running multiple workflows with the same agent instance.
+
         """
         self.current_state = DeveloperState.initializing
         self.decisions_log = []

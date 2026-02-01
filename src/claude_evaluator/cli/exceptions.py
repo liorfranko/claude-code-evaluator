@@ -3,6 +3,8 @@
 This module defines exceptions specific to CLI operations.
 """
 
+from claude_evaluator.exceptions import ClaudeEvaluatorError
+
 __all__ = [
     "CLIError",
     "ValidationError",
@@ -10,7 +12,7 @@ __all__ = [
 ]
 
 
-class CLIError(Exception):
+class CLIError(ClaudeEvaluatorError):
     """Base exception for CLI-related errors."""
 
     pass

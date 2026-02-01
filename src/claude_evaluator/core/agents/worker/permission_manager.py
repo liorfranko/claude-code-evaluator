@@ -38,12 +38,22 @@ class PermissionManager:
 
     @property
     def project_directory(self) -> str:
-        """Get the project directory."""
+        """Get the project directory.
+
+        Returns:
+            The path to the main project directory.
+
+        """
         return self._project_directory
 
     @property
     def additional_dirs(self) -> list[str]:
-        """Get the list of additional allowed directories."""
+        """Get the list of additional allowed directories.
+
+        Returns:
+            List of additional directory paths that are allowed for access.
+
+        """
         return self._additional_dirs
 
     def is_path_allowed(self, path: str) -> bool:

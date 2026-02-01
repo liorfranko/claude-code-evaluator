@@ -41,7 +41,7 @@ evaluations:
       - name: feature-dev
         permission_mode: bypassPermissions
         prompt: >
-          /feature-dev Build a task management CLI application that allows users to:
+          /feature-dev:feature-dev Build a task management CLI application that allows users to:
           - Add, list, update, and delete tasks
           - Mark tasks as complete/incomplete
           - Assign priorities (low, medium, high)

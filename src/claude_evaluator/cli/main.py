@@ -3,8 +3,10 @@
 This module provides the main entry point for the claude-evaluator CLI.
 """
 
+import argparse
 import asyncio
 import sys
+import traceback
 
 from claude_evaluator.cli.commands import (
     RunEvaluationCommand,
@@ -38,7 +40,7 @@ class CommandDispatcher:
         self._eval_cmd = RunEvaluationCommand()
         self._validate_cmd = ValidateSuiteCommand()
 
-    async def dispatch(self, args: object) -> int:
+    async def dispatch(self, args: argparse.Namespace) -> int:
         """Dispatch to the appropriate command based on arguments.
 
         Args:
@@ -105,7 +107,6 @@ def main(argv: list[str] | None = None) -> int:
         logger.exception("fatal_error", error=str(e))
         print(f"Error: {e}", file=sys.stderr)
         if getattr(args, "verbose", False):
-            import traceback
             traceback.print_exc()
         return 1
 
