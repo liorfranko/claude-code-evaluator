@@ -10,7 +10,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from claude_evaluator.agents.developer import DeveloperAgent
@@ -360,11 +360,54 @@ class BaseWorkflow(ABC):
         worker.on_question_callback = callback
         worker.question_timeout_seconds = self._question_timeout_seconds
 
+        # Create and set the implicit question callback for detecting
+        # questions asked in plain text without using AskUserQuestion tool
+        worker.on_implicit_question_callback = self._create_implicit_question_callback(
+            developer
+        )
+
         logger.debug(
             f"Configured worker for questions: timeout={self._question_timeout_seconds}s, "
             f"context_size={self._context_window_size}, "
             f"qa_model={self._developer_qa_model or 'default'}"
         )
+
+    def _create_implicit_question_callback(
+        self,
+        developer_agent: "DeveloperAgent",
+    ) -> Callable[[str, list[dict[str, Any]]], Awaitable[Optional[str]]]:
+        """Create a callback for detecting and answering implicit questions.
+
+        Implicit questions are questions asked in plain text without using
+        the AskUserQuestion tool. This callback uses the DeveloperAgent to
+        detect such questions and generate appropriate answers.
+
+        Args:
+            developer_agent: The DeveloperAgent to handle detection and answering.
+
+        Returns:
+            An async callback function with signature
+            (response_text, conversation_history) -> Optional[str].
+        """
+
+        async def implicit_question_callback(
+            response_text: str,
+            conversation_history: list[dict[str, Any]],
+        ) -> Optional[str]:
+            """Detect and answer implicit questions in the response.
+
+            Args:
+                response_text: The text response to analyze.
+                conversation_history: Recent conversation context.
+
+            Returns:
+                An answer if an implicit question was detected, None otherwise.
+            """
+            return await developer_agent.detect_and_answer_implicit_question(
+                response_text, conversation_history
+            )
+
+        return implicit_question_callback
 
     def _summarize_questions(self, context: "QuestionContext") -> str:
         """Create a brief summary of questions for logging and error messages.

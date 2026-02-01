@@ -858,6 +858,97 @@ Your answer:"""
 
         return answer
 
+    async def detect_and_answer_implicit_question(
+        self,
+        response_text: str,
+        conversation_history: list[dict[str, Any]],
+    ) -> Optional[str]:
+        """Detect if a response contains an implicit question and answer it.
+
+        Analyzes the response text to determine if the Worker is asking for
+        user input without using the AskUserQuestion tool. If an implicit
+        question is detected, generates an appropriate answer.
+
+        Common patterns detected:
+        - "What would you like to do?"
+        - "Please let me know your preference"
+        - Options presented (Option A, Option B, etc.)
+        - "Should I proceed?"
+        - "Which option should I choose?"
+
+        Args:
+            response_text: The text response from the Worker.
+            conversation_history: Recent conversation context.
+
+        Returns:
+            An answer string if an implicit question was detected and answered,
+            None if no implicit question was found.
+        """
+        if not SDK_AVAILABLE or sdk_query is None:
+            # Can't detect without SDK
+            return None
+
+        # Build a prompt to detect and answer implicit questions
+        prompt = f"""You are helping evaluate if an AI assistant's response requires user input, and if so, provide an appropriate answer.
+
+## Assistant's Response
+{response_text[:3000]}
+
+## Task
+1. Analyze if the assistant is asking the user to make a choice or provide input
+2. Look for patterns like:
+   - Presenting options (Option A, Option B, etc.)
+   - Asking "What would you like to do?"
+   - Asking for preferences or confirmation
+   - Requesting the user to choose between approaches
+3. If the assistant IS asking for input: Respond with "NEEDS_ANSWER:" followed by an appropriate autonomous answer that helps the assistant proceed with the task
+4. If the assistant is NOT asking for input (just providing information or completing work): Respond with exactly "NO_QUESTION"
+
+## Guidelines for answering (if needed):
+- Choose the most comprehensive/complete option (e.g., "Proceed with full implementation")
+- Prefer options that move the task forward without user interaction
+- Be direct and actionable
+
+Your response:"""
+
+        try:
+            # Determine the model to use
+            model = self.developer_qa_model or DEFAULT_QA_MODEL
+
+            response = await sdk_query(
+                prompt=prompt,
+                model=model,
+            )
+
+            # Extract the answer
+            answer_text = self._extract_answer_from_response(response)
+
+            # Check if a question was detected
+            if answer_text.strip().upper() == "NO_QUESTION":
+                return None
+
+            if answer_text.startswith("NEEDS_ANSWER:"):
+                answer = answer_text[len("NEEDS_ANSWER:"):].strip()
+
+                self.log_decision(
+                    context="Detected implicit question in Worker response",
+                    action="Generated autonomous answer to continue workflow",
+                    rationale=f"Answer: {answer[:100]}...",
+                )
+
+                return answer
+
+            # If response doesn't match expected format, assume no question
+            return None
+
+        except Exception as e:
+            self.log_decision(
+                context="Error detecting implicit question",
+                action="Assuming no implicit question",
+                rationale=str(e),
+            )
+            return None
+
     def reset(self) -> None:
         """Reset the agent to its initial state.
 

@@ -84,6 +84,9 @@ class WorkerAgent:
     max_budget_usd: Optional[float] = None
     model: Optional[str] = None
     on_question_callback: Optional[Callable[[QuestionContext], Awaitable[str]]] = None
+    on_implicit_question_callback: Optional[
+        Callable[[str, list[dict[str, Any]]], Awaitable[Optional[str]]]
+    ] = None
     question_timeout_seconds: int = 60
     use_user_plugins: bool = False
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
@@ -315,7 +318,22 @@ class WorkerAgent:
                 # Continue the loop to process the response to our answer
                 continue
 
-            # No question block found, exit the loop
+            # Check for implicit questions in the response text
+            if (
+                result_message is not None
+                and self.on_implicit_question_callback is not None
+                and response_content
+            ):
+                implicit_answer = await self._handle_implicit_question(
+                    response_content, all_messages
+                )
+                if implicit_answer is not None:
+                    # Send the answer and continue
+                    await client.query(implicit_answer)
+                    result_message = None  # Reset to wait for new result
+                    continue
+
+            # No question found, exit the loop
             break
 
         if result_message is None:
@@ -387,6 +405,41 @@ class WorkerAgent:
                 f"Question callback timed out after {self.question_timeout_seconds} seconds. "
                 f"Question: {self._summarize_questions(block)}"
             )
+
+    async def _handle_implicit_question(
+        self,
+        response_text: str,
+        all_messages: list[dict[str, Any]],
+    ) -> Optional[str]:
+        """Handle potential implicit questions in the response text.
+
+        Checks if the response contains questions asked in plain text
+        (without using AskUserQuestion tool) and generates an answer
+        if needed.
+
+        Args:
+            response_text: The text content of the response.
+            all_messages: Current conversation history.
+
+        Returns:
+            An answer string if an implicit question was detected,
+            None otherwise.
+        """
+        if self.on_implicit_question_callback is None:
+            return None
+
+        try:
+            answer = await asyncio.wait_for(
+                self.on_implicit_question_callback(response_text, all_messages),
+                timeout=self.question_timeout_seconds,
+            )
+            return answer
+        except asyncio.TimeoutError:
+            # Log but don't raise - treat as no implicit question
+            return None
+        except Exception:
+            # Any error in detection - treat as no implicit question
+            return None
 
     def _build_question_context(
         self,
