@@ -219,7 +219,11 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         """Execute the implementation phase.
 
         Switches the Worker to acceptEdits mode and sends the implementation
-        prompt. The session continues from the planning phase.
+        prompt. A new session is created to apply the new permission mode.
+
+        Note: We don't use resume_session=True because the SDK client doesn't
+        support changing permission mode mid-session. The plan is saved to a
+        file in ~/.claude/plans/ which Claude will read at the start of this phase.
 
         Args:
             evaluation: The Evaluation instance.
@@ -234,11 +238,12 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         # Build implementation prompt - Claude will read the plan file
         implementation_prompt = self._implementation_prompt_template
 
-        # Execute implementation query with session resumption for context continuity
+        # Execute implementation query with a new session to apply acceptEdits permission
+        # Note: resume_session=False because permission mode change requires new client
         query_metrics = await worker.execute_query(
             query=implementation_prompt,
             phase="implementation",
-            resume_session=True,
+            resume_session=False,
         )
 
         # Collect metrics from the implementation phase
