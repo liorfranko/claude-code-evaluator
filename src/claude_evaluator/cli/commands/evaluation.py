@@ -13,6 +13,8 @@ from claude_evaluator.cli.formatters import create_progress_callback
 from claude_evaluator.config.models import Phase, RepositorySource
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
+from claude_evaluator.core.exceptions import CloneError
+from claude_evaluator.core.git_operations import clone_repository
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode, WorkflowType
@@ -244,6 +246,40 @@ class RunEvaluationCommand(BaseCommand):
             raise RuntimeError(
                 f"Git push failed for branch '{current_branch}': {push_result.stderr}"
             )
+
+    async def _clone_repository(
+        self,
+        source: RepositorySource,
+        target_path: Path,
+        verbose: bool,
+    ) -> str:
+        """Clone a repository for brownfield evaluation.
+
+        Args:
+            source: The repository source configuration.
+            target_path: The target directory for the clone.
+            verbose: Whether to print progress messages.
+
+        Returns:
+            The ref that was checked out.
+
+        Raises:
+            CloneError: If the clone fails after retry.
+
+        """
+        if verbose:
+            print(f"Cloning repository: {source.url}")
+            if source.ref:
+                print(f"  Branch/ref: {source.ref}")
+            if source.depth != "full":
+                print(f"  Depth: {source.depth}")
+
+        ref_used = await clone_repository(source, target_path)
+
+        if verbose:
+            print(f"Clone complete. Ref: {ref_used}")
+
+        return ref_used
 
     def _get_current_branch(self, workspace_path: Path) -> str:
         """Get the current git branch name."""
