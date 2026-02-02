@@ -80,3 +80,40 @@ class InvalidRepositoryError(EvaluationError):
         self.url = url
         self.reason = reason
         super().__init__(f"Invalid repository URL '{url}': {reason}")
+
+
+class BranchNotFoundError(EvaluationError):
+    """Raised when a specified branch or ref does not exist in the repository.
+
+    Attributes:
+        url: The repository URL.
+        ref: The branch, tag, or commit that was not found.
+        available_refs: List of available branches/tags if known.
+
+    """
+
+    def __init__(
+        self,
+        url: str,
+        ref: str,
+        available_refs: list[str] | None = None,
+    ) -> None:
+        """Initialize BranchNotFoundError.
+
+        Args:
+            url: The repository URL.
+            ref: The branch, tag, or commit that was not found.
+            available_refs: List of available branches/tags if known.
+
+        """
+        self.url = url
+        self.ref = ref
+        self.available_refs = available_refs or []
+
+        message = f"Branch or ref '{ref}' not found in repository {url}"
+        if self.available_refs:
+            refs_str = ", ".join(self.available_refs[:5])
+            if len(self.available_refs) > 5:
+                refs_str += f", ... ({len(self.available_refs) - 5} more)"
+            message += f". Available: {refs_str}"
+        super().__init__(message)

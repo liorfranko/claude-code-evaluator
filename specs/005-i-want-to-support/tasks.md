@@ -53,7 +53,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 ### Exception Implementation
 
 - [X] T011 Add CloneError exception with url, error_message, retry_attempted attributes (src/claude_evaluator/core/exceptions.py)
-- [ ] T012 Add InvalidRepositoryError exception for URL validation failures (src/claude_evaluator/core/exceptions.py)
+- [X] T012 Add InvalidRepositoryError exception for URL validation failures (src/claude_evaluator/core/exceptions.py)
 - [ ] T013 Add BranchNotFoundError exception (src/claude_evaluator/core/exceptions.py)
 
 ### Checkpoint
