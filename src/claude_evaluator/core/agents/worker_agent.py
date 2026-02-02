@@ -44,16 +44,9 @@ from claude_evaluator.models.tool_invocation import ToolInvocation
 
 logger = get_logger(__name__)
 
-# Optional SDK import - allows tests to run without SDK installed
-try:
-    from claude_agent_sdk import ClaudeSDKClient
+from claude_agent_sdk import ClaudeSDKClient
 
-    SDK_AVAILABLE = True
-except ImportError:
-    ClaudeSDKClient = None  # type: ignore
-    SDK_AVAILABLE = False
-
-__all__ = ["WorkerAgent", "SDK_AVAILABLE", "DEFAULT_MODEL"]
+__all__ = ["WorkerAgent", "DEFAULT_MODEL"]
 
 
 # Re-export for backward compatibility
@@ -213,16 +206,7 @@ class WorkerAgent(BaseSchema):
         Returns:
             QueryMetrics with execution results.
 
-        Raises:
-            RuntimeError: If SDK is not available.
-
         """
-        if not SDK_AVAILABLE or ClaudeSDKClient is None:
-            raise RuntimeError(
-                "claude-agent-sdk is not installed. "
-                "Install with: pip install claude-agent-sdk"
-            )
-
         # Prepare for new query
         self.tool_invocations = []
         self._query_counter += 1

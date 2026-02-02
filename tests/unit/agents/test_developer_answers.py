@@ -307,20 +307,6 @@ class TestAnswerQuestionGeneratesResponse:
                     == DeveloperState.awaiting_response
                 )
 
-    @pytest.mark.asyncio
-    async def test_answer_question_raises_without_sdk(
-        self,
-        base_developer_agent: DeveloperAgent,
-        sample_question_context: QuestionContext,
-    ) -> None:
-        """Test that answer_question raises RuntimeError when SDK is not available."""
-        with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", False):
-            with pytest.raises(RuntimeError) as exc_info:
-                await base_developer_agent.answer_question(sample_question_context)
-
-            assert "claude-agent-sdk is not installed" in str(exc_info.value)
-
-
 # =============================================================================
 # T416: Test developer_qa_model is Used When Specified
 # =============================================================================

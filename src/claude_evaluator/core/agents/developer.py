@@ -41,20 +41,9 @@ ReceiveResponseCallback: TypeAlias = Callable[[], dict[str, Any]]
 
 logger = get_logger(__name__)
 
-# Optional SDK import for LLM-powered answer generation
-# Type annotations for optional SDK imports
-sdk_query: "Callable[..., Any] | None"
-ClaudeAgentOptions: "type[Any] | None"
-
-try:
-    from claude_agent_sdk import ClaudeAgentOptions
-    from claude_agent_sdk import query as sdk_query
-
-    SDK_AVAILABLE = True
-except ImportError:
-    sdk_query = None
-    ClaudeAgentOptions = None
-    SDK_AVAILABLE = False
+# SDK imports for LLM-powered answer generation
+from claude_agent_sdk import ClaudeAgentOptions
+from claude_agent_sdk import query as sdk_query
 
 __all__ = ["DeveloperAgent"]
 
@@ -600,15 +589,9 @@ class DeveloperAgent(BaseSchema):
             context size, generation time, and attempt number.
 
         Raises:
-            RuntimeError: If SDK is not available or answer generation fails.
+            RuntimeError: If answer generation fails.
 
         """
-        if not SDK_AVAILABLE or sdk_query is None:
-            raise RuntimeError(
-                "claude-agent-sdk is not installed. "
-                "Install with: pip install claude-agent-sdk"
-            )
-
         # Transition to answering_question state
         if self.can_transition_to(DeveloperState.answering_question):
             self.transition_to(DeveloperState.answering_question)
@@ -632,7 +615,7 @@ class DeveloperAgent(BaseSchema):
             action=f"Generating LLM answer using {context_strategy}",
             rationale=f"Questions: {self._summarize_questions(context.questions)}",
         )
-
+        logger.info("developer_answer_question_starting", prompt=prompt)
         # Determine the model to use
         model = self.developer_qa_model or DEFAULT_QA_MODEL
 
@@ -996,10 +979,6 @@ Your response:"""
             None if no implicit question was found.
 
         """
-        if not SDK_AVAILABLE or sdk_query is None:
-            # Can't detect without SDK
-            return None
-
         # Build a prompt to detect and answer implicit questions
         prompt = f"""You are helping evaluate if an AI assistant's response requires user input, and if so, provide an appropriate answer.
 

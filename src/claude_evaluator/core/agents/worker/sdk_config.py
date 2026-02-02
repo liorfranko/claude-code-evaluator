@@ -21,20 +21,11 @@ __all__ = ["SDKConfigBuilder"]
 
 logger = get_logger(__name__)
 
-# Import SDK types conditionally
-try:
-    from claude_agent_sdk import (
-        ClaudeAgentOptions,
-        PermissionResultAllow,
-        PermissionResultDeny,
-    )
-
-    SDK_AVAILABLE = True
-except ImportError:
-    ClaudeAgentOptions = None  # type: ignore
-    PermissionResultAllow = None  # type: ignore
-    PermissionResultDeny = None  # type: ignore
-    SDK_AVAILABLE = False
+from claude_agent_sdk import (
+    ClaudeAgentOptions,
+    PermissionResultAllow,
+    PermissionResultDeny,
+)
 
 
 class SDKConfigBuilder:
@@ -98,16 +89,7 @@ class SDKConfigBuilder:
         Returns:
             Configured ClaudeAgentOptions instance.
 
-        Raises:
-            RuntimeError: If SDK is not available.
-
         """
-        if not SDK_AVAILABLE or ClaudeAgentOptions is None:
-            raise RuntimeError(
-                "claude-agent-sdk is not installed. "
-                "Install with: pip install claude-agent-sdk"
-            )
-
         permission_map = {
             PermissionMode.plan: "plan",
             PermissionMode.acceptEdits: "acceptEdits",
@@ -213,9 +195,6 @@ class ToolPermissionHandler:
             PermissionResultAllow or PermissionResultDeny.
 
         """
-        if not SDK_AVAILABLE:
-            return None
-
         # Check file paths for file operation tools
         allowed, denied_path = self._permission_manager.check_tool_paths(
             tool_name, input_data

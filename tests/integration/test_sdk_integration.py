@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
-from claude_evaluator.core.agents.worker_agent import DEFAULT_MODEL, SDK_AVAILABLE
+from claude_evaluator.core.agents.worker_agent import DEFAULT_MODEL
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.query_metrics import QueryMetrics
 from claude_evaluator.models.base import BaseSchema
@@ -29,23 +29,6 @@ try:
     HAS_SDK = True
 except ImportError:
     HAS_SDK = False
-
-
-class TestSDKImportAvailability:
-    """Tests for SDK import detection."""
-
-    def test_sdk_available_flag_reflects_import_status(self) -> None:
-        """Test that SDK_AVAILABLE flag correctly reflects import status.
-
-        The SDK_AVAILABLE flag should be True if claude-agent-sdk is installed,
-        and False otherwise.
-        """
-        # SDK_AVAILABLE should match our local import check
-        assert SDK_AVAILABLE == HAS_SDK
-
-    def test_sdk_available_is_boolean(self) -> None:
-        """Test that SDK_AVAILABLE is a boolean value."""
-        assert isinstance(SDK_AVAILABLE, bool)
 
 
 class TestWorkerAgentSDKConfiguration:
@@ -194,7 +177,7 @@ class TestExecuteQueryWithMockedSDK:
             max_turns=10,
         )
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_execute_query_with_sdk_available(
         self, worker_agent: WorkerAgent, mock_sdk_result: ResultMessage
     ) -> None:
@@ -202,7 +185,7 @@ class TestExecuteQueryWithMockedSDK:
         mock_client = create_mock_client(mock_sdk_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             # Execute query
             result = asyncio.run(
@@ -220,19 +203,7 @@ class TestExecuteQueryWithMockedSDK:
             assert result.num_turns == 3
             assert result.phase == "implementation"
 
-    def test_execute_query_raises_when_sdk_not_available(
-        self, worker_agent: WorkerAgent
-    ) -> None:
-        """Test that execute_query raises RuntimeError when SDK is not available."""
-        # Patch SDK_AVAILABLE and ClaudeSDKClient to simulate SDK not being installed
-        with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", False):
-            with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", None):
-                with pytest.raises(RuntimeError) as exc_info:
-                    asyncio.run(worker_agent.execute_query("test query"))
-
-                assert "claude-agent-sdk is not installed" in str(exc_info.value)
-
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_execute_query_calls_client_methods(
         self, worker_agent: WorkerAgent, mock_sdk_result: ResultMessage
     ) -> None:
@@ -240,7 +211,7 @@ class TestExecuteQueryWithMockedSDK:
         mock_client = create_mock_client(mock_sdk_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             # Execute query
             asyncio.run(worker_agent.execute_query("query 1"))
@@ -249,7 +220,7 @@ class TestExecuteQueryWithMockedSDK:
             mock_client.connect.assert_called_once()
             mock_client.query.assert_called_once_with("query 1")
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_execute_query_increments_query_counter(
         self, worker_agent: WorkerAgent, mock_sdk_result: ResultMessage
     ) -> None:
@@ -257,7 +228,7 @@ class TestExecuteQueryWithMockedSDK:
         mock_client = create_mock_client(mock_sdk_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             assert worker_agent._query_counter == 0
 
@@ -287,7 +258,7 @@ class TestSDKOptionsConfiguration:
             max_budget_usd=5.0,
         )
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_options_include_project_directory(self, worker_agent: WorkerAgent) -> None:
         """Test that SDK options include the correct project directory."""
         mock_result = ResultMessage(
@@ -306,7 +277,7 @@ class TestSDKOptionsConfiguration:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=capture_options,
         ):
             asyncio.run(worker_agent.execute_query("test"))
@@ -315,7 +286,7 @@ class TestSDKOptionsConfiguration:
             assert captured_options is not None
             assert captured_options.cwd == "/home/user/project"
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_options_include_permission_mode(self, worker_agent: WorkerAgent) -> None:
         """Test that SDK options include the correct permission mode."""
         mock_result = ResultMessage(
@@ -334,7 +305,7 @@ class TestSDKOptionsConfiguration:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=capture_options,
         ):
             asyncio.run(worker_agent.execute_query("test"))
@@ -342,7 +313,7 @@ class TestSDKOptionsConfiguration:
             assert captured_options is not None
             assert captured_options.permission_mode == "acceptEdits"
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_options_include_allowed_tools(self, worker_agent: WorkerAgent) -> None:
         """Test that SDK options include the allowed tools list."""
         mock_result = ResultMessage(
@@ -361,7 +332,7 @@ class TestSDKOptionsConfiguration:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=capture_options,
         ):
             asyncio.run(worker_agent.execute_query("test"))
@@ -369,7 +340,7 @@ class TestSDKOptionsConfiguration:
             assert captured_options is not None
             assert captured_options.allowed_tools == ["Read", "Edit", "Write"]
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_options_include_max_turns_and_budget(
         self, worker_agent: WorkerAgent
     ) -> None:
@@ -390,7 +361,7 @@ class TestSDKOptionsConfiguration:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=capture_options,
         ):
             asyncio.run(worker_agent.execute_query("test"))
@@ -403,7 +374,7 @@ class TestSDKOptionsConfiguration:
 class TestPermissionModeMapping:
     """Tests for permission mode to SDK string mapping."""
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     @pytest.mark.parametrize(
         "permission_mode,expected_sdk_string",
         [
@@ -439,7 +410,7 @@ class TestPermissionModeMapping:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=capture_options,
         ):
             asyncio.run(agent.execute_query("test"))
@@ -461,7 +432,7 @@ class TestToolInvocationTrackingDuringSDKExecution:
             permission_mode=PermissionMode.plan,
         )
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_tool_invocations_cleared_before_query(
         self, worker_agent: WorkerAgent
     ) -> None:
@@ -481,14 +452,14 @@ class TestToolInvocationTrackingDuringSDKExecution:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             asyncio.run(worker_agent.execute_query("test"))
 
             # Invocations should be cleared
             assert len(worker_agent.tool_invocations) == 0
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_tool_use_tracking_method_exists(self, worker_agent: WorkerAgent) -> None:
         """Test that _on_tool_use method exists and works."""
         invocation = worker_agent._on_tool_use("Read", "test-id", {"path": "/file.txt"})
@@ -503,7 +474,7 @@ class TestToolInvocationTrackingDuringSDKExecution:
 class TestSDKExecutionWithEmptyAllowedTools:
     """Tests for SDK execution when allowed_tools is empty."""
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_empty_allowed_tools_passed_as_empty_list(self) -> None:
         """Test that empty allowed_tools list is passed as empty list to SDK."""
         agent = WorkerAgent(
@@ -530,7 +501,7 @@ class TestSDKExecutionWithEmptyAllowedTools:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=capture_options,
         ):
             asyncio.run(agent.execute_query("test"))
@@ -543,7 +514,7 @@ class TestSDKExecutionWithEmptyAllowedTools:
 class TestQueryMetricsFromSDKResult:
     """Tests for QueryMetrics extraction from SDK result."""
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_query_metrics_captures_all_fields(self) -> None:
         """Test that QueryMetrics captures all fields from SDK result."""
         agent = WorkerAgent(
@@ -564,7 +535,7 @@ class TestQueryMetricsFromSDKResult:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             result = asyncio.run(agent.execute_query("complex query", phase="planning"))
 
@@ -577,7 +548,7 @@ class TestQueryMetricsFromSDKResult:
             assert result.num_turns == 5
             assert result.phase == "planning"
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_query_metrics_without_phase(self) -> None:
         """Test QueryMetrics when no phase is specified."""
         agent = WorkerAgent(
@@ -597,7 +568,7 @@ class TestQueryMetricsFromSDKResult:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             result = asyncio.run(agent.execute_query("test query"))
 
@@ -607,7 +578,7 @@ class TestQueryMetricsFromSDKResult:
 class TestClientSessionManagement:
     """Tests for ClaudeSDKClient session management functionality."""
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_has_active_client_after_query(self) -> None:
         """Test that has_active_client returns True after a query."""
         agent = WorkerAgent(
@@ -627,7 +598,7 @@ class TestClientSessionManagement:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             assert agent.has_active_client() is False
             asyncio.run(agent.execute_query("test"))
@@ -654,7 +625,7 @@ class TestClientSessionManagement:
         assert agent.has_active_client() is False
         mock_client.disconnect.assert_called_once()
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_session_resumption_reuses_client(self) -> None:
         """Test that resume_session=True reuses existing client."""
         agent = WorkerAgent(
@@ -680,7 +651,7 @@ class TestClientSessionManagement:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=track_client_creation,
         ):
             # First query creates new client
@@ -703,7 +674,7 @@ class TestClaudeSDKClientCreation:
     ClaudeSDKClient instances during query execution.
     """
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_worker_agent_creates_sdk_client_instance(self) -> None:
         """Test that WorkerAgent creates a ClaudeSDKClient instance on query."""
         agent = WorkerAgent(
@@ -729,7 +700,7 @@ class TestClaudeSDKClientCreation:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=track_client_creation,
         ):
             asyncio.run(agent.execute_query("test query"))
@@ -737,7 +708,7 @@ class TestClaudeSDKClientCreation:
             # Verify ClaudeSDKClient was instantiated
             assert client_class_called is True
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_sdk_client_receives_configured_options(self) -> None:
         """Test that ClaudeSDKClient receives properly configured options."""
         agent = WorkerAgent(
@@ -767,7 +738,7 @@ class TestClaudeSDKClientCreation:
             return mock_client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=capture_options,
         ):
             asyncio.run(agent.execute_query("test"))
@@ -789,7 +760,7 @@ class TestAsyncClientLifecycle:
     methods are called correctly in the proper sequence.
     """
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_connect_called_before_query(self) -> None:
         """Test that connect() is called before sending a query."""
         agent = WorkerAgent(
@@ -825,14 +796,14 @@ class TestAsyncClientLifecycle:
         mock_client.query = tracked_query
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             asyncio.run(agent.execute_query("test"))
 
             # Verify connect was called before query
             assert call_order == ["connect", "query"]
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_client_stored_for_session_resumption(self) -> None:
         """Test that client is stored after successful connection."""
         agent = WorkerAgent(
@@ -852,7 +823,7 @@ class TestAsyncClientLifecycle:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             # Before query, no client
             assert agent._client is None
@@ -862,7 +833,7 @@ class TestAsyncClientLifecycle:
             # After query, client is stored
             assert agent._client is mock_client
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_disconnect_called_on_clear_session(self) -> None:
         """Test that disconnect() is called when clearing session."""
         agent = WorkerAgent(
@@ -882,7 +853,7 @@ class TestAsyncClientLifecycle:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             asyncio.run(agent.execute_query("test"))
 
@@ -903,7 +874,7 @@ class TestClientCleanupNormalCompletion:
     successful query completion (preserved for session resumption).
     """
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_client_persists_after_normal_completion(self) -> None:
         """Test that client persists after successful query for session reuse."""
         agent = WorkerAgent(
@@ -923,7 +894,7 @@ class TestClientCleanupNormalCompletion:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             asyncio.run(agent.execute_query("test"))
 
@@ -931,7 +902,7 @@ class TestClientCleanupNormalCompletion:
             assert agent.has_active_client() is True
             assert agent._client is mock_client
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_old_client_disconnected_on_new_session(self) -> None:
         """Test that old client is disconnected when starting new session."""
         agent = WorkerAgent(
@@ -962,7 +933,7 @@ class TestClientCleanupNormalCompletion:
             return client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", side_effect=create_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", side_effect=create_client
         ):
             # First query
             asyncio.run(agent.execute_query("first query"))
@@ -976,7 +947,7 @@ class TestClientCleanupNormalCompletion:
             # New client is now active
             assert agent._client is mock_client2
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_manual_cleanup_via_clear_session(self) -> None:
         """Test manual cleanup using clear_session method."""
         agent = WorkerAgent(
@@ -996,7 +967,7 @@ class TestClientCleanupNormalCompletion:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             asyncio.run(agent.execute_query("test"))
             assert agent.has_active_client() is True
@@ -1016,7 +987,7 @@ class TestClientCleanupOnException:
     when errors occur during connection, query, or streaming.
     """
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_client_cleanup_on_connect_failure(self) -> None:
         """Test that client is cleaned up when connect() fails."""
         agent = WorkerAgent(
@@ -1033,7 +1004,7 @@ class TestClientCleanupOnException:
         mock_client.disconnect = AsyncMock()
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             with pytest.raises(ConnectionError):
                 asyncio.run(agent.execute_query("test"))
@@ -1042,7 +1013,7 @@ class TestClientCleanupOnException:
             mock_client.disconnect.assert_called()
             assert agent._client is None
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_client_cleanup_on_query_failure(self) -> None:
         """Test that client is cleaned up when query() fails."""
         agent = WorkerAgent(
@@ -1061,7 +1032,7 @@ class TestClientCleanupOnException:
         mock_client.receive_response = MagicMock()
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             with pytest.raises(RuntimeError, match="Query failed"):
                 asyncio.run(agent.execute_query("test"))
@@ -1070,7 +1041,7 @@ class TestClientCleanupOnException:
             # and only cleans up on the initial creation path
             # This test documents actual behavior
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_client_cleanup_on_streaming_failure(self) -> None:
         """Test behavior when streaming response fails."""
         agent = WorkerAgent(
@@ -1094,12 +1065,12 @@ class TestClientCleanupOnException:
         mock_client.receive_response = failing_receive
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             with pytest.raises(RuntimeError, match="Streaming failed"):
                 asyncio.run(agent.execute_query("test"))
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_disconnect_error_ignored_during_cleanup(self) -> None:
         """Test that disconnect errors are silently ignored during cleanup."""
         agent = WorkerAgent(
@@ -1118,7 +1089,7 @@ class TestClientCleanupOnException:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             # Should raise the original connection error, not the disconnect error
             with pytest.raises(ConnectionError, match="Connection failed"):
@@ -1127,7 +1098,7 @@ class TestClientCleanupOnException:
             # Disconnect was still attempted
             mock_client.disconnect.assert_called()
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_client_preserved_on_resume_session_error(self) -> None:
         """Test that client is preserved when error occurs during session resumption."""
         agent = WorkerAgent(
@@ -1147,7 +1118,7 @@ class TestClientCleanupOnException:
         mock_client = create_mock_client(mock_result)
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             # First query succeeds
             asyncio.run(agent.execute_query("first query"))
@@ -1189,7 +1160,7 @@ class TestIntegrationWorkflow:
     with existing workflow patterns.
     """
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_plan_then_implement_workflow(self) -> None:
         """Test workflow: plan query followed by implement query with session reuse."""
         agent = WorkerAgent(
@@ -1227,7 +1198,7 @@ class TestIntegrationWorkflow:
         mock_client.receive_response = dynamic_receive
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", return_value=mock_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             # Planning phase
             plan_metrics = asyncio.run(
@@ -1250,7 +1221,7 @@ class TestIntegrationWorkflow:
             # Only one client should have been created (session reused)
             assert mock_client.connect.call_count == 1
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_multiple_independent_tasks(self) -> None:
         """Test workflow: multiple independent tasks without session sharing."""
         agent = WorkerAgent(
@@ -1278,7 +1249,7 @@ class TestIntegrationWorkflow:
             return client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             side_effect=create_fresh_client,
         ):
             # First independent task
@@ -1292,7 +1263,7 @@ class TestIntegrationWorkflow:
             # Verify first client was disconnected
             clients[0].disconnect.assert_called()
 
-    @pytest.mark.skipif(not SDK_AVAILABLE, reason="claude-agent-sdk not installed")
+    @pytest.mark.skipif(not HAS_SDK, reason="claude-agent-sdk not installed")
     def test_error_recovery_workflow(self) -> None:
         """Test workflow: recover from error and continue with new session."""
         agent = WorkerAgent(
@@ -1332,7 +1303,7 @@ class TestIntegrationWorkflow:
             return client
 
         with patch(
-            "claude_evaluator.core.agents.worker.ClaudeSDKClient", side_effect=create_client
+            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", side_effect=create_client
         ):
             # First attempt fails
             with pytest.raises(ConnectionError):
