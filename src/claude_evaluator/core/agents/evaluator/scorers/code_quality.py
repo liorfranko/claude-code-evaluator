@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import structlog
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from claude_evaluator.core.agents.evaluator.gemini_client import GeminiClient
 from claude_evaluator.core.agents.evaluator.prompts import (
     CODE_QUALITY_PROMPT_TEMPLATE,
     CODE_QUALITY_SYSTEM_PROMPT,
 )
+from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.score_report import (
     ASTMetrics,
     DimensionScore,
@@ -23,7 +24,6 @@ from claude_evaluator.models.score_report import (
 )
 
 if TYPE_CHECKING:
-    from claude_evaluator.core.agents.evaluator.checks.base import CheckResult
     from claude_evaluator.core.agents.evaluator.checks.registry import CheckRegistry
 
 __all__ = [
@@ -39,7 +39,7 @@ logger = structlog.get_logger(__name__)
 MAX_CODE_CONTENT_LENGTH = 50000
 
 
-class CodeQualitySubScores(BaseModel):
+class CodeQualitySubScores(BaseSchema):
     """Sub-scores for code quality dimensions."""
 
     correctness: int = Field(
@@ -92,7 +92,7 @@ class CodeQualitySubScores(BaseModel):
     )
 
 
-class CodeQualityResult(BaseModel):
+class CodeQualityResult(BaseSchema):
     """Structured result from code quality scoring."""
 
     score: int = Field(

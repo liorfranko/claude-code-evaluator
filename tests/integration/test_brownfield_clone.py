@@ -20,7 +20,6 @@ from claude_evaluator.core.git_operations import (
     get_change_summary,
 )
 
-
 # Use a small, stable public repository for testing
 # This is the GitHub repo for "hello-world" example
 TEST_REPO_URL = "https://github.com/octocat/Hello-World"

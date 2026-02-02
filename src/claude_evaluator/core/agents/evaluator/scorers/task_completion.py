@@ -5,13 +5,14 @@ outcome against the original task description.
 """
 
 import structlog
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from claude_evaluator.core.agents.evaluator.gemini_client import GeminiClient
 from claude_evaluator.core.agents.evaluator.prompts import (
     TASK_COMPLETION_PROMPT_TEMPLATE,
     TASK_COMPLETION_SYSTEM_PROMPT,
 )
+from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.score_report import DimensionScore, DimensionType
 
 __all__ = [
@@ -22,7 +23,7 @@ __all__ = [
 logger = structlog.get_logger(__name__)
 
 
-class TaskCompletionResult(BaseModel):
+class TaskCompletionResult(BaseSchema):
     """Structured result from task completion scoring."""
 
     score: int = Field(

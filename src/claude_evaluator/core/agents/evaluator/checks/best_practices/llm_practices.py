@@ -8,9 +8,8 @@ violations using LLM inference, including:
 - API misuse
 """
 
-from pydantic import BaseModel, Field
-
 import structlog
+from pydantic import Field
 
 from claude_evaluator.core.agents.evaluator.ast.parser import ParseResult
 from claude_evaluator.core.agents.evaluator.checks.base import (
@@ -19,6 +18,7 @@ from claude_evaluator.core.agents.evaluator.checks.base import (
     CheckSeverity,
     LLMCheck,
 )
+from claude_evaluator.models.base import BaseSchema
 
 __all__ = [
     "BestPracticesCheck",
@@ -63,7 +63,7 @@ Return a structured list of findings with severity, line numbers, and suggestion
 If the code follows best practices, return an empty list."""
 
 
-class BestPracticesFinding(BaseModel):
+class BestPracticesFinding(BaseSchema):
     """A single best practices finding from LLM analysis."""
 
     severity: str = Field(
@@ -88,7 +88,7 @@ class BestPracticesFinding(BaseModel):
     )
 
 
-class BestPracticesResponse(BaseModel):
+class BestPracticesResponse(BaseSchema):
     """Structured response from best practices analysis."""
 
     findings: list[BestPracticesFinding] = Field(

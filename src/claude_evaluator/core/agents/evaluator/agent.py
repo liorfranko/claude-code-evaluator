@@ -13,9 +13,15 @@ import structlog
 
 from claude_evaluator.core.agents.evaluator.analyzers import CodeAnalyzer, StepAnalyzer
 from claude_evaluator.core.agents.evaluator.checks import CheckRegistry
-from claude_evaluator.core.agents.evaluator.checks.best_practices import get_all_best_practices_checks
-from claude_evaluator.core.agents.evaluator.checks.performance import get_all_performance_checks
-from claude_evaluator.core.agents.evaluator.checks.security import get_all_security_checks
+from claude_evaluator.core.agents.evaluator.checks.best_practices import (
+    get_all_best_practices_checks,
+)
+from claude_evaluator.core.agents.evaluator.checks.performance import (
+    get_all_performance_checks,
+)
+from claude_evaluator.core.agents.evaluator.checks.security import (
+    get_all_security_checks,
+)
 from claude_evaluator.core.agents.evaluator.checks.smells import get_all_smell_checks
 from claude_evaluator.core.agents.evaluator.exceptions import (
     EvaluatorError,

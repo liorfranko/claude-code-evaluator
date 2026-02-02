@@ -31,7 +31,6 @@ from claude_evaluator.models.question import (
     QuestionItem,
     QuestionOption,
 )
-from claude_evaluator.models.timeline_event import TimelineEvent
 from claude_evaluator.models.score_report import (
     AnalysisStatus,
     ASTMetrics,
@@ -46,6 +45,7 @@ from claude_evaluator.models.score_report import (
     StepAnalysis,
     TaskComplexityTier,
 )
+from claude_evaluator.models.timeline_event import TimelineEvent
 from claude_evaluator.models.tool_invocation import ToolInvocation
 
 __all__ = [
