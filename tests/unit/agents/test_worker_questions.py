@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
+from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
 from claude_evaluator.core.agents.worker.question_handler import QuestionHandler
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.question import (
@@ -190,7 +191,7 @@ class TestQuestionBlockDetection:
         )
         message = AssistantMessage(content=[TextBlock("Thinking..."), question_block])
 
-        result = base_agent._find_question_block(message)
+        result = base_agent._question_handler.find_question_block(message)
 
         assert result is not None
         assert type(result).__name__ == "AskUserQuestionBlock"
@@ -207,7 +208,7 @@ class TestQuestionBlockDetection:
             ]
         )
 
-        result = base_agent._find_question_block(message)
+        result = base_agent._question_handler.find_question_block(message)
 
         assert result is None
 
@@ -217,7 +218,7 @@ class TestQuestionBlockDetection:
         """Test that _find_question_block handles empty content list."""
         message = AssistantMessage(content=[])
 
-        result = base_agent._find_question_block(message)
+        result = base_agent._question_handler.find_question_block(message)
 
         assert result is None
 
@@ -227,7 +228,7 @@ class TestQuestionBlockDetection:
         """Test that _find_question_block handles message without content attribute."""
         message = MagicMock(spec=[])  # No content attribute
 
-        result = base_agent._find_question_block(message)
+        result = base_agent._question_handler.find_question_block(message)
 
         assert result is None
 
@@ -243,7 +244,7 @@ class TestQuestionBlockDetection:
         )
         message = AssistantMessage(content=[question_block_1, question_block_2])
 
-        result = base_agent._find_question_block(message)
+        result = base_agent._question_handler.find_question_block(message)
 
         assert result is question_block_1
         assert result.questions[0]["question"] == "First question?"
@@ -262,7 +263,7 @@ class TestQuestionBlockDetection:
             ]
         )
 
-        result = base_agent._find_question_block(message)
+        result = base_agent._question_handler.find_question_block(message)
 
         assert result is question_block
 
@@ -295,9 +296,9 @@ class TestCallbackInvocation:
         mock_client = MockClaudeSDKClient()
 
         # Set the attempt counter to simulate first question
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, all_messages, mock_client)
+        context = base_agent._question_handler._build_question_context(block, all_messages, mock_client.session_id)
 
         assert isinstance(context, QuestionContext)
         assert len(context.questions) == 1
@@ -323,9 +324,9 @@ class TestCallbackInvocation:
             ]
         )
         mock_client = MockClaudeSDKClient()
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert len(context.questions) == 3
         assert context.questions[0].question == "First question?"
@@ -338,9 +339,9 @@ class TestCallbackInvocation:
         """Test that _build_question_context creates fallback when no valid questions."""
         block = AskUserQuestionBlock(questions=[{"question": ""}])  # Empty question
         mock_client = MockClaudeSDKClient()
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert len(context.questions) == 1
         assert "clarification" in context.questions[0].question.lower()
@@ -352,23 +353,26 @@ class TestCallbackInvocation:
         block = AskUserQuestionBlock(questions=[{"question": "Test?"}])
         mock_client = MockClaudeSDKClient()
         mock_client.session_id = "client-session-xyz"
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert context.session_id == "client-session-xyz"
 
-    def test_build_question_context_falls_back_to_agent_session_id(
+    def test_build_question_context_uses_provided_session_id(
         self, base_agent: WorkerAgent
     ) -> None:
-        """Test that session_id falls back to agent's session_id if client has none."""
-        block = AskUserQuestionBlock(questions=[{"question": "Test?"}])
-        mock_client = MagicMock()
-        mock_client.session_id = None  # Client has no session_id
-        base_agent.session_id = "agent-session-abc"
-        base_agent._question_attempt_counter = 1
+        """Test that session_id uses the provided value.
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        Note: Fallback from client.session_id to agent.session_id happens
+        at the call site in WorkerAgent, not inside QuestionHandler.
+        """
+        block = AskUserQuestionBlock(questions=[{"question": "Test?"}])
+        base_agent._question_handler._attempt_counter = 1
+
+        # Simulate the fallback that WorkerAgent does at the call site
+        session_id = "agent-session-abc"
+        context = base_agent._question_handler._build_question_context(block, [], session_id)
 
         assert context.session_id == "agent-session-abc"
 
@@ -380,9 +384,9 @@ class TestCallbackInvocation:
         mock_client = MagicMock()
         mock_client.session_id = None
         base_agent.session_id = None
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert context.session_id == "unknown"
 
@@ -394,9 +398,9 @@ class TestCallbackInvocation:
         mock_client = MockClaudeSDKClient()
 
         # Test with attempt counter > 2
-        base_agent._question_attempt_counter = 5
+        base_agent._question_handler._attempt_counter = 5
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert context.attempt_number == 2  # Clamped to max of 2
 
@@ -407,9 +411,9 @@ class TestCallbackInvocation:
         block = AskUserQuestionBlock(questions=[{"question": "Test?"}])
         mock_client = MockClaudeSDKClient()
         all_messages = [{"role": "user", "content": "Hello"}]
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, all_messages, mock_client)
+        context = base_agent._question_handler._build_question_context(block, all_messages, mock_client.session_id)
 
         # Modify original list
         all_messages.append({"role": "assistant", "content": "Hi"})
@@ -431,9 +435,9 @@ class TestCallbackInvocation:
         block = AskUserQuestionBlock()
         block.questions = [ObjectQuestion()]
         mock_client = MockClaudeSDKClient()
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert len(context.questions) == 1
         assert context.questions[0].question == "Object question?"
@@ -459,7 +463,7 @@ class TestCallbackInvocation:
         block = AskUserQuestionBlock(questions=[{"question": "What is the answer?"}])
         mock_client = MockClaudeSDKClient()
 
-        answer = await agent._handle_question_block(block, [], mock_client)
+        answer = await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
 
         assert answer == "user's answer"
         assert len(callback_received_context) == 1
@@ -476,9 +480,9 @@ class TestCallbackInvocation:
         mock_client = MockClaudeSDKClient()
 
         with pytest.raises(RuntimeError) as exc_info:
-            await base_agent._handle_question_block(block, [], mock_client)
+            await base_agent._question_handler.handle_question_block(block, [], mock_client.session_id)
 
-        assert "no on_question_callback is configured" in str(exc_info.value)
+        assert "no question callback is configured" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_handle_question_block_increments_attempt_counter(self) -> None:
@@ -498,13 +502,13 @@ class TestCallbackInvocation:
         block = AskUserQuestionBlock(questions=[{"question": "Q1?"}])
         mock_client = MockClaudeSDKClient()
 
-        assert agent._question_attempt_counter == 0
+        assert agent._question_handler._attempt_counter == 0
 
-        await agent._handle_question_block(block, [], mock_client)
-        assert agent._question_attempt_counter == 1
+        await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+        assert agent._question_handler._attempt_counter == 1
 
-        await agent._handle_question_block(block, [], mock_client)
-        assert agent._question_attempt_counter == 2
+        await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+        assert agent._question_handler._attempt_counter == 2
 
 
 # =============================================================================
@@ -756,8 +760,8 @@ class TestTimeoutHandling:
         block = AskUserQuestionBlock(questions=[{"question": "Will this timeout?"}])
         mock_client = MockClaudeSDKClient()
 
-        with pytest.raises(asyncio.TimeoutError) as exc_info:
-            await agent._handle_question_block(block, [], mock_client)
+        with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
+            await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
 
         error_msg = str(exc_info.value)
         assert "timed out after 1 seconds" in error_msg
@@ -788,8 +792,8 @@ class TestTimeoutHandling:
         )
         mock_client = MockClaudeSDKClient()
 
-        with pytest.raises(asyncio.TimeoutError) as exc_info:
-            await agent._handle_question_block(block, [], mock_client)
+        with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
+            await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
 
         error_msg = str(exc_info.value)
         assert "First important question?" in error_msg
@@ -814,7 +818,7 @@ class TestTimeoutHandling:
         block = AskUserQuestionBlock(questions=[{"question": "Quick question?"}])
         mock_client = MockClaudeSDKClient()
 
-        answer = await agent._handle_question_block(block, [], mock_client)
+        answer = await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
 
         assert answer == "quick answer"
 
@@ -850,7 +854,7 @@ class TestQuestionHandlingIntegration:
         """Test _summarize_questions with a single question."""
         block = AskUserQuestionBlock(questions=[{"question": "Single question?"}])
 
-        summary = base_agent._summarize_questions(block)
+        summary = base_agent._question_handler._summarize_questions(block)
 
         assert summary == "Single question?"
 
@@ -866,7 +870,7 @@ class TestQuestionHandlingIntegration:
             ]
         )
 
-        summary = base_agent._summarize_questions(block)
+        summary = base_agent._question_handler._summarize_questions(block)
 
         assert "First?" in summary
         assert "Second?" in summary
@@ -880,7 +884,7 @@ class TestQuestionHandlingIntegration:
         long_question = "A" * 150  # Longer than 100 char limit
         block = AskUserQuestionBlock(questions=[{"question": long_question}])
 
-        summary = base_agent._summarize_questions(block)
+        summary = base_agent._question_handler._summarize_questions(block)
 
         assert len(summary) < len(long_question)
         assert summary.endswith("...")
@@ -897,7 +901,7 @@ class TestQuestionHandlingIntegration:
             ]
         )
 
-        summary = base_agent._summarize_questions(block)
+        summary = base_agent._question_handler._summarize_questions(block)
 
         assert "Q1?" in summary
         assert "Q2?" in summary
@@ -911,7 +915,7 @@ class TestQuestionHandlingIntegration:
         """Test _summarize_questions with no questions."""
         block = AskUserQuestionBlock(questions=[])
 
-        summary = base_agent._summarize_questions(block)
+        summary = base_agent._question_handler._summarize_questions(block)
 
         assert summary == "(no questions)"
 
@@ -930,18 +934,16 @@ class TestQuestionHandlingIntegration:
         )
 
         # Simulate having some prior attempts
-        agent._question_attempt_counter = 5
+        agent._question_handler._attempt_counter = 5
 
-        mock_client = MockClaudeSDKClient()
-        mock_client.set_responses([[ResultMessage(result="Done")]])
+        # Verify counter was set
+        assert agent._question_handler._attempt_counter == 5
 
-        async def run_test() -> None:
-            await agent._stream_sdk_messages_with_client("Test query", mock_client)
+        # Call reset_counter() which is what _execute_via_sdk does at start of each query
+        agent._question_handler.reset_counter()
 
-        asyncio.run(run_test())
-
-        # Counter should have been reset to 0 at start
-        assert agent._question_attempt_counter == 0
+        # Counter should have been reset to 0
+        assert agent._question_handler._attempt_counter == 0
 
     def test_options_with_less_than_two_items_become_none(
         self, base_agent: WorkerAgent
@@ -956,9 +958,9 @@ class TestQuestionHandlingIntegration:
             ]
         )
         mock_client = MockClaudeSDKClient()
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         # Single option should be converted to None
         assert context.questions[0].options is None
@@ -974,9 +976,9 @@ class TestQuestionHandlingIntegration:
             ]
         )
         mock_client = MockClaudeSDKClient()
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert context.questions[0].options is None
 
@@ -1080,9 +1082,9 @@ class TestQuestionHandlingEdgeCases:
             ]
         )
         mock_client = MockClaudeSDKClient()
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         # Only non-empty labels should remain, and we need >= 2
         assert context.questions[0].options is not None
@@ -1111,9 +1113,9 @@ class TestQuestionHandlingEdgeCases:
             }
         ]
         mock_client = MockClaudeSDKClient()
-        base_agent._question_attempt_counter = 1
+        base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._build_question_context(block, [], mock_client)
+        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
 
         assert context.questions[0].options is not None
         assert len(context.questions[0].options) == 2
@@ -1141,6 +1143,6 @@ class TestQuestionHandlingEdgeCases:
         mock_client = MockClaudeSDKClient()
 
         with pytest.raises(ValueError) as exc_info:
-            await agent._handle_question_block(block, [], mock_client)
+            await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
 
         assert "Callback failed intentionally" in str(exc_info.value)

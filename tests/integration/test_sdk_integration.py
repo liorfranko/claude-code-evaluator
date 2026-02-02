@@ -12,15 +12,15 @@ without actual API calls or SDK installation.
 """
 
 import asyncio
-from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
-from claude_evaluator.core.agents.worker import DEFAULT_MODEL, SDK_AVAILABLE
+from claude_evaluator.core.agents.worker_agent import DEFAULT_MODEL, SDK_AVAILABLE
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.base import BaseSchema
 
 # Check if SDK is available for conditional test skipping
 try:
@@ -120,8 +120,7 @@ class TestWorkerAgentSDKConfiguration:
         assert isinstance(DEFAULT_MODEL, str)
 
 
-@dataclass
-class MockUsage:
+class MockUsage(BaseSchema):
     """Mock Usage dataclass for testing."""
 
     input_tokens: int

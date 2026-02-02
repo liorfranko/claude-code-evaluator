@@ -1,6 +1,6 @@
 """Worker Agent for Claude Code execution.
 
-This module defines the WorkerAgent dataclass that executes Claude Code
+This module defines the WorkerAgent model that executes Claude Code
 commands and returns results. It supports both SDK and CLI execution modes
 with configurable permission levels and tool access.
 
@@ -15,8 +15,9 @@ The WorkerAgent acts as a facade, delegating to extracted components:
 import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
 from typing import Any
+
+from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from claude_evaluator.config.defaults import (
     DEFAULT_MAX_TURNS,
@@ -34,6 +35,7 @@ from claude_evaluator.core.agents.worker.sdk_config import (
 )
 from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
 from claude_evaluator.logging_config import get_logger
+from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.query_metrics import QueryMetrics
@@ -58,8 +60,7 @@ __all__ = ["WorkerAgent", "SDK_AVAILABLE", "DEFAULT_MODEL"]
 DEFAULT_MODEL = DEFAULT_WORKER_MODEL
 
 
-@dataclass
-class WorkerAgent:
+class WorkerAgent(BaseSchema):
     """Agent that executes Claude Code commands and returns results.
 
     The WorkerAgent is responsible for interfacing with Claude Code through
@@ -87,12 +88,17 @@ class WorkerAgent:
 
     """
 
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        extra="allow",  # Allow setting extra attributes (needed for test mocking)
+    )
+
     execution_mode: ExecutionMode
     project_directory: str
     active_session: bool
     permission_mode: PermissionMode
-    allowed_tools: list[str] = field(default_factory=list)
-    additional_dirs: list[str] = field(default_factory=list)
+    allowed_tools: list[str] = Field(default_factory=list)
+    additional_dirs: list[str] = Field(default_factory=list)
     max_turns: int = DEFAULT_MAX_TURNS
     session_id: str | None = None
     max_budget_usd: float | None = None
@@ -104,22 +110,23 @@ class WorkerAgent:
     on_progress_callback: Callable[[ProgressEvent], None] | None = None
     question_timeout_seconds: int = DEFAULT_QUESTION_TIMEOUT_SECONDS
     use_user_plugins: bool = False
-    tool_invocations: list[ToolInvocation] = field(default_factory=list)
+    tool_invocations: list[ToolInvocation] = Field(default_factory=list)
 
-    # Internal state
-    _query_counter: int = field(default=0, repr=False)
-    _client: Any | None = field(default=None, repr=False)
-    _exit_plan_mode_triggered: bool = field(default=False, repr=False)
+    # Internal state (private attributes)
+    _query_counter: int = PrivateAttr(default=0)
+    _client: Any | None = PrivateAttr(default=None)
+    _exit_plan_mode_triggered: bool = PrivateAttr(default=False)
 
-    # Internal components (initialized in __post_init__)
-    _tool_tracker: ToolTracker | None = field(default=None, repr=False)
-    _permission_manager: PermissionManager | None = field(default=None, repr=False)
-    _message_processor: MessageProcessor | None = field(default=None, repr=False)
-    _question_handler: QuestionHandler | None = field(default=None, repr=False)
-    _permission_handler: ToolPermissionHandler | None = field(default=None, repr=False)
+    # Internal components (initialized in model_validator)
+    _tool_tracker: ToolTracker = PrivateAttr()
+    _permission_manager: PermissionManager = PrivateAttr()
+    _message_processor: MessageProcessor = PrivateAttr()
+    _question_handler: QuestionHandler = PrivateAttr()
+    _permission_handler: ToolPermissionHandler = PrivateAttr()
 
-    def __post_init__(self) -> None:
-        """Validate WorkerAgent initialization parameters and create components."""
+    @model_validator(mode="after")
+    def _validate_and_init_components(self) -> "WorkerAgent":
+        """Validate WorkerAgent parameters and initialize components."""
         # Validate question_timeout_seconds is in valid range
         if not (
             QUESTION_TIMEOUT_MIN
@@ -159,6 +166,7 @@ class WorkerAgent:
             project_directory=self.project_directory,
             question_callback=self.on_question_callback,
         )
+        return self
 
     async def execute_query(
         self,

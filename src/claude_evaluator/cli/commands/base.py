@@ -6,15 +6,14 @@ following the Command pattern.
 
 from abc import ABC, abstractmethod
 from argparse import Namespace
-from dataclasses import dataclass
 
+from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.report.models import EvaluationReport
 
 __all__ = ["BaseCommand", "CommandResult"]
 
 
-@dataclass
-class CommandResult:
+class CommandResult(BaseSchema):
     """Result of a command execution.
 
     Attributes:

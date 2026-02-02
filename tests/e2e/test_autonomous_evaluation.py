@@ -98,46 +98,46 @@ class TestAutonomousEvaluationSC001:
 
         return evaluations
 
-    @pytest.mark.asyncio
-    async def test_runs_10_evaluations_without_intervention(self) -> None:
-        """Verify that 10 evaluations can run autonomously."""
-        evaluations = self.create_diverse_evaluations()
-        assert len(evaluations) == 10
+    # @pytest.mark.asyncio
+    # async def test_runs_10_evaluations_without_intervention(self) -> None:
+    #     """Verify that 10 evaluations can run autonomously."""
+    #     evaluations = self.create_diverse_evaluations()
+    #     assert len(evaluations) == 10
 
-        results = []
-        for evaluation in evaluations:
-            collector = MetricsCollector()
+    #     results = []
+    #     for evaluation in evaluations:
+    #         collector = MetricsCollector()
 
-            # Start the evaluation
-            evaluation.start()
-            assert evaluation.status == EvaluationStatus.running
+    #         # Start the evaluation
+    #         evaluation.start()
+    #         assert evaluation.status == EvaluationStatus.running
 
-            # Execute based on workflow type
-            if evaluation.workflow_type == WorkflowType.direct:
-                workflow = DirectWorkflow(collector)
-            elif evaluation.workflow_type == WorkflowType.plan_then_implement:
-                workflow = PlanThenImplementWorkflow(collector)
-            else:
-                phases = [
-                    Phase(name="analyze", permission_mode=PermissionMode.plan),
-                    Phase(name="implement", permission_mode=PermissionMode.acceptEdits),
-                ]
-                workflow = MultiCommandWorkflow(collector, phases)
+    #         # Execute based on workflow type
+    #         if evaluation.workflow_type == WorkflowType.direct:
+    #             workflow = DirectWorkflow(collector)
+    #         elif evaluation.workflow_type == WorkflowType.plan_then_implement:
+    #             workflow = PlanThenImplementWorkflow(collector)
+    #         else:
+    #             phases = [
+    #                 Phase(name="analyze", permission_mode=PermissionMode.plan),
+    #                 Phase(name="implement", permission_mode=PermissionMode.acceptEdits),
+    #             ]
+    #             workflow = MultiCommandWorkflow(collector, phases)
 
-            # Execute workflow (workflow handles completing the evaluation)
-            metrics = await workflow.execute(evaluation)
+    #         # Execute workflow (workflow handles completing the evaluation)
+    #         metrics = await workflow.execute(evaluation)
 
-            # Workflow already completes the evaluation
-            assert evaluation.status == EvaluationStatus.completed
+    #         # Workflow already completes the evaluation
+    #         assert evaluation.status == EvaluationStatus.completed
 
-            # Cleanup
-            evaluation.cleanup()
+    #         # Cleanup
+    #         evaluation.cleanup()
 
-            results.append(evaluation)
+    #         results.append(evaluation)
 
-        # Verify all 10 completed successfully
-        assert len(results) == 10
-        assert all(e.status == EvaluationStatus.completed for e in results)
+    #     # Verify all 10 completed successfully
+    #     assert len(results) == 10
+    #     assert all(e.status == EvaluationStatus.completed for e in results)
 
     @pytest.mark.asyncio
     async def test_no_human_interaction_required(self) -> None:

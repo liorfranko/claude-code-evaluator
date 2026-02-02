@@ -1,6 +1,6 @@
 """Developer Agent for claude-evaluator.
 
-This module defines the DeveloperAgent dataclass which simulates a human developer
+This module defines the DeveloperAgent class which simulates a human developer
 orchestrating Claude Code during evaluation. The agent manages state transitions
 through the evaluation workflow and logs autonomous decisions.
 """
@@ -9,9 +9,10 @@ import os
 import time
 import traceback
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, TypeAlias
+
+from pydantic import ConfigDict, Field, PrivateAttr
 
 from claude_evaluator.config.defaults import (
     CONTEXT_WINDOW_MAX,
@@ -29,6 +30,7 @@ from claude_evaluator.core.agents.exceptions import (
 )
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.answer import AnswerResult
+from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import DeveloperState, Outcome
 from claude_evaluator.models.question import QuestionContext
@@ -55,9 +57,6 @@ except ImportError:
     SDK_AVAILABLE = False
 
 __all__ = ["DeveloperAgent"]
-
-# Note: Re-exporting for potential backward compatibility is not needed
-# as DEFAULT_QA_MODEL was not in __all__
 
 # Define valid state transitions for the Developer agent state machine
 _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
@@ -105,8 +104,7 @@ _VALID_TRANSITIONS: dict[DeveloperState, set[DeveloperState]] = {
 }
 
 
-@dataclass
-class DeveloperAgent:
+class DeveloperAgent(BaseSchema):
     """Developer agent that orchestrates Claude Code during evaluation.
 
     The DeveloperAgent simulates a human developer interacting with Claude Code.
@@ -124,44 +122,34 @@ class DeveloperAgent:
         context_window_size: Number of recent messages to include as context (1-100).
         max_answer_retries: Maximum retries for rejected answers (0-5).
         cwd: Working directory for SDK queries (optional, defaults to os.getcwd()).
-        _answer_retry_count: Internal counter for answer attempt tracking.
 
     """
 
-    role: str = field(default="developer", init=False)
-    current_state: DeveloperState = field(default=DeveloperState.initializing)
-    decisions_log: list[Decision] = field(default_factory=list)
-    fallback_responses: dict[str, str] | None = field(default=None)
-    max_iterations: int = field(default=DEFAULT_MAX_ITERATIONS)
-    iteration_count: int = field(default=0, init=False)
-    developer_qa_model: str | None = field(default=None)
-    context_window_size: int = field(default=DEFAULT_CONTEXT_WINDOW_SIZE)
-    max_answer_retries: int = field(default=DEFAULT_MAX_ANSWER_RETRIES)
-    cwd: str | None = field(default=None)
-    _answer_retry_count: int = field(default=0, init=False, repr=False)
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        validate_assignment=True,
+    )
 
-    def __post_init__(self) -> None:
-        """Validate the initial state of the agent."""
-        if self.max_iterations < 1:
-            raise ValueError("max_iterations must be at least 1")
-
-        # Validate context_window_size is in valid range
-        if not (CONTEXT_WINDOW_MIN <= self.context_window_size <= CONTEXT_WINDOW_MAX):
-            raise ValueError(
-                f"context_window_size must be between {CONTEXT_WINDOW_MIN} "
-                f"and {CONTEXT_WINDOW_MAX}, got {self.context_window_size}"
-            )
-
-        # Validate max_answer_retries is in valid range
-        if not (
-            MAX_ANSWER_RETRIES_MIN
-            <= self.max_answer_retries
-            <= MAX_ANSWER_RETRIES_MAX
-        ):
-            raise ValueError(
-                f"max_answer_retries must be between {MAX_ANSWER_RETRIES_MIN} "
-                f"and {MAX_ANSWER_RETRIES_MAX}, got {self.max_answer_retries}"
-            )
+    role: str = Field(default="developer", init=False)
+    current_state: DeveloperState = Field(default=DeveloperState.initializing)
+    decisions_log: list[Decision] = Field(default_factory=list)
+    fallback_responses: dict[str, str] | None = Field(default=None)
+    max_iterations: int = Field(default=DEFAULT_MAX_ITERATIONS, ge=1)
+    iteration_count: int = Field(default=0, init=False)
+    developer_qa_model: str | None = Field(default=None)
+    context_window_size: int = Field(
+        default=DEFAULT_CONTEXT_WINDOW_SIZE,
+        ge=CONTEXT_WINDOW_MIN,
+        le=CONTEXT_WINDOW_MAX,
+    )
+    max_answer_retries: int = Field(
+        default=DEFAULT_MAX_ANSWER_RETRIES,
+        ge=MAX_ANSWER_RETRIES_MIN,
+        le=MAX_ANSWER_RETRIES_MAX,
+    )
+    cwd: str | None = Field(default=None)
+    _answer_retry_count: int = PrivateAttr(default=0)
 
     def transition_to(self, new_state: DeveloperState) -> None:
         """Transition the agent to a new state.

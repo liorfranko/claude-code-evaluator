@@ -1,6 +1,6 @@
-"""Evaluation dataclass for claude-evaluator.
+"""Evaluation model for claude-evaluator.
 
-This module defines the Evaluation dataclass which represents a single end-to-end
+This module defines the Evaluation class which represents a single end-to-end
 test run. It manages state transitions, workspace lifecycle, and collects metrics
 during evaluation execution.
 """
@@ -8,15 +8,17 @@ during evaluation execution.
 import shutil
 import tempfile
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from pydantic import ConfigDict, Field, PrivateAttr
 
 from claude_evaluator.core.agents.developer import DeveloperAgent
 from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.core.exceptions import InvalidEvaluationStateError
 from claude_evaluator.logging_config import get_logger
+from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import EvaluationStatus, WorkflowType
 from claude_evaluator.models.metrics import Metrics
 
@@ -43,8 +45,7 @@ _VALID_TRANSITIONS: dict[EvaluationStatus, set[EvaluationStatus]] = {
 }
 
 
-@dataclass
-class Evaluation:
+class Evaluation(BaseSchema):
     """Represents a single end-to-end evaluation test run.
 
     An Evaluation encapsulates all the context needed for a complete evaluation,
@@ -67,18 +68,24 @@ class Evaluation:
 
     """
 
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        arbitrary_types_allowed=True,
+    )
+
     task_description: str
     workflow_type: WorkflowType
     developer_agent: DeveloperAgent
     worker_agent: WorkerAgent
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    status: EvaluationStatus = field(default=EvaluationStatus.pending)
-    start_time: datetime = field(default_factory=datetime.now)
-    end_time: datetime | None = field(default=None)
-    workspace_path: str | None = field(default=None)
-    metrics: Metrics | None = field(default=None)
-    error: str | None = field(default=None)
-    _owns_workspace: bool = field(default=True, repr=False)
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    status: EvaluationStatus = Field(default=EvaluationStatus.pending)
+    start_time: datetime = Field(default_factory=datetime.now)
+    end_time: datetime | None = Field(default=None)
+    workspace_path: str | None = Field(default=None)
+    metrics: Metrics | None = Field(default=None)
+    error: str | None = Field(default=None)
+    _owns_workspace: bool = PrivateAttr(default=True)
 
     def start(self, workspace_path: str | None = None) -> None:
         """Start the evaluation, transitioning from pending to running.

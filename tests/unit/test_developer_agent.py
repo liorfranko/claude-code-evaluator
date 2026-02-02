@@ -8,6 +8,7 @@ fallback response handling, and workflow execution.
 from datetime import datetime
 
 import pytest
+from pydantic import ValidationError
 
 from claude_evaluator.core.agents import DeveloperAgent
 from claude_evaluator.core.agents.exceptions import (
@@ -52,11 +53,11 @@ class TestDeveloperAgentInitialization:
         assert agent.current_state == DeveloperState.prompting
 
     def test_invalid_max_iterations_raises_error(self) -> None:
-        """Test that max_iterations less than 1 raises ValueError."""
-        with pytest.raises(ValueError, match="max_iterations must be at least 1"):
+        """Test that max_iterations less than 1 raises ValidationError."""
+        with pytest.raises(ValidationError, match="greater_than_equal"):
             DeveloperAgent(max_iterations=0)
 
-        with pytest.raises(ValueError, match="max_iterations must be at least 1"):
+        with pytest.raises(ValidationError, match="greater_than_equal"):
             DeveloperAgent(max_iterations=-1)
 
     def test_role_is_immutable(self) -> None:
