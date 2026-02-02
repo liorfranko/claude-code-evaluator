@@ -8,13 +8,15 @@ import structlog
 
 from claude_evaluator.core.agents.evaluator.ast.languages import Language
 from claude_evaluator.core.agents.evaluator.ast.parser import ParseResult
-from claude_evaluator.models.score_report import ASTMetrics, LOCBreakdown
+from claude_evaluator.models.score_report import ASTMetrics
 
 __all__ = [
     "MetricsExtractor",
+    "LOCResult",
     "count_functions",
     "count_classes",
     "calculate_cyclomatic_complexity",
+    "calculate_max_cyclomatic_complexity",
     "calculate_max_nesting_depth",
     "count_imports",
     "calculate_loc_breakdown",
@@ -306,7 +308,29 @@ def count_imports(parse_result: ParseResult) -> int:
     return _traverse_tree(parse_result.root_node, node_types)
 
 
-def calculate_loc_breakdown(source: bytes | str) -> LOCBreakdown:
+class LOCResult:
+    """Result of lines of code analysis."""
+
+    def __init__(self, code: int, comments: int, blank: int) -> None:
+        """Initialize LOC result.
+
+        Args:
+            code: Lines containing code.
+            comments: Lines containing comments.
+            blank: Empty lines.
+
+        """
+        self.code = code
+        self.comments = comments
+        self.blank = blank
+
+    @property
+    def total(self) -> int:
+        """Total lines in the file."""
+        return self.code + self.comments + self.blank
+
+
+def calculate_loc_breakdown(source: bytes | str) -> LOCResult:
     """Calculate lines of code breakdown.
 
     Categorizes lines as code, comments, or blank.
@@ -315,7 +339,7 @@ def calculate_loc_breakdown(source: bytes | str) -> LOCBreakdown:
         source: Source code as bytes or string.
 
     Returns:
-        LOCBreakdown with code, comments, and blank line counts.
+        LOCResult with code, comments, and blank line counts.
 
     """
     if isinstance(source, bytes):
@@ -376,11 +400,51 @@ def calculate_loc_breakdown(source: bytes | str) -> LOCBreakdown:
         # Otherwise it's code
         code_lines += 1
 
-    return LOCBreakdown(
+    return LOCResult(
         code=code_lines,
         comments=comment_lines,
         blank=blank_lines,
     )
+
+
+def calculate_max_cyclomatic_complexity(parse_result: ParseResult) -> int:
+    """Calculate the maximum cyclomatic complexity of any function.
+
+    Args:
+        parse_result: The parse result to analyze.
+
+    Returns:
+        Maximum cyclomatic complexity found (minimum 1).
+
+    """
+    if not parse_result.success or parse_result.root_node is None:
+        return 1
+
+    function_types = FUNCTION_NODE_TYPES.get(parse_result.language, set())
+    decision_types = DECISION_NODE_TYPES.get(parse_result.language, set())
+
+    def find_functions(node) -> list:  # noqa: ANN001
+        """Find all function nodes."""
+        functions = []
+        if node.type in function_types:
+            functions.append(node)
+        for child in node.children:
+            functions.extend(find_functions(child))
+        return functions
+
+    functions = find_functions(parse_result.root_node)
+
+    if not functions:
+        return 1
+
+    max_complexity = 1
+    for func in functions:
+        # Count decision points within this function
+        decisions = _traverse_tree(func, decision_types)
+        complexity = 1 + decisions
+        max_complexity = max(max_complexity, complexity)
+
+    return max_complexity
 
 
 class MetricsExtractor:
@@ -404,6 +468,7 @@ class MetricsExtractor:
         function_count = count_functions(parse_result)
         class_count = count_classes(parse_result)
         complexity = calculate_cyclomatic_complexity(parse_result)
+        max_complexity = calculate_max_cyclomatic_complexity(parse_result)
         max_depth = calculate_max_nesting_depth(parse_result)
         import_count = count_imports(parse_result)
         loc = calculate_loc_breakdown(parse_result.source_bytes)
@@ -414,6 +479,7 @@ class MetricsExtractor:
             function_count=function_count,
             class_count=class_count,
             complexity=complexity,
+            max_complexity=max_complexity,
             max_depth=max_depth,
             import_count=import_count,
         )
@@ -422,7 +488,13 @@ class MetricsExtractor:
             function_count=function_count,
             class_count=class_count,
             cyclomatic_complexity=complexity,
+            max_cyclomatic_complexity=max_complexity,
             max_nesting_depth=max_depth,
             import_count=import_count,
-            loc_breakdown=loc,
+            total_lines=loc.total,
+            code_lines=loc.code,
+            comment_lines=loc.comments,
+            blank_lines=loc.blank,
+            parsing_successful=parse_result.success,
+            language=parse_result.language.value,
         )
