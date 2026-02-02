@@ -6,6 +6,8 @@ This module contains data models including:
 - Models: Decision, ToolInvocation, QueryMetrics, Metrics, TimelineEvent,
           QuestionOption, QuestionItem, QuestionContext, AnswerResult,
           ProgressEvent, ProgressEventType
+- Score Report: ScoreReport, DimensionScore, StepAnalysis, FileAnalysis, CodeAnalysis, CodeIssue
+- Score Report Enums: DimensionType, EfficiencyFlag, AnalysisStatus, IssueSeverity, TaskComplexityTier
 - Exceptions: ModelValidationError
 """
 
@@ -30,6 +32,20 @@ from claude_evaluator.models.question import (
     QuestionOption,
 )
 from claude_evaluator.models.timeline_event import TimelineEvent
+from claude_evaluator.models.score_report import (
+    AnalysisStatus,
+    ASTMetrics,
+    CodeAnalysis,
+    CodeIssue,
+    DimensionScore,
+    DimensionType,
+    EfficiencyFlag,
+    FileAnalysis,
+    IssueSeverity,
+    ScoreReport,
+    StepAnalysis,
+    TaskComplexityTier,
+)
 from claude_evaluator.models.tool_invocation import ToolInvocation
 
 __all__ = [
@@ -56,4 +72,17 @@ __all__ = [
     "ToolInvocation",
     # Exceptions
     "ModelValidationError",
+    # Score Report Models
+    "AnalysisStatus",
+    "ASTMetrics",
+    "CodeAnalysis",
+    "CodeIssue",
+    "DimensionScore",
+    "DimensionType",
+    "EfficiencyFlag",
+    "FileAnalysis",
+    "IssueSeverity",
+    "ScoreReport",
+    "StepAnalysis",
+    "TaskComplexityTier",
 ]

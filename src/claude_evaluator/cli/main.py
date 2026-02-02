@@ -11,6 +11,7 @@ import traceback
 from claude_evaluator.cli.commands import (
     RunEvaluationCommand,
     RunSuiteCommand,
+    ScoreCommand,
     ValidateSuiteCommand,
 )
 from claude_evaluator.cli.formatters import format_results
@@ -38,6 +39,7 @@ class CommandDispatcher:
         self._suite_cmd = RunSuiteCommand()
         self._eval_cmd = RunEvaluationCommand()
         self._validate_cmd = ValidateSuiteCommand()
+        self._score_cmd = ScoreCommand()
 
     async def dispatch(self, args: argparse.Namespace) -> int:
         """Dispatch to the appropriate command based on arguments.
@@ -49,6 +51,15 @@ class CommandDispatcher:
             Exit code (0 for success, non-zero for errors).
 
         """
+        # Handle score command
+        if getattr(args, "score", None):
+            # Map score argument to evaluation_path for the command
+            args.evaluation_path = args.score
+            result = await self._score_cmd.execute(args)  # type: ignore
+            if result.message:
+                print(result.message)
+            return result.exit_code
+
         # Handle dry-run (validation only)
         if getattr(args, "dry_run", False):
             result = await self._validate_cmd.execute(args)  # type: ignore
