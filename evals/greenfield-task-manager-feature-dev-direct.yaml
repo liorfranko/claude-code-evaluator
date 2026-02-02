@@ -1,0 +1,42 @@
+name: greenfield-feature-dev-direct
+description: >
+  Evaluate the /feature-dev command using direct workflow mode.
+  Direct mode avoids the multi_command continuation loop that can terminate early.
+version: "1.0.0"
+
+defaults:
+  max_turns: 2000
+  max_budget_usd: 50.0
+  timeout_seconds: 36000
+  allowed_tools:
+    - Read
+    - Edit
+    - Write
+    - Bash
+    - Glob
+    - Grep
+  model: claude-sonnet-4-5@20250929
+
+evaluations:
+  - id: task-manager-feature-dev-direct
+    name: Task Management CLI (feature-dev direct)
+    description: >
+      Uses the /feature-dev command with direct workflow mode.
+      This allows the full interactive workflow to run without early termination.
+    task: >
+      /feature-dev:feature-dev Build a task management CLI application that allows users to:
+      - Add, list, update, and delete tasks
+      - Mark tasks as complete/incomplete
+      - Assign priorities (low, medium, high)
+      - Filter and search tasks
+      - Persist tasks to a JSON file
+      - Support for due dates
+
+      Use Python with Click for CLI and Rich for formatting.
+      Implement it now without asking additional questions.
+    workflow_type: direct
+    tags:
+      - feature-dev
+      - complex
+      - python
+      - cli

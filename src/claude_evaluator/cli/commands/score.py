@@ -42,7 +42,14 @@ class ScoreCommand(BaseCommand):
         """
         evaluation_path = Path(args.evaluation_path)
         workspace_path = Path(args.workspace) if args.workspace else evaluation_path.parent
-        output_path = Path(args.output) if args.output else None
+
+        # For score command, default output is same directory as evaluation file
+        # Don't use args.output if it's the suite default "evaluations" directory
+        output_arg = getattr(args, "output", None)
+        if output_arg and output_arg != "evaluations":
+            output_path = Path(output_arg)
+        else:
+            output_path = None  # Will default to workspace/score_report.json
 
         # Configuration
         enable_ast = not getattr(args, "no_ast", False)
@@ -121,23 +128,27 @@ class ScoreCommand(BaseCommand):
 
         if report.code_analysis:
             print(f"\nCode Analysis:")
-            print(f"  Files analyzed: {report.code_analysis.total_files}")
-            print(f"  Total lines: {report.code_analysis.total_lines}")
-            if report.code_analysis.languages:
-                langs = ", ".join(f"{k}({v})" for k, v in report.code_analysis.languages.items())
+            print(f"  Files analyzed: {len(report.code_analysis.files_analyzed)}")
+            print(f"  Total lines: {report.code_analysis.total_lines_added}")
+            if report.code_analysis.languages_detected:
+                langs = ", ".join(report.code_analysis.languages_detected)
                 print(f"  Languages: {langs}")
 
-        if report.step_analyses:
+        if report.step_analysis:
             from claude_evaluator.models.score_report import EfficiencyFlag
-            redundant = sum(1 for s in report.step_analyses if s.efficiency_flag == EfficiencyFlag.redundant)
+            redundant = sum(1 for s in report.step_analysis if s.efficiency_flag == EfficiencyFlag.redundant)
             if redundant > 0:
                 print(f"\nExecution Analysis:")
-                print(f"  Total steps: {len(report.step_analyses)}")
+                print(f"  Total steps: {len(report.step_analysis)}")
                 print(f"  Redundant steps: {redundant}")
 
-        if verbose and report.strategy_commentary:
+        if verbose and report.rationale:
             print(f"\nStrategy Commentary:")
-            print(f"  {report.strategy_commentary}")
+            # Truncate long rationale for display
+            rationale = report.rationale
+            if len(rationale) > 200:
+                rationale = rationale[:197] + "..."
+            print(f"  {rationale}")
 
         print("=" * 60)
         print()

@@ -12,6 +12,11 @@ from pathlib import Path
 import structlog
 
 from claude_evaluator.core.agents.evaluator.analyzers import CodeAnalyzer, StepAnalyzer
+from claude_evaluator.core.agents.evaluator.checks import CheckRegistry
+from claude_evaluator.core.agents.evaluator.checks.best_practices import get_all_best_practices_checks
+from claude_evaluator.core.agents.evaluator.checks.performance import get_all_performance_checks
+from claude_evaluator.core.agents.evaluator.checks.security import get_all_security_checks
+from claude_evaluator.core.agents.evaluator.checks.smells import get_all_smell_checks
 from claude_evaluator.core.agents.evaluator.exceptions import (
     EvaluatorError,
     GeminiAPIError,
@@ -51,6 +56,7 @@ class EvaluatorAgent:
         workspace_path: Path | None = None,
         enable_ast: bool = True,
         gemini_client: GeminiClient | None = None,
+        enable_checks: bool = True,
     ) -> None:
         """Initialize the evaluator agent.
 
@@ -58,10 +64,12 @@ class EvaluatorAgent:
             workspace_path: Base path for resolving file paths.
             enable_ast: Whether to enable AST-based metrics.
             gemini_client: Optional Gemini client (creates new if not provided).
+            enable_checks: Whether to enable extended code quality checks.
 
         """
         self.workspace_path = workspace_path or Path.cwd()
         self.enable_ast = enable_ast
+        self.enable_checks = enable_checks
 
         # Initialize components
         self.gemini_client = gemini_client or GeminiClient()
@@ -71,9 +79,25 @@ class EvaluatorAgent:
             enable_ast=enable_ast,
         )
 
+        # Initialize check registry with all checks
+        self.check_registry: CheckRegistry | None = None
+        if enable_checks:
+            self.check_registry = CheckRegistry(
+                gemini_client=self.gemini_client,
+                max_workers=4,
+            )
+            # Register all checks
+            self.check_registry.register_all(get_all_security_checks())
+            self.check_registry.register_all(get_all_performance_checks())
+            self.check_registry.register_all(get_all_smell_checks())
+            self.check_registry.register_all(get_all_best_practices_checks(self.gemini_client))
+
         # Initialize scorers with shared Gemini client
         self.task_completion_scorer = TaskCompletionScorer(client=self.gemini_client)
-        self.code_quality_scorer = CodeQualityScorer(client=self.gemini_client)
+        self.code_quality_scorer = CodeQualityScorer(
+            client=self.gemini_client,
+            check_registry=self.check_registry,
+        )
         self.efficiency_scorer = EfficiencyScorer()
         self.aggregate_scorer = AggregateScorer()
 
@@ -81,6 +105,7 @@ class EvaluatorAgent:
             "evaluator_agent_initialized",
             workspace_path=str(self.workspace_path),
             enable_ast=enable_ast,
+            enable_checks=enable_checks,
         )
 
     def load_evaluation(self, evaluation_path: Path | str) -> EvaluationReport:
@@ -111,7 +136,7 @@ class EvaluatorAgent:
             raise ParsingError(f"Failed to parse evaluation file: {e}") from e
 
     def _extract_steps(self, evaluation: EvaluationReport) -> list[dict]:
-        """Extract tool call steps from evaluation timeline.
+        """Extract tool call steps from evaluation messages.
 
         Args:
             evaluation: The evaluation report.
@@ -122,25 +147,45 @@ class EvaluatorAgent:
         """
         steps = []
 
+        # Extract from timeline if tool_name is present
         for event in evaluation.timeline:
-            # Check if this is a tool call event
             if hasattr(event, "tool_name") and event.tool_name:
                 steps.append({
                     "tool_name": event.tool_name,
                     "tool_input": getattr(event, "tool_input", {}),
                 })
 
-        # Also extract from queries if available
+        # Extract from queries.messages if available
+        # Messages contain ToolUseBlock items in their content
         if hasattr(evaluation, "metrics") and hasattr(evaluation.metrics, "queries"):
             for query in evaluation.metrics.queries:
-                if hasattr(query, "messages"):
-                    for msg in query.messages:
-                        if hasattr(msg, "tool_calls"):
-                            for tool_call in msg.tool_calls:
-                                steps.append({
-                                    "tool_name": tool_call.get("name", "unknown"),
-                                    "tool_input": tool_call.get("input", {}),
-                                })
+                messages = getattr(query, "messages", [])
+                for msg in messages:
+                    # Handle dict format (from JSON)
+                    if isinstance(msg, dict):
+                        content = msg.get("content", [])
+                        if isinstance(content, list):
+                            for item in content:
+                                if isinstance(item, dict) and item.get("type") == "ToolUseBlock":
+                                    steps.append({
+                                        "tool_name": item.get("name", "unknown"),
+                                        "tool_input": item.get("input", {}),
+                                    })
+                    # Handle object format
+                    elif hasattr(msg, "content"):
+                        content = msg.content
+                        if isinstance(content, list):
+                            for item in content:
+                                if isinstance(item, dict) and item.get("type") == "ToolUseBlock":
+                                    steps.append({
+                                        "tool_name": item.get("name", "unknown"),
+                                        "tool_input": item.get("input", {}),
+                                    })
+                                elif hasattr(item, "type") and item.type == "ToolUseBlock":
+                                    steps.append({
+                                        "tool_name": getattr(item, "name", "unknown"),
+                                        "tool_input": getattr(item, "input", {}),
+                                    })
 
         return steps
 
@@ -159,7 +204,7 @@ class EvaluatorAgent:
         """
         files = []
 
-        for file_analysis in code_analysis.files:
+        for file_analysis in code_analysis.files_analyzed:
             # Read file content
             path = self.workspace_path / file_analysis.file_path
             if not path.exists():
@@ -198,6 +243,9 @@ class EvaluatorAgent:
             EvaluatorError: If evaluation fails critically.
 
         """
+        import time
+        self._evaluation_start = time.time()
+
         logger.info("starting_evaluation", path=str(evaluation_path))
 
         # T406: Graceful handling for malformed evaluation.json
@@ -228,16 +276,11 @@ class EvaluatorAgent:
             strategy_commentary = f"Step analysis failed: {e}"
 
         # T408: Analyze code with AST fallback
+        code_analysis: CodeAnalysis | None = None
         try:
             code_analysis = self.code_analyzer.analyze(steps=steps)
         except Exception as e:
             logger.warning("code_analysis_failed", error=str(e))
-            code_analysis = CodeAnalysis(
-                files=[],
-                total_files=0,
-                total_lines=0,
-                languages={},
-            )
 
         # T407: Score task completion with Gemini API error handling
         try:
@@ -262,7 +305,7 @@ class EvaluatorAgent:
 
         # T407: Score code quality with error handling
         code_quality_score: DimensionScore | None = None
-        if code_analysis.total_files > 0:
+        if code_analysis and len(code_analysis.files_analyzed) > 0:
             code_files = self._prepare_code_files(code_analysis)
             if code_files:
                 try:
@@ -288,20 +331,27 @@ class EvaluatorAgent:
             *([code_quality_score] if code_quality_score else []),
         ])
 
+        # Calculate evaluation duration
+        import time
+        evaluation_end = time.time()
+        evaluation_duration_ms = int((evaluation_end - self._evaluation_start) * 1000) if hasattr(self, "_evaluation_start") else 0
+
         # Assemble score report
         score_report = ScoreReport(
             evaluation_id=evaluation.evaluation_id,
             task_description=evaluation.task_description,
             aggregate_score=aggregate_score,
+            rationale=strategy_commentary or "No additional rationale provided.",
             dimension_scores=[
                 task_completion_score,
                 efficiency_score,
                 *([code_quality_score] if code_quality_score else []),
             ],
-            step_analyses=step_analyses,
-            code_analysis=code_analysis if code_analysis.total_files > 0 else None,
-            strategy_commentary=strategy_commentary,
+            step_analysis=step_analyses,
+            code_analysis=code_analysis,
             generated_at=datetime.now(),
+            evaluator_model=self.gemini_client.model,
+            evaluation_duration_ms=evaluation_duration_ms,
         )
 
         logger.info(

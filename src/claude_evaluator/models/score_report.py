@@ -21,6 +21,7 @@ __all__ = [
     "StepAnalysis",
     "FileAnalysis",
     "CodeIssue",
+    "CheckFinding",
     "CodeAnalysis",
     "ScoreReport",
     "ASTMetrics",
@@ -314,6 +315,63 @@ class CodeIssue(BaseSchema):
     )
 
 
+class CheckFinding(BaseSchema):
+    """A finding from a static analysis check.
+
+    Attributes:
+        check_id: Unique identifier for the check.
+        category: Check category (security, performance, best_practices, code_smells).
+        severity: Severity level of the finding.
+        file_path: File where the issue was found.
+        line_number: Line number where issue occurs.
+        message: Description of the finding.
+        confidence: Confidence score from 0.0 to 1.0.
+        suggestion: Suggested fix or improvement.
+
+    """
+
+    check_id: str = Field(
+        ...,
+        min_length=1,
+        description="Unique identifier for the check",
+    )
+    category: str = Field(
+        ...,
+        min_length=1,
+        description="Check category (security, performance, best_practices, code_smells)",
+    )
+    severity: str = Field(
+        ...,
+        min_length=1,
+        description="Severity level (critical, high, medium, low, info)",
+    )
+    file_path: str = Field(
+        ...,
+        min_length=1,
+        description="File where the issue was found",
+    )
+    line_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Line number where issue occurs",
+    )
+    message: str = Field(
+        ...,
+        min_length=1,
+        description="Description of the finding",
+    )
+    confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score from 0.0 to 1.0",
+    )
+    suggestion: str | None = Field(
+        default=None,
+        description="Suggested fix or improvement",
+    )
+
+
 class CodeAnalysis(BaseSchema):
     """Analysis of code files generated or modified during the evaluation.
 
@@ -324,36 +382,39 @@ class CodeAnalysis(BaseSchema):
         languages_detected: Programming languages found in analyzed files.
         quality_summary: Overall assessment of code quality.
         issues_found: List of potential issues or anti-patterns detected.
+        check_findings: List of findings from static analysis checks.
 
     """
 
     files_analyzed: list[FileAnalysis] = Field(
-        ...,
-        min_length=1,
+        default_factory=list,
         description="List of analyzed code files",
     )
     total_lines_added: int = Field(
-        ...,
+        default=0,
         ge=0,
         description="Total lines of code added across all files",
     )
     total_lines_modified: int = Field(
-        ...,
+        default=0,
         ge=0,
         description="Total lines of code modified across all files",
     )
     languages_detected: list[str] = Field(
-        ...,
+        default_factory=list,
         description="Programming languages found in analyzed files",
     )
     quality_summary: str = Field(
-        ...,
-        min_length=10,
+        default="No code files analyzed",
         description="Overall assessment of code quality",
     )
     issues_found: list[CodeIssue] = Field(
         default_factory=list,
         description="List of potential issues or anti-patterns detected",
+    )
+    check_findings: list[CheckFinding] = Field(
+        default_factory=list,
+        description="List of findings from static analysis checks",
     )
 
 

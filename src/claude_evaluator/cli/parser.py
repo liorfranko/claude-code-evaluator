@@ -41,6 +41,12 @@ Examples:
   # Output results as JSON
   claude-evaluator --suite evals/example.yaml --json
 
+  # Score an evaluation result
+  claude-evaluator --score evaluations/2026-02-02T14-51-21/evaluation.json
+
+  # Score with verbose output
+  claude-evaluator --score evaluation.json --verbose
+
 For more information, see the documentation.
 """,
     )

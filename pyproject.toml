@@ -45,6 +45,7 @@ dev = [
 
 [project.scripts]
 claude-evaluator = "claude_evaluator.cli:main"
+claude-eval = "claude_evaluator.cli:main"
 task-manager = "task_manager.cli:main"
 
 [tool.setuptools.packages.find]

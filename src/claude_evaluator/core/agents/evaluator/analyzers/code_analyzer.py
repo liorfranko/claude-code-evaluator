@@ -257,12 +257,8 @@ class CodeAnalyzer:
 
         if not files_to_analyze:
             logger.info("no_files_to_analyze")
-            return CodeAnalysis(
-                files=[],
-                total_files=0,
-                total_lines=0,
-                languages={},
-            )
+            # Return None when no files to analyze - the caller handles this
+            return None  # type: ignore[return-value]
 
         # Analyze each file
         file_analyses: list[FileAnalysis] = []
@@ -272,21 +268,21 @@ class CodeAnalyzer:
 
         # Aggregate statistics
         total_lines = sum(f.lines_of_code for f in file_analyses)
-        language_counts: dict[str, int] = {}
-        for f in file_analyses:
-            lang = f.language
-            language_counts[lang] = language_counts.get(lang, 0) + 1
+        languages_detected: list[str] = list(
+            {f.language for f in file_analyses if f.language != "unknown"}
+        )
 
         logger.debug(
             "code_analysis_complete",
             total_files=len(file_analyses),
             total_lines=total_lines,
-            languages=language_counts,
+            languages=languages_detected,
         )
 
         return CodeAnalysis(
-            files=file_analyses,
-            total_files=len(file_analyses),
-            total_lines=total_lines,
-            languages=language_counts,
+            files_analyzed=file_analyses,
+            total_lines_added=total_lines,
+            total_lines_modified=0,
+            languages_detected=languages_detected,
+            quality_summary="Code analysis complete. See file analyses for details.",
         )

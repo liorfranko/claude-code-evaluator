@@ -1,10 +1,12 @@
 """Code quality scorer using LLM-based evaluation.
 
 This module provides code quality scoring by analyzing code files
-for correctness, structure, error handling, and naming conventions.
+for correctness, structure, error handling, naming conventions,
+security, performance, best practices, and code smells.
 """
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
 from pydantic import BaseModel, Field
@@ -19,6 +21,10 @@ from claude_evaluator.models.score_report import (
     DimensionScore,
     DimensionType,
 )
+
+if TYPE_CHECKING:
+    from claude_evaluator.core.agents.evaluator.checks.base import CheckResult
+    from claude_evaluator.core.agents.evaluator.checks.registry import CheckRegistry
 
 __all__ = [
     "CodeQualityScorer",
@@ -40,25 +46,49 @@ class CodeQualitySubScores(BaseModel):
         ...,
         ge=0,
         le=100,
-        description="Score for code correctness (40% weight)",
+        description="Score for code correctness (25% weight)",
     )
     structure: int = Field(
         ...,
         ge=0,
         le=100,
-        description="Score for code structure and organization (25% weight)",
+        description="Score for code structure and organization (15% weight)",
     )
     error_handling: int = Field(
         ...,
         ge=0,
         le=100,
-        description="Score for error handling (20% weight)",
+        description="Score for error handling (12% weight)",
     )
     naming: int = Field(
         ...,
         ge=0,
         le=100,
-        description="Score for naming conventions (15% weight)",
+        description="Score for naming conventions (10% weight)",
+    )
+    security: int = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Score for security practices (18% weight)",
+    )
+    performance: int = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Score for performance patterns (10% weight)",
+    )
+    best_practices: int = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Score for best practices adherence (6% weight)",
+    )
+    code_smells: int = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Score for absence of code smells (4% weight)",
     )
 
 
@@ -141,23 +171,39 @@ class CodeQualityScorer:
     """Scorer for evaluating code quality.
 
     Uses LLM to analyze code files for quality dimensions with weighted sub-scores.
+    Integrates with CheckRegistry for static analysis checks.
 
     """
+
+    # Weights for new sub-score dimensions
+    SUB_SCORE_WEIGHTS = {
+        "correctness": 0.25,
+        "structure": 0.15,
+        "error_handling": 0.12,
+        "naming": 0.10,
+        "security": 0.18,
+        "performance": 0.10,
+        "best_practices": 0.06,
+        "code_smells": 0.04,
+    }
 
     def __init__(
         self,
         client: GeminiClient | None = None,
         weight: float = 0.3,
+        check_registry: "CheckRegistry | None" = None,
     ) -> None:
         """Initialize the scorer.
 
         Args:
             client: Gemini client instance (creates new if not provided).
             weight: Weight for this dimension in aggregate scoring.
+            check_registry: Optional registry for running static analysis checks.
 
         """
         self.client = client or GeminiClient()
         self.weight = weight
+        self.check_registry = check_registry
 
     def score_file(
         self,
@@ -274,12 +320,16 @@ class CodeQualityScorer:
             )
             avg_score = int(round(weighted_sum / total_loc))
 
-        # Aggregate sub-scores
+        # Aggregate sub-scores (all 8 dimensions)
         avg_sub_scores = {
             "correctness": sum(r.sub_scores.correctness for r in results) // len(results),
             "structure": sum(r.sub_scores.structure for r in results) // len(results),
             "error_handling": sum(r.sub_scores.error_handling for r in results) // len(results),
             "naming": sum(r.sub_scores.naming for r in results) // len(results),
+            "security": sum(r.sub_scores.security for r in results) // len(results),
+            "performance": sum(r.sub_scores.performance for r in results) // len(results),
+            "best_practices": sum(r.sub_scores.best_practices for r in results) // len(results),
+            "code_smells": sum(r.sub_scores.code_smells for r in results) // len(results),
         }
 
         # Build rationale
@@ -294,7 +344,11 @@ class CodeQualityScorer:
             f"Sub-scores: correctness={avg_sub_scores['correctness']}, "
             f"structure={avg_sub_scores['structure']}, "
             f"error_handling={avg_sub_scores['error_handling']}, "
-            f"naming={avg_sub_scores['naming']}."
+            f"naming={avg_sub_scores['naming']}, "
+            f"security={avg_sub_scores['security']}, "
+            f"performance={avg_sub_scores['performance']}, "
+            f"best_practices={avg_sub_scores['best_practices']}, "
+            f"code_smells={avg_sub_scores['code_smells']}."
         )
 
         logger.debug(

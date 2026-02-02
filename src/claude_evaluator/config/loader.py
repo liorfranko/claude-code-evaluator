@@ -20,7 +20,7 @@ from claude_evaluator.config.models import (
     Phase,
     RepositorySource,
 )
-from claude_evaluator.models.enums import PermissionMode
+from claude_evaluator.models.enums import PermissionMode, WorkflowType
 
 # Type alias for unvalidated data from YAML parsing
 UnvalidatedData: TypeAlias = Any
@@ -422,12 +422,37 @@ def _parse_evaluation(
     name = _require_string(data, "name", context)
     task = _require_string(data, "task", context)
 
-    # Validate required phases list
-    phases_data = _require_non_empty_list(data, "phases", context)
-    phases = [
-        _parse_phase(phase_data, phase_index, context)
-        for phase_index, phase_data in enumerate(phases_data)
-    ]
+    # Parse optional workflow_type
+    workflow_type: WorkflowType | None = None
+    workflow_type_str = _optional_string(data, "workflow_type", context)
+    if workflow_type_str:
+        try:
+            workflow_type = WorkflowType(workflow_type_str)
+        except ValueError:
+            valid_types = [wt.value for wt in WorkflowType]
+            raise ConfigurationError(
+                f"Invalid workflow_type '{workflow_type_str}' in {context}. "
+                f"Valid values: {valid_types}"
+            )
+
+    # Parse phases - required only if workflow_type is not 'direct'
+    phases: list[Phase] = []
+    phases_data = data.get("phases")
+    if phases_data is not None:
+        if not isinstance(phases_data, list):
+            raise ConfigurationError(
+                f"Field 'phases' must be a list in {context}"
+            )
+        phases = [
+            _parse_phase(phase_data, phase_index, context)
+            for phase_index, phase_data in enumerate(phases_data)
+        ]
+    elif workflow_type != WorkflowType.direct:
+        # Phases required for non-direct workflows
+        raise ConfigurationError(
+            f"Missing required field 'phases' in {context}. "
+            f"Either add phases or set workflow_type: direct"
+        )
 
     # Parse optional repository_source for brownfield mode
     repository_source = _parse_repository_source(data, context)
@@ -437,6 +462,7 @@ def _parse_evaluation(
         name=name,
         task=task,
         phases=phases,
+        workflow_type=workflow_type,
         description=data.get("description"),
         tags=_optional_string_list(data, "tags", context),
         enabled=_optional_bool(data, "enabled", context, default=True),

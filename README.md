@@ -18,6 +18,14 @@ A CLI tool for evaluating Claude Code agent implementations with automated, inte
 pip install claude-evaluator
 ```
 
+For development (from source):
+
+```bash
+git clone https://github.com/liorfranko/claude-code-evaluator.git
+cd claude-code-evaluator
+pip install -e .
+```
+
 For SDK-based execution with Q&A support:
 
 ```bash
@@ -56,7 +64,7 @@ evaluations:
 2. Run the evaluation:
 
 ```bash
-claude-eval run my-suite.yaml
+claude-eval --suite my-suite.yaml
 ```
 
 3. Run with verbose mode to see detailed tool execution:
@@ -147,10 +155,230 @@ Enable user-level plugins, skills, and settings during evaluation runs:
 
 ```bash
 # CLI automatically enables user plugins
-claude-eval run my-suite.yaml
+claude-eval --suite my-suite.yaml
 ```
 
 This allows evaluations to use custom skills like `spectra:specify`, `spectra:plan`, and other user-configured plugins. The feature passes `setting_sources=['user']` to the SDK, inheriting your personal Claude Code configuration.
+
+## Scoring Evaluations
+
+After running evaluations, use the Evaluator Agent to score results with comprehensive code quality analysis.
+
+### Basic Usage
+
+```python
+import asyncio
+from pathlib import Path
+from claude_evaluator.core.agents.evaluator import EvaluatorAgent
+
+async def score_evaluation():
+    agent = EvaluatorAgent(
+        workspace_path=Path("/path/to/evaluation/workspace"),
+        enable_ast=True,      # Enable AST-based metrics
+        enable_checks=True,   # Enable extended code quality checks
+    )
+
+    # Score an evaluation
+    report = await agent.evaluate(
+        evaluation_path="evaluation.json",
+        context="Optional context about the task",
+    )
+
+    # Save the score report
+    agent.save_report(report, "score_report.json")
+
+    print(f"Aggregate Score: {report.aggregate_score}/100")
+    for dim in report.dimension_scores:
+        print(f"  {dim.dimension_name}: {dim.score}/100")
+
+asyncio.run(score_evaluation())
+```
+
+### CLI Usage
+
+```bash
+# Score an evaluation
+claude-eval --score evaluations/2026-02-02T14-51-21/evaluation.json
+
+# Score with custom workspace directory
+claude-eval --score evaluation.json --workspace /path/to/workspace
+
+# Score without AST analysis (faster)
+claude-eval --score evaluation.json --no-ast
+
+# Score with verbose output
+claude-eval --score evaluation.json --verbose
+```
+
+### Scoring Dimensions
+
+The Evaluator Agent scores across three main dimensions:
+
+| Dimension | Weight | Description |
+|-----------|--------|-------------|
+| **Task Completion** | 50% | Did the agent complete the requested task? |
+| **Code Quality** | 30% | Quality of code produced (see sub-scores below) |
+| **Efficiency** | 20% | Resource usage: tokens, turns, cost |
+
+### Code Quality Sub-Scores
+
+Code quality is analyzed across 8 dimensions:
+
+| Sub-Score | Weight | Description |
+|-----------|--------|-------------|
+| Correctness | 25% | Does the code work without bugs? |
+| Structure | 15% | Is code well-organized and modular? |
+| Error Handling | 12% | Are errors and edge cases handled? |
+| Naming | 10% | Are names clear and consistent? |
+| Security | 18% | Free from vulnerabilities? |
+| Performance | 10% | Efficient algorithms and patterns? |
+| Best Practices | 6% | Follows SOLID, language idioms? |
+| Code Smells | 4% | Free from anti-patterns? |
+
+### Static Analysis Checks
+
+When `enable_checks=True`, the evaluator runs automated checks:
+
+**Security Checks:**
+- `security.hardcoded_secrets` - Detects passwords, API keys, tokens
+- `security.sql_injection` - Detects SQL string formatting risks
+- `security.eval_exec` - Detects dangerous eval/exec usage
+- `security.insecure_random` - Detects non-cryptographic random
+
+**Performance Checks:**
+- `performance.nested_loops` - Detects O(n³+) complexity
+- `performance.large_file_read` - Detects unbounded file reads
+- `performance.ineffective_loop` - Detects append/concat in loops
+
+**Code Smell Checks:**
+- `smells.long_function` - Functions exceeding 50 lines
+- `smells.long_parameter_list` - Functions with >5 parameters
+- `smells.dead_code` - Unreachable code after return/raise
+- `smells.magic_number` - Literal numbers without constants
+
+**Best Practices Checks:**
+- `best_practices.llm_analysis` - LLM-based SOLID, idioms, patterns analysis
+
+### Multi-Language Support
+
+Static analysis checks support:
+- Python
+- JavaScript/TypeScript
+- Go
+- Rust
+- Java
+- C/C++
+
+### Score Report Structure
+
+```json
+{
+  "evaluation_id": "bae0a935-d843-4f8c-9774-075004ae7e30",
+  "aggregate_score": 77,
+  "dimension_scores": [
+    {
+      "dimension_name": "task_completion",
+      "score": 100,
+      "weight": 0.5,
+      "rationale": "The task was completed successfully..."
+    },
+    {
+      "dimension_name": "efficiency",
+      "score": 59,
+      "weight": 0.2,
+      "rationale": "Task classified as complex complexity..."
+    },
+    {
+      "dimension_name": "code_quality",
+      "score": 50,
+      "weight": 0.3,
+      "rationale": "Analyzed 2 file(s)...",
+      "sub_scores": {
+        "correctness": 50,
+        "structure": 50,
+        "error_handling": 50,
+        "naming": 50,
+        "security": 100,
+        "performance": 100,
+        "best_practices": 100,
+        "code_smells": 100
+      }
+    }
+  ],
+  "rationale": "Execution consisted of 23 steps using 3 different tools...",
+  "step_analysis": [
+    {
+      "step_index": 0,
+      "tool_name": "Bash",
+      "action_summary": "Invoked Bash: mkdir -p task-cli",
+      "efficiency_flag": "efficient"
+    }
+  ],
+  "code_analysis": {
+    "files_analyzed": [
+      {
+        "file_path": "workspace/task-cli/index.js",
+        "language": "javascript",
+        "lines_of_code": 337,
+        "ast_metrics": {
+          "function_count": 21,
+          "class_count": 0,
+          "cyclomatic_complexity": 3.38,
+          "max_nesting_depth": 7
+        }
+      }
+    ],
+    "total_lines_added": 539,
+    "languages_detected": ["javascript"],
+    "check_findings": []
+  },
+  "evaluator_model": "gemini-2.0-flash",
+  "evaluation_duration_ms": 14584
+}
+```
+
+### Disabling Extended Checks
+
+For faster scoring without static analysis:
+
+```python
+agent = EvaluatorAgent(
+    workspace_path=Path("/path/to/workspace"),
+    enable_checks=False,  # Disable extended checks
+)
+```
+
+### Creating Custom Checks
+
+Extend the check system by implementing `ASTCheck` or `LLMCheck`:
+
+```python
+from claude_evaluator.core.agents.evaluator.checks.base import (
+    ASTCheck,
+    CheckCategory,
+    CheckResult,
+    CheckSeverity,
+)
+
+class MyCustomCheck(ASTCheck):
+    check_id = "custom.my_check"
+    category = CheckCategory.code_smells
+
+    def run(self, parse_result, file_path, source_code):
+        results = []
+        # Your check logic here
+        # Use self._get_line_number(node) and self._get_node_text(node, source_code)
+        return results
+```
+
+Register custom checks:
+
+```python
+from claude_evaluator.core.agents.evaluator.checks import CheckRegistry
+
+registry = CheckRegistry()
+registry.register(MyCustomCheck())
+```
 
 ## Architecture
 
@@ -158,6 +386,7 @@ The evaluator uses a two-agent architecture:
 
 - **Worker Agent**: Executes Claude Code commands using ClaudeSDKClient for persistent session management. Supports configurable models, permission modes, and tool access.
 - **Developer Agent**: Orchestrates evaluations and uses an LLM (via `claude-agent-sdk` `query()`) to generate intelligent, context-aware answers when the Worker asks questions. Handles both explicit questions (AskUserQuestion) and implicit questions in plain text.
+- **Evaluator Agent**: Scores completed evaluations using AST analysis, static checks, and LLM-based assessment. Produces comprehensive score reports with multiple quality dimensions.
 
 ## Requirements
 

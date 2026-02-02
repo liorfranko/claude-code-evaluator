@@ -142,7 +142,7 @@ class EvaluatorSettings(BaseSettings):
     )
 
     model: str = Field(
-        default="gemini-2.0-flash",
+        default="gemini-3-flash-preview",
         description="Gemini model identifier for evaluation scoring",
     )
     timeout_seconds: int = Field(

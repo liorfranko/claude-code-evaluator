@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 from pydantic import Field, field_validator
 
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.enums import PermissionMode
+from claude_evaluator.models.enums import PermissionMode, WorkflowType
 from claude_evaluator.report.models import EvaluationReport
 
 __all__ = [
@@ -201,6 +201,11 @@ class EvaluationConfig(BaseSchema):
     name: str
     task: str
     phases: list[Phase] = Field(default_factory=list)
+    workflow_type: WorkflowType | None = Field(
+        default=None,
+        description="Workflow type: direct, multi_command, or plan_then_implement. "
+        "Defaults to multi_command if phases are defined, direct otherwise.",
+    )
     description: str | None = None
     tags: list[str] | None = None
     enabled: bool = True

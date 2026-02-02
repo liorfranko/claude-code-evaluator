@@ -63,6 +63,13 @@ def validate_args(args: argparse.Namespace) -> str | None:
         Error message if validation fails, None if valid.
 
     """
+    # --score is a standalone command
+    if getattr(args, "score", None) is not None:
+        score_path = Path(args.score)
+        if not score_path.exists():
+            return f"Error: Evaluation file not found: {args.score}"
+        return None
+
     # Check --workflow requires --task
     if args.workflow is not None and args.task is None:
         return "Error: --workflow requires --task"
@@ -75,7 +82,7 @@ def validate_args(args: argparse.Namespace) -> str | None:
     if args.suite is None and not (
         args.workflow is not None and args.task is not None
     ):
-        return "Error: Either --suite or both --workflow and --task are required"
+        return "Error: Either --suite or both --workflow and --task are required, or use --score"
 
     # --eval requires --suite
     if args.eval is not None and args.suite is None:

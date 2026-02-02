@@ -24,6 +24,17 @@ logger = structlog.get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
+def _strip_additional_properties(obj: dict | list) -> None:
+    """Recursively remove additionalProperties from a JSON schema in-place."""
+    if isinstance(obj, dict):
+        obj.pop("additionalProperties", None)
+        for value in obj.values():
+            _strip_additional_properties(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            _strip_additional_properties(item)
+
+
 class GeminiClient:
     """Client for interacting with Google Gemini API.
 
@@ -135,10 +146,14 @@ class GeminiClient:
             GeminiAPIError: If the API call fails after retries.
 
         """
+        # Get JSON schema and strip additionalProperties (not supported by Gemini)
+        schema = response_model.model_json_schema()
+        _strip_additional_properties(schema)
+
         config = types.GenerateContentConfig(
             temperature=self.temperature,
             response_mime_type="application/json",
-            response_schema=response_model,
+            response_schema=schema,
         )
         if system_instruction:
             config.system_instruction = system_instruction
@@ -153,11 +168,6 @@ class GeminiClient:
                     config=config,
                 )
 
-                # Parse the response using the Pydantic model
-                if hasattr(response, "parsed") and response.parsed:
-                    return response.parsed
-
-                # Fallback to manual parsing
                 if response.text:
                     return response_model.model_validate_json(response.text)
 

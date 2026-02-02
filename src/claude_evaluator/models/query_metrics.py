@@ -35,11 +35,11 @@ class QueryMetrics(BaseSchema):
 
     query_index: int
     prompt: str
-    duration_ms: int
-    input_tokens: int
-    output_tokens: int
-    cost_usd: float
-    num_turns: int
+    duration_ms: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+    num_turns: int = 0
     phase: str | None = None
     response: str | None = None
     messages: list[dict[str, Any]] = Field(default_factory=list)

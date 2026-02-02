@@ -136,19 +136,28 @@ class RunSuiteCommand(BaseCommand):
 
         return reports
 
-    def _determine_workflow_type(self, _config: EvaluationConfig) -> WorkflowType:
+    def _determine_workflow_type(self, config: EvaluationConfig) -> WorkflowType:
         """Determine the workflow type from evaluation config.
 
-        Always returns multi_command for YAML configs with phases.
+        Uses explicit workflow_type if set, otherwise:
+        - multi_command if phases are defined
+        - direct if no phases
 
         Args:
-            _config: The evaluation configuration (unused).
+            config: The evaluation configuration.
 
         Returns:
-            WorkflowType.multi_command for all YAML-based evaluations.
+            The determined WorkflowType.
 
         """
-        return WorkflowType.multi_command
+        # Use explicit workflow_type if set
+        if config.workflow_type is not None:
+            return config.workflow_type
+
+        # Default: multi_command if phases, direct otherwise
+        if config.phases:
+            return WorkflowType.multi_command
+        return WorkflowType.direct
 
     def _create_failed_report(
         self,

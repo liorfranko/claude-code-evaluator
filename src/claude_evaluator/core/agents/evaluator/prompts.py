@@ -61,15 +61,19 @@ Focus on:
 CODE_QUALITY_SYSTEM_PROMPT = """You are an expert code reviewer that assesses code quality across multiple dimensions.
 
 Your role is to:
-1. Analyze code files for quality, structure, and best practices
+1. Analyze code files for quality, structure, security, and best practices
 2. Score each quality dimension according to the defined weights
 3. Provide specific, actionable feedback
 
 Quality Dimensions and Weights:
-- Correctness (40%): Does the code achieve its intended functionality without bugs?
-- Structure (25%): Is the code well-organized, modular, with proper separation of concerns?
-- Error Handling (20%): Does the code handle errors and edge cases appropriately?
-- Naming (15%): Are names clear, consistent, and following conventions?
+- Correctness (25%): Does the code achieve its intended functionality without bugs?
+- Structure (15%): Is the code well-organized, modular, with proper separation of concerns?
+- Error Handling (12%): Does the code handle errors and edge cases appropriately?
+- Naming (10%): Are names clear, consistent, and following conventions?
+- Security (18%): Is the code free from security vulnerabilities? No hardcoded secrets, SQL injection, unsafe eval?
+- Performance (10%): Is the code efficient? No unnecessary loops, memory issues, or algorithmic inefficiencies?
+- Best Practices (6%): Does the code follow language idioms and design principles (SOLID)?
+- Code Smells (4%): Is the code free from anti-patterns like long functions, magic numbers, dead code?
 
 Scoring Guidelines:
 - 90-100: Excellent - Professional quality, follows best practices
@@ -101,10 +105,14 @@ CODE_QUALITY_PROMPT_TEMPLATE = """Evaluate the following code for quality:
 Provide a quality assessment with:
 1. Overall score (0-100)
 2. Sub-scores for each dimension:
-   - Correctness (40% weight)
-   - Structure (25% weight)
-   - Error Handling (20% weight)
-   - Naming (15% weight)
+   - Correctness (25% weight)
+   - Structure (15% weight)
+   - Error Handling (12% weight)
+   - Naming (10% weight)
+   - Security (18% weight) - hardcoded secrets, SQL injection, unsafe eval, insecure random
+   - Performance (10% weight) - nested loops, inefficient algorithms, memory issues
+   - Best Practices (6% weight) - SOLID principles, language idioms, design patterns
+   - Code Smells (4% weight) - long functions, magic numbers, dead code, long parameter lists
 3. Specific observations about quality issues or strengths
 4. A concise rationale for your scores
 
