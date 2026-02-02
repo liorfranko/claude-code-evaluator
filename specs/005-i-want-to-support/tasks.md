@@ -158,7 +158,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 - [X] T046 [US3] Modify ReportGenerator to call get_change_summary() for brownfield (src/claude_evaluator/report/generator.py)
 - [X] T047 [US3] Include workspace_path in EvaluationReport output (src/claude_evaluator/report/generator.py)
-- [ ] T048 [US3] Include change_summary in EvaluationReport JSON output (src/claude_evaluator/report/generator.py)
+- [X] T048 [US3] Include change_summary in EvaluationReport JSON output (src/claude_evaluator/report/generator.py)
 
 ### Tests
 
