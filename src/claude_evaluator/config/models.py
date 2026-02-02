@@ -16,6 +16,7 @@ from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.report.models import EvaluationReport
 
 __all__ = [
+    "RepositorySource",
     "Phase",
     "EvalDefaults",
     "EvaluationConfig",
@@ -23,6 +24,21 @@ __all__ = [
     "SuiteSummary",
     "SuiteRunResult",
 ]
+
+
+class RepositorySource(BaseSchema):
+    """External repository configuration for brownfield evaluation.
+
+    Attributes:
+        url: GitHub HTTPS URL to clone.
+        ref: Branch, tag, or commit to checkout.
+        depth: Clone depth (positive int or 'full').
+
+    """
+
+    url: str = Field(..., description="GitHub HTTPS URL to clone")
+    ref: str | None = Field(default=None, description="Branch, tag, or commit to checkout")
+    depth: int | str = Field(default=1, description="Clone depth (positive int or 'full')")
 
 
 class Phase(BaseSchema):
