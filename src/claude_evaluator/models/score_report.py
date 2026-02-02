@@ -19,6 +19,7 @@ __all__ = [
     "TaskComplexityTier",
     "DimensionScore",
     "StepAnalysis",
+    "FileAnalysis",
 ]
 
 
@@ -141,4 +142,41 @@ class StepAnalysis(BaseSchema):
         default=None,
         ge=0,
         description="Time taken for this step if available",
+    )
+
+
+class FileAnalysis(BaseSchema):
+    """Analysis of a single code file.
+
+    Attributes:
+        file_path: Relative path to the file from workspace root.
+        language: Detected programming language.
+        lines_of_code: Total lines in the file.
+        analysis_status: Whether file was analyzed, skipped, or missing.
+        quality_notes: Specific observations about this file's quality.
+
+    """
+
+    file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Relative path to the file from workspace root",
+    )
+    language: str = Field(
+        ...,
+        min_length=1,
+        description="Detected programming language",
+    )
+    lines_of_code: int = Field(
+        ...,
+        ge=0,
+        description="Total lines in the file",
+    )
+    analysis_status: AnalysisStatus = Field(
+        ...,
+        description="Whether file was analyzed, skipped, or missing",
+    )
+    quality_notes: str | None = Field(
+        default=None,
+        description="Specific observations about this file's quality",
     )
