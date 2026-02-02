@@ -20,6 +20,7 @@ __all__ = [
     "DimensionScore",
     "StepAnalysis",
     "FileAnalysis",
+    "CodeIssue",
 ]
 
 
@@ -179,4 +180,47 @@ class FileAnalysis(BaseSchema):
     quality_notes: str | None = Field(
         default=None,
         description="Specific observations about this file's quality",
+    )
+
+
+class CodeIssue(BaseSchema):
+    """A potential issue or anti-pattern detected in the code.
+
+    Attributes:
+        severity: Severity level (high, medium, low).
+        category: Category of issue (e.g., error_handling, naming).
+        file_path: File where the issue was found.
+        line_number: Line number where issue occurs.
+        description: Description of the issue.
+        suggestion: Suggested fix or improvement.
+
+    """
+
+    severity: IssueSeverity = Field(
+        ...,
+        description="Severity level (high, medium, low)",
+    )
+    category: str = Field(
+        ...,
+        min_length=1,
+        description="Category of issue (e.g., error_handling, naming, structure)",
+    )
+    file_path: str = Field(
+        ...,
+        min_length=1,
+        description="File where the issue was found",
+    )
+    line_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Line number where issue occurs",
+    )
+    description: str = Field(
+        ...,
+        min_length=10,
+        description="Description of the issue",
+    )
+    suggestion: str | None = Field(
+        default=None,
+        description="Suggested fix or improvement",
     )
