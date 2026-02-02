@@ -93,6 +93,35 @@ class RepositorySource(BaseSchema):
 
         return v
 
+    @field_validator("depth")
+    @classmethod
+    def validate_depth(cls, v: int | str) -> int | str:
+        """Validate depth is a positive integer or 'full'.
+
+        Args:
+            v: The depth value to validate.
+
+        Returns:
+            The validated depth value.
+
+        Raises:
+            ValueError: If depth is not a positive integer or 'full'.
+
+        """
+        if isinstance(v, str):
+            if v != "full":
+                raise ValueError(
+                    f"depth must be a positive integer or 'full'. Got '{v}'"
+                )
+            return v
+
+        # v must be int at this point (since str case is handled above)
+        if v < 1:
+            raise ValueError(
+                f"depth must be a positive integer (>= 1). Got {v}"
+            )
+        return v
+
 
 class Phase(BaseSchema):
     """Configuration for a single execution phase within an evaluation.
