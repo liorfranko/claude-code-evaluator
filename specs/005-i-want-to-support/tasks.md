@@ -118,10 +118,10 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Tests
 
-- [ ] T035 [US1] Write E2E test: clone public repo and execute prompt (tests/e2e/test_brownfield_evaluation.py)
-- [ ] T036 [US1] Verify: User can specify GitHub repository URL in config (tests/e2e/test_brownfield_evaluation.py)
-- [ ] T037 [US1] Verify: System clones repository into isolated workspace (tests/e2e/test_brownfield_evaluation.py)
-- [ ] T038 [US1] Verify: Workspace is preserved after evaluation (tests/e2e/test_brownfield_evaluation.py)
+- [X] T035 [US1] Write E2E test: clone public repo and execute prompt (tests/e2e/test_brownfield_evaluation.py)
+- [X] T036 [US1] Verify: User can specify GitHub repository URL in config (tests/e2e/test_brownfield_evaluation.py)
+- [X] T037 [US1] Verify: System clones repository into isolated workspace (tests/e2e/test_brownfield_evaluation.py)
+- [X] T038 [US1] Verify: Workspace is preserved after evaluation (tests/e2e/test_brownfield_evaluation.py)
 
 ### Checkpoint
 
