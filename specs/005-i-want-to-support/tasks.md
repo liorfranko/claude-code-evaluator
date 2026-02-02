@@ -69,7 +69,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 ### Core Functions
 
 - [X] T015 Create git_operations.py module with module docstring (src/claude_evaluator/core/git_operations.py)
-- [ ] T016 Implement build_clone_command() function (src/claude_evaluator/core/git_operations.py)
+- [X] T016 Implement build_clone_command() function (src/claude_evaluator/core/git_operations.py)
 - [ ] T017 Implement clone_repository() async function with retry logic (src/claude_evaluator/core/git_operations.py)
 - [ ] T018 Implement is_network_error() helper function (src/claude_evaluator/core/git_operations.py)
 - [ ] T019 Implement get_change_summary() async function (src/claude_evaluator/core/git_operations.py)
