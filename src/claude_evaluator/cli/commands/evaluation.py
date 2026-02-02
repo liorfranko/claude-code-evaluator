@@ -10,7 +10,7 @@ from pathlib import Path
 
 from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
 from claude_evaluator.cli.formatters import create_progress_callback
-from claude_evaluator.config.models import Phase
+from claude_evaluator.config.models import Phase, RepositorySource
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.logging_config import get_logger
@@ -72,6 +72,7 @@ class RunEvaluationCommand(BaseCommand):
         phases: list[Phase] | None = None,
         model: str | None = None,
         max_turns: int | None = None,
+        repository_source: RepositorySource | None = None,
     ) -> EvaluationReport:
         """Run a single evaluation.
 
@@ -84,6 +85,7 @@ class RunEvaluationCommand(BaseCommand):
             phases: Phases for multi-command workflow (optional).
             model: Model identifier to use (optional).
             max_turns: Maximum turns per query for the SDK (optional).
+            repository_source: Source repository for brownfield mode (optional).
 
         Returns:
             The generated EvaluationReport.
