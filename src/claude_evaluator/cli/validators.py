@@ -84,10 +84,6 @@ def validate_args(args: argparse.Namespace) -> str | None:
     ):
         return "Error: Either --suite or both --workflow and --task are required, or use --score"
 
-    # --eval requires --suite
-    if args.eval is not None and args.suite is None:
-        return "Error: --eval requires --suite"
-
     # --dry-run only works with --suite
     if args.dry_run and args.suite is None:
         return "Error: --dry-run requires --suite"

@@ -36,7 +36,7 @@ class RunSuiteCommand(BaseCommand):
         """Execute the suite command.
 
         Args:
-            args: Parsed arguments with suite path, eval filter, etc.
+            args: Parsed arguments with suite path.
 
         Returns:
             CommandResult with all evaluation reports.
@@ -45,7 +45,6 @@ class RunSuiteCommand(BaseCommand):
         reports = await self.run_suite(
             suite_path=Path(args.suite),
             output_dir=Path(args.output),
-            eval_filter=getattr(args, "eval", None),
             verbose=getattr(args, "verbose", False),
         )
 
@@ -59,7 +58,6 @@ class RunSuiteCommand(BaseCommand):
         self,
         suite_path: Path,
         output_dir: Path,
-        eval_filter: str | None = None,
         verbose: bool = False,
     ) -> list[EvaluationReport]:
         """Run all evaluations in a suite.
@@ -67,7 +65,6 @@ class RunSuiteCommand(BaseCommand):
         Args:
             suite_path: Path to the YAML suite file.
             output_dir: Directory to save reports.
-            eval_filter: Optional evaluation ID to run only that one.
             verbose: Whether to print progress.
 
         Returns:
@@ -83,17 +80,8 @@ class RunSuiteCommand(BaseCommand):
                 print(f"Description: {suite.description}")
             print(f"Evaluations: {len(suite.evaluations)}")
 
-        # Filter evaluations
-        evaluations_to_run = suite.evaluations
-        if eval_filter:
-            evaluations_to_run = [
-                e for e in suite.evaluations if e.id == eval_filter
-            ]
-            if not evaluations_to_run:
-                print(f"Error: Evaluation '{eval_filter}' not found in suite")
-                return []
-
         # Filter enabled evaluations
+        evaluations_to_run = suite.evaluations
         evaluations_to_run = [e for e in evaluations_to_run if e.enabled]
 
         if verbose:

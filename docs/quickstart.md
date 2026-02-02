@@ -222,9 +222,6 @@ claude-eval run api-development-suite.yaml
 
 # Run with verbose output to see Q&A interactions
 claude-eval run api-development-suite.yaml --verbose
-
-# Run specific evaluation by ID
-claude-eval run api-development-suite.yaml --eval-id create-rest-api
 ```
 
 ---

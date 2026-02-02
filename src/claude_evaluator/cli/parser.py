@@ -30,9 +30,6 @@ Examples:
   # Run a suite of evaluations
   claude-evaluator --suite evals/greenfield.yaml
 
-  # Run a specific evaluation from a suite
-  claude-evaluator --suite evals/example.yaml --eval simple-function-implementation
-
   # Run an ad-hoc evaluation with a specific workflow
   claude-evaluator --workflow direct --task "Create a hello world script"
 
@@ -65,14 +62,6 @@ For more information, see the documentation.
         type=str,
         metavar="FILE",
         help="Path to YAML suite file to execute",
-    )
-
-    # Evaluation selection
-    parser.add_argument(
-        "--eval",
-        type=str,
-        metavar="ID",
-        help="Run only the evaluation with this ID (requires --suite)",
     )
 
     # Ad-hoc evaluation

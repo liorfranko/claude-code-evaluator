@@ -81,13 +81,6 @@ class TestCreateParser:
         args = parser.parse_args(["--suite", "test.yaml", "--dry-run"])
         assert args.dry_run is True
 
-    def test_parser_has_eval_option(self) -> None:
-        """Test that parser has --eval option."""
-        parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml", "--eval", "test-id"])
-        assert args.eval == "test-id"
-
-
 class TestValidateArgs:
     """Tests for validate_args function."""
 
@@ -100,7 +93,6 @@ class TestValidateArgs:
             suite=str(suite_file),
             workflow=None,
             task=None,
-            eval=None,
             dry_run=False,
         )
         assert validate_args(args) is None
@@ -111,7 +103,6 @@ class TestValidateArgs:
             suite=None,
             workflow="direct",
             task="test task",
-            eval=None,
             dry_run=False,
         )
         assert validate_args(args) is None
@@ -122,7 +113,6 @@ class TestValidateArgs:
             suite=None,
             workflow="direct",
             task=None,
-            eval=None,
             dry_run=False,
         )
         error = validate_args(args)
@@ -135,7 +125,6 @@ class TestValidateArgs:
             suite=None,
             workflow=None,
             task="test task",
-            eval=None,
             dry_run=False,
         )
         error = validate_args(args)
@@ -148,25 +137,11 @@ class TestValidateArgs:
             suite=None,
             workflow=None,
             task=None,
-            eval=None,
             dry_run=False,
         )
         error = validate_args(args)
         assert error is not None
         assert "Either --suite or both --workflow and --task are required" in error
-
-    def test_error_eval_without_suite(self) -> None:
-        """Test error when --eval provided without --suite."""
-        args = Namespace(
-            suite=None,
-            workflow="direct",
-            task="test",
-            eval="test-id",
-            dry_run=False,
-        )
-        error = validate_args(args)
-        assert error is not None
-        assert "--eval requires --suite" in error
 
     def test_error_dry_run_without_suite(self) -> None:
         """Test error when --dry-run provided without --suite."""
@@ -174,7 +149,6 @@ class TestValidateArgs:
             suite=None,
             workflow="direct",
             task="test",
-            eval=None,
             dry_run=True,
         )
         error = validate_args(args)
@@ -187,7 +161,6 @@ class TestValidateArgs:
             suite="/nonexistent/path/test.yaml",
             workflow=None,
             task=None,
-            eval=None,
             dry_run=False,
         )
         error = validate_args(args)
