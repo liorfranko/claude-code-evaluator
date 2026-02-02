@@ -86,10 +86,10 @@ Implement the individual dimension scorers.
 ### Task Completion Scorer (LLM-Based)
 - [x] T205 [US1] [US2] Create Gemini client wrapper with retry logic (core/agents/evaluator/gemini_client.py)
 - [x] T206 [US1] [US2] Define task completion scoring prompt template (prompts.py)
-- [ ] T207 [US1] [US2] Implement TaskCompletionScorer with structured output using Pydantic schema (scorers/task_completion.py)
+- [x] T207 [US1] [US2] Implement TaskCompletionScorer with structured output using Pydantic schema (scorers/task_completion.py)
 
 ### Code Quality Scorer (LLM-Based)
-- [ ] T208 [US1] [US2] Define code quality scoring prompt template with criteria weights (prompts.py)
+- [x] T208 [US1] [US2] Define code quality scoring prompt template with criteria weights (prompts.py)
 - [ ] T209 [US1] [US2] Implement CodeQualityScorer with sub-scores: correctness 40%, structure 25%, error_handling 20%, naming 15% (scorers/code_quality.py)
 - [ ] T210 [US1] [US2] Add file content reading and truncation for large files (scorers/code_quality.py)
 
