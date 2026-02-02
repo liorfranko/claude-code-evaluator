@@ -93,8 +93,11 @@ class RunEvaluationCommand(BaseCommand):
             The generated EvaluationReport.
 
         """
+        is_brownfield = repository_source is not None
+
         if verbose:
-            print(f"Starting evaluation with {workflow_type.value} workflow...")
+            mode_str = "brownfield" if is_brownfield else "greenfield"
+            print(f"Starting {mode_str} evaluation with {workflow_type.value} workflow...")
 
         # Create timestamped folder for this evaluation
         timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -102,11 +105,21 @@ class RunEvaluationCommand(BaseCommand):
         eval_folder.mkdir(parents=True, exist_ok=True)
 
         # Create workspace subfolder inside the evaluation folder
-        workspace_path = eval_folder / "workspace"
+        # Use "brownfield" subdirectory for cloned repositories
+        workspace_subdir = "brownfield" if is_brownfield else "workspace"
+        workspace_path = eval_folder / workspace_subdir
         workspace_path.mkdir(parents=True, exist_ok=True)
 
-        # Initialize git repository
-        self._init_git_repo(workspace_path, eval_folder, verbose)
+        # Initialize workspace: clone for brownfield, init for greenfield
+        ref_used: str | None = None
+        if is_brownfield:
+            # Clone external repository
+            ref_used = await self._clone_repository(
+                repository_source, workspace_path, verbose
+            )
+        else:
+            # Initialize empty git repository
+            self._init_git_repo(workspace_path, eval_folder, verbose)
 
         # Get current branch name
         current_branch = self._get_current_branch(workspace_path)

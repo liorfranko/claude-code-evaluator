@@ -97,7 +97,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 - [X] T026 [US1] Add repository_source parameter to run_evaluation() method (src/claude_evaluator/cli/commands/evaluation.py)
 - [X] T027 [US1] Implement _clone_repository() method in RunEvaluationCommand (src/claude_evaluator/cli/commands/evaluation.py)
 - [X] T028 [US1] Implement _is_network_error() helper method (src/claude_evaluator/cli/commands/evaluation.py)
-- [ ] T029 [US1] Add conditional logic to skip _init_git_repo() for brownfield mode (src/claude_evaluator/cli/commands/evaluation.py)
+- [X] T029 [US1] Add conditional logic to skip _init_git_repo() for brownfield mode (src/claude_evaluator/cli/commands/evaluation.py)
 - [ ] T030 [US1] Update RunSuiteCommand to pass repository_source from EvaluationConfig (src/claude_evaluator/cli/commands/suite.py)
 
 ### Checkpoint
