@@ -23,6 +23,7 @@ __all__ = [
     "CodeIssue",
     "CodeAnalysis",
     "ScoreReport",
+    "ASTMetrics",
 ]
 
 
@@ -145,6 +146,86 @@ class StepAnalysis(BaseSchema):
         default=None,
         ge=0,
         description="Time taken for this step if available",
+    )
+
+
+class ASTMetrics(BaseSchema):
+    """Structural metrics extracted via tree-sitter AST parsing for a single file.
+
+    Attributes:
+        function_count: Number of functions/methods defined.
+        class_count: Number of classes defined.
+        cyclomatic_complexity: Average cyclomatic complexity per function.
+        max_cyclomatic_complexity: Highest complexity of any single function.
+        max_nesting_depth: Maximum nesting level in code blocks.
+        import_count: Number of import statements.
+        total_lines: Total lines in file.
+        code_lines: Lines containing code.
+        comment_lines: Lines containing comments.
+        blank_lines: Empty lines.
+        parsing_successful: Whether AST parsing succeeded.
+        language: Detected programming language.
+
+    """
+
+    function_count: int = Field(
+        ...,
+        ge=0,
+        description="Number of functions/methods defined",
+    )
+    class_count: int = Field(
+        ...,
+        ge=0,
+        description="Number of classes defined",
+    )
+    cyclomatic_complexity: float = Field(
+        ...,
+        ge=1.0,
+        description="Average cyclomatic complexity per function",
+    )
+    max_cyclomatic_complexity: int = Field(
+        ...,
+        ge=1,
+        description="Highest complexity of any single function",
+    )
+    max_nesting_depth: int = Field(
+        ...,
+        ge=0,
+        description="Maximum nesting level in code blocks",
+    )
+    import_count: int = Field(
+        ...,
+        ge=0,
+        description="Number of import statements",
+    )
+    total_lines: int = Field(
+        ...,
+        ge=0,
+        description="Total lines in file",
+    )
+    code_lines: int = Field(
+        ...,
+        ge=0,
+        description="Lines containing code",
+    )
+    comment_lines: int = Field(
+        ...,
+        ge=0,
+        description="Lines containing comments",
+    )
+    blank_lines: int = Field(
+        ...,
+        ge=0,
+        description="Empty lines",
+    )
+    parsing_successful: bool = Field(
+        ...,
+        description="Whether AST parsing succeeded",
+    )
+    language: str = Field(
+        ...,
+        min_length=1,
+        description="Detected programming language",
     )
 
 
