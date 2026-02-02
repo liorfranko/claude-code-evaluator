@@ -82,6 +82,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         implementation_prompt_template: str | None = None,
         defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
+        model: str | None = None,
     ) -> None:
         """Initialize the workflow with optional custom prompt templates.
 
@@ -97,9 +98,10 @@ class PlanThenImplementWorkflow(BaseWorkflow):
             enable_question_handling: Whether to configure the WorkerAgent
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
+            model: Model identifier for the WorkerAgent (optional).
 
         """
-        super().__init__(metrics_collector, defaults)
+        super().__init__(metrics_collector, defaults, model=model)
         self._planning_prompt_template = (
             planning_prompt_template or self.DEFAULT_PLANNING_PROMPT
         )
@@ -163,10 +165,13 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         """
         self.on_execution_start(evaluation)
 
+        # Create agents for this execution
+        self._create_agents(evaluation)
+
         try:
             # Configure question handling if enabled (once for both phases)
             if self._enable_question_handling:
-                self.configure_worker_for_questions(evaluation)
+                self.configure_worker_for_questions()
 
             # Phase 1: Planning
             await self._execute_planning_phase(evaluation)
@@ -198,7 +203,8 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         self.set_phase("planning")
 
         # Configure Worker with plan permission (read-only)
-        worker = evaluation.worker_agent
+        worker = self._worker
+        assert worker is not None, "Agents not created"
         worker.set_permission_mode(PermissionMode.plan)
 
         # Emit phase start event for verbose output
@@ -234,7 +240,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)
 
-    async def _execute_implementation_phase(self, evaluation: "Evaluation") -> None:
+    async def _execute_implementation_phase(self, evaluation: "Evaluation") -> None:  # noqa: ARG002
         """Execute the implementation phase.
 
         Switches the Worker to acceptEdits mode and sends the implementation
@@ -252,7 +258,8 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         self.set_phase("implementation")
 
         # Switch Worker to acceptEdits permission
-        worker = evaluation.worker_agent
+        worker = self._worker
+        assert worker is not None, "Agents not created"
         worker.set_permission_mode(PermissionMode.acceptEdits)
 
         # Emit phase start event for verbose output

@@ -51,6 +51,7 @@ class DirectWorkflow(BaseWorkflow):
         metrics_collector: "MetricsCollector",
         defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
+        model: str | None = None,
     ) -> None:
         """Initialize the DirectWorkflow.
 
@@ -62,9 +63,10 @@ class DirectWorkflow(BaseWorkflow):
             enable_question_handling: Whether to configure the WorkerAgent
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
+            model: Model identifier for the WorkerAgent (optional).
 
         """
-        super().__init__(metrics_collector, defaults)
+        super().__init__(metrics_collector, defaults, model=model)
         self._enable_question_handling = enable_question_handling
 
     @property
@@ -96,16 +98,18 @@ class DirectWorkflow(BaseWorkflow):
         """
         self.on_execution_start(evaluation)
 
+        # Create agents for this execution
+        _, worker = self._create_agents(evaluation)
+
         try:
             # Configure question handling if enabled
             if self._enable_question_handling:
-                self.configure_worker_for_questions(evaluation)
+                self.configure_worker_for_questions()
 
             # Set the phase for metrics tracking
             self.set_phase("implementation")
 
             # Configure Worker with acceptEdits permission for direct execution
-            worker = evaluation.worker_agent
             worker.set_permission_mode(PermissionMode.acceptEdits)
 
             # Emit phase start event for verbose output

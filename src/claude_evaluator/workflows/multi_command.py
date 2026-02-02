@@ -69,15 +69,17 @@ class MultiCommandWorkflow(BaseWorkflow):
         self,
         metrics_collector: "MetricsCollector",
         phases: list[Phase],
+        model: str | None = None,
     ) -> None:
         """Initialize the workflow with phases to execute.
 
         Args:
             metrics_collector: The MetricsCollector instance for aggregating metrics.
             phases: List of Phase configurations defining the workflow steps.
+            model: Model identifier for the WorkerAgent (optional).
 
         """
-        super().__init__(metrics_collector)
+        super().__init__(metrics_collector, model=model)
         self._phases = phases
         self._phase_results: dict[str, str] = {}
         self._current_phase_index: int = 0
@@ -128,6 +130,9 @@ class MultiCommandWorkflow(BaseWorkflow):
         """
         self.on_execution_start(evaluation)
 
+        # Create agents for this execution
+        self._create_agents(evaluation)
+
         try:
             previous_result: str | None = None
 
@@ -146,6 +151,9 @@ class MultiCommandWorkflow(BaseWorkflow):
         except Exception as e:
             self.on_execution_error(evaluation, e)
             raise
+        finally:
+            # Ensure cleanup happens even on error
+            await self.cleanup_worker(evaluation)
 
     async def _execute_phase(
         self,
@@ -168,7 +176,8 @@ class MultiCommandWorkflow(BaseWorkflow):
         self.set_phase(phase.name)
 
         # Configure Worker for this phase
-        worker = evaluation.worker_agent
+        worker = self._worker
+        assert worker is not None, "Agents not created"
         worker.set_permission_mode(phase.permission_mode)
 
         # Emit phase start event for verbose output
@@ -213,12 +222,13 @@ class MultiCommandWorkflow(BaseWorkflow):
         response = query_metrics.response
         logger.info("developer_continuation_starting", response=response)
         continuation_count = 0
-        developer = evaluation.developer_agent
-        # Only invoke developer continuation if developer has answer_question capability
+        developer = self._developer
+        # Only invoke developer continuation if developer exists, has answer_question capability,
         # and there's a response to analyze
         while (
             continuation_count < MAX_CONTINUATIONS_PER_PHASE
             and response
+            and developer is not None
             and hasattr(developer, "answer_question")
         ):
             continuation_count += 1

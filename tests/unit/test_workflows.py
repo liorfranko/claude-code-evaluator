@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from claude_evaluator.config.models import Phase
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
@@ -22,6 +23,8 @@ from claude_evaluator.models.enums import (
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
 from claude_evaluator.workflows.direct import DirectWorkflow
+from claude_evaluator.workflows.multi_command import MultiCommandWorkflow
+from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
 
 
 class TestDirectWorkflowInitialization:
@@ -72,17 +75,12 @@ class TestDirectWorkflowExecuteReturnsMetrics:
         return DeveloperAgent()
 
     @pytest.fixture
-    def evaluation(
-        self,
-        mock_developer_agent: DeveloperAgent,
-        mock_worker_agent: WorkerAgent,
-    ) -> Evaluation:
+    def evaluation(self, tmp_path) -> Evaluation:
         """Create a basic Evaluation instance for testing."""
         return Evaluation(
             task_description="Test task: create a hello world script",
             workflow_type=WorkflowType.direct,
-            developer_agent=mock_developer_agent,
-            worker_agent=mock_worker_agent,
+            workspace_path=str(tmp_path),
         )
 
     @pytest.fixture
@@ -102,17 +100,26 @@ class TestDirectWorkflowExecuteReturnsMetrics:
     def test_execute_returns_metrics_instance(
         self,
         evaluation: Evaluation,
+        mock_worker_agent: WorkerAgent,
+        mock_developer_agent: DeveloperAgent,
         sample_query_metrics: QueryMetrics,
     ) -> None:
         """Test that execute() returns a Metrics object."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         # Mock the worker's execute_query method
-        evaluation.worker_agent.execute_query = AsyncMock(
-            return_value=sample_query_metrics
-        )
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.execute_query = AsyncMock(return_value=sample_query_metrics)
+        mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.clear_session = AsyncMock()
+
+        # Patch _create_agents to return our mocks
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer_agent
+            workflow._worker = mock_worker_agent
+            return mock_developer_agent, mock_worker_agent
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -121,16 +128,21 @@ class TestDirectWorkflowExecuteReturnsMetrics:
     def test_execute_returns_metrics_with_token_counts(
         self,
         evaluation: Evaluation,
+        mock_worker_agent: WorkerAgent,
+        mock_developer_agent: DeveloperAgent,
         sample_query_metrics: QueryMetrics,
     ) -> None:
         """Test that returned Metrics contains correct token counts."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
-        evaluation.worker_agent.execute_query = AsyncMock(
-            return_value=sample_query_metrics
+        mock_worker_agent.execute_query = AsyncMock(return_value=sample_query_metrics)
+        mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.clear_session = AsyncMock()
+
+        workflow._create_agents = MagicMock(
+            return_value=(mock_developer_agent, mock_worker_agent)
         )
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -141,16 +153,21 @@ class TestDirectWorkflowExecuteReturnsMetrics:
     def test_execute_returns_metrics_with_cost(
         self,
         evaluation: Evaluation,
+        mock_worker_agent: WorkerAgent,
+        mock_developer_agent: DeveloperAgent,
         sample_query_metrics: QueryMetrics,
     ) -> None:
         """Test that returned Metrics contains correct cost."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
-        evaluation.worker_agent.execute_query = AsyncMock(
-            return_value=sample_query_metrics
+        mock_worker_agent.execute_query = AsyncMock(return_value=sample_query_metrics)
+        mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.clear_session = AsyncMock()
+
+        workflow._create_agents = MagicMock(
+            return_value=(mock_developer_agent, mock_worker_agent)
         )
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -159,16 +176,21 @@ class TestDirectWorkflowExecuteReturnsMetrics:
     def test_execute_returns_metrics_with_prompt_count(
         self,
         evaluation: Evaluation,
+        mock_worker_agent: WorkerAgent,
+        mock_developer_agent: DeveloperAgent,
         sample_query_metrics: QueryMetrics,
     ) -> None:
         """Test that returned Metrics contains correct prompt count."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
-        evaluation.worker_agent.execute_query = AsyncMock(
-            return_value=sample_query_metrics
+        mock_worker_agent.execute_query = AsyncMock(return_value=sample_query_metrics)
+        mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.clear_session = AsyncMock()
+
+        workflow._create_agents = MagicMock(
+            return_value=(mock_developer_agent, mock_worker_agent)
         )
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -178,16 +200,21 @@ class TestDirectWorkflowExecuteReturnsMetrics:
     def test_execute_returns_metrics_with_turn_count(
         self,
         evaluation: Evaluation,
+        mock_worker_agent: WorkerAgent,
+        mock_developer_agent: DeveloperAgent,
         sample_query_metrics: QueryMetrics,
     ) -> None:
         """Test that returned Metrics contains correct turn count."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
-        evaluation.worker_agent.execute_query = AsyncMock(
-            return_value=sample_query_metrics
+        mock_worker_agent.execute_query = AsyncMock(return_value=sample_query_metrics)
+        mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.clear_session = AsyncMock()
+
+        workflow._create_agents = MagicMock(
+            return_value=(mock_developer_agent, mock_worker_agent)
         )
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -208,25 +235,28 @@ class TestDirectWorkflowPermissionMode:
         )
 
     @pytest.fixture
-    def evaluation(
-        self,
-        mock_worker_agent: WorkerAgent,
-    ) -> Evaluation:
+    def mock_developer_agent(self) -> DeveloperAgent:
+        """Create a mock DeveloperAgent for testing."""
+        return DeveloperAgent()
+
+    @pytest.fixture
+    def evaluation(self, tmp_path) -> Evaluation:
         """Create an Evaluation for testing permission mode."""
         return Evaluation(
             task_description="Test task",
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
-            worker_agent=mock_worker_agent,
+            workspace_path=str(tmp_path),
         )
 
     def test_execute_sets_permission_mode_to_accept_edits(
         self,
         evaluation: Evaluation,
+        mock_worker_agent: WorkerAgent,
+        mock_developer_agent: DeveloperAgent,
     ) -> None:
         """Test that execute() sets worker permission mode to acceptEdits."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -242,15 +272,22 @@ class TestDirectWorkflowPermissionMode:
         # Track permission mode changes
         permission_mode_during_execution = None
 
-        async def mock_execute_query(
-            query: str, phase: str = None, resume_session: bool = False
+        async def mock_execute_query(  # noqa: ARG001
+            query: str,  # noqa: ARG001
+            phase: str | None = None,  # noqa: ARG001
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal permission_mode_during_execution
-            permission_mode_during_execution = evaluation.worker_agent.permission_mode
+            permission_mode_during_execution = mock_worker_agent.permission_mode
             return sample_metrics
 
-        evaluation.worker_agent.execute_query = mock_execute_query
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.execute_query = mock_execute_query
+        mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.clear_session = AsyncMock()
+
+        workflow._create_agents = MagicMock(
+            return_value=(mock_developer_agent, mock_worker_agent)
+        )
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -260,10 +297,12 @@ class TestDirectWorkflowPermissionMode:
     def test_worker_permission_mode_is_accept_edits_after_execute(
         self,
         evaluation: Evaluation,
+        mock_worker_agent: WorkerAgent,
+        mock_developer_agent: DeveloperAgent,
     ) -> None:
         """Test that worker permission mode remains acceptEdits after execute."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -275,16 +314,21 @@ class TestDirectWorkflowPermissionMode:
             num_turns=1,
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
+        mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker_agent.clear_session = AsyncMock()
+
+        workflow._create_agents = MagicMock(
+            return_value=(mock_developer_agent, mock_worker_agent)
+        )
 
         # Initially plan mode
-        assert evaluation.worker_agent.permission_mode == PermissionMode.plan
+        assert mock_worker_agent.permission_mode == PermissionMode.plan
 
         asyncio.run(workflow.execute(evaluation))
 
         # After execution, should be acceptEdits
-        assert evaluation.worker_agent.permission_mode == PermissionMode.acceptEdits
+        assert mock_worker_agent.permission_mode == PermissionMode.acceptEdits
 
 
 class TestDirectWorkflowMockedWorker:
@@ -298,7 +342,7 @@ class TestDirectWorkflowMockedWorker:
     @pytest.fixture
     def workflow(self, metrics_collector: MetricsCollector) -> DirectWorkflow:
         """Create a DirectWorkflow instance."""
-        return DirectWorkflow(metrics_collector)
+        return DirectWorkflow(metrics_collector, enable_question_handling=False)
 
     @pytest.fixture
     def mock_worker(self) -> WorkerAgent:
@@ -312,19 +356,25 @@ class TestDirectWorkflowMockedWorker:
         return worker
 
     @pytest.fixture
-    def evaluation(self, mock_worker: WorkerAgent) -> Evaluation:
+    def mock_developer(self) -> DeveloperAgent:
+        """Create a mock DeveloperAgent for testing."""
+        return DeveloperAgent()
+
+    @pytest.fixture
+    def evaluation(self, tmp_path) -> Evaluation:
         """Create an Evaluation with mocked worker."""
         return Evaluation(
             task_description="Implement a calculator function",
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
-            worker_agent=mock_worker,
+            workspace_path=str(tmp_path),
         )
 
     def test_execute_calls_worker_execute_query(
         self,
         workflow: DirectWorkflow,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() calls worker.execute_query with correct params."""
         sample_metrics = QueryMetrics(
@@ -338,8 +388,11 @@ class TestDirectWorkflowMockedWorker:
         )
 
         mock_execute = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.execute_query = mock_execute
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.execute_query = mock_execute
+        mock_worker.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.clear_session = AsyncMock()
+
+        workflow._create_agents = MagicMock(return_value=(mock_developer, mock_worker))
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -353,6 +406,8 @@ class TestDirectWorkflowMockedWorker:
         self,
         workflow: DirectWorkflow,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() collects query metrics."""
         sample_metrics = QueryMetrics(
@@ -384,8 +439,16 @@ class TestDirectWorkflowMockedWorker:
             ],
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.execute_query = AsyncMock(return_value=sample_metrics)
+        mock_worker.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -407,6 +470,8 @@ class TestDirectWorkflowMockedWorker:
         self,
         workflow: DirectWorkflow,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() transitions evaluation to completed state."""
         sample_metrics = QueryMetrics(
@@ -419,8 +484,16 @@ class TestDirectWorkflowMockedWorker:
             num_turns=1,
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.execute_query = AsyncMock(return_value=sample_metrics)
+        mock_worker.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         assert evaluation.status == EvaluationStatus.pending
 
@@ -432,6 +505,8 @@ class TestDirectWorkflowMockedWorker:
         self,
         workflow: DirectWorkflow,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() sets the phase to 'implementation'."""
         sample_metrics = QueryMetrics(
@@ -445,8 +520,16 @@ class TestDirectWorkflowMockedWorker:
             phase="implementation",
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.execute_query = AsyncMock(return_value=sample_metrics)
+        mock_worker.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -459,32 +542,50 @@ class TestDirectWorkflowErrorHandling:
     """Tests for DirectWorkflow error handling."""
 
     @pytest.fixture
-    def evaluation(self) -> Evaluation:
-        """Create an Evaluation for error handling tests."""
-        worker = WorkerAgent(
+    def mock_worker(self) -> WorkerAgent:
+        """Create a mock WorkerAgent for testing."""
+        return WorkerAgent(
             execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
+
+    @pytest.fixture
+    def mock_developer(self) -> DeveloperAgent:
+        """Create a mock DeveloperAgent for testing."""
+        return DeveloperAgent()
+
+    @pytest.fixture
+    def evaluation(self, tmp_path) -> Evaluation:
+        """Create an Evaluation for error handling tests."""
         return Evaluation(
             task_description="Test task",
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
-            worker_agent=worker,
+            workspace_path=str(tmp_path),
         )
 
     def test_execute_raises_on_worker_error(
         self,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() raises exception when worker fails."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
-        evaluation.worker_agent.execute_query = AsyncMock(
+        mock_worker.execute_query = AsyncMock(
             side_effect=RuntimeError("SDK connection failed")
         )
+        mock_worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         with pytest.raises(RuntimeError) as exc_info:
             asyncio.run(workflow.execute(evaluation))
@@ -494,14 +595,24 @@ class TestDirectWorkflowErrorHandling:
     def test_execute_transitions_to_failed_on_error(
         self,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() transitions evaluation to failed on error."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
-        evaluation.worker_agent.execute_query = AsyncMock(
+        mock_worker.execute_query = AsyncMock(
             side_effect=RuntimeError("SDK connection failed")
         )
+        mock_worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         with pytest.raises(RuntimeError):
             asyncio.run(workflow.execute(evaluation))
@@ -513,28 +624,38 @@ class TestDirectWorkflowRuntimeTracking:
     """Tests for DirectWorkflow runtime tracking."""
 
     @pytest.fixture
-    def evaluation(self) -> Evaluation:
-        """Create an Evaluation for runtime tests."""
-        worker = WorkerAgent(
+    def mock_worker(self) -> WorkerAgent:
+        """Create a mock WorkerAgent for testing."""
+        return WorkerAgent(
             execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
+
+    @pytest.fixture
+    def mock_developer(self) -> DeveloperAgent:
+        """Create a mock DeveloperAgent for testing."""
+        return DeveloperAgent()
+
+    @pytest.fixture
+    def evaluation(self, tmp_path) -> Evaluation:
+        """Create an Evaluation for runtime tests."""
         return Evaluation(
             task_description="Test task",
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
-            worker_agent=worker,
+            workspace_path=str(tmp_path),
         )
 
     def test_execute_tracks_total_runtime(
         self,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() tracks total runtime in metrics."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -546,8 +667,16 @@ class TestDirectWorkflowRuntimeTracking:
             num_turns=1,
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.execute_query = AsyncMock(return_value=sample_metrics)
+        mock_worker.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -559,28 +688,38 @@ class TestDirectWorkflowToolCounts:
     """Tests for DirectWorkflow tool count aggregation."""
 
     @pytest.fixture
-    def evaluation(self) -> Evaluation:
-        """Create an Evaluation for tool count tests."""
-        worker = WorkerAgent(
+    def mock_worker(self) -> WorkerAgent:
+        """Create a mock WorkerAgent for testing."""
+        return WorkerAgent(
             execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
+
+    @pytest.fixture
+    def mock_developer(self) -> DeveloperAgent:
+        """Create a mock DeveloperAgent for testing."""
+        return DeveloperAgent()
+
+    @pytest.fixture
+    def evaluation(self, tmp_path) -> Evaluation:
+        """Create an Evaluation for tool count tests."""
         return Evaluation(
             task_description="Test task",
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
-            worker_agent=worker,
+            workspace_path=str(tmp_path),
         )
 
     def test_execute_aggregates_tool_counts(
         self,
         evaluation: Evaluation,
+        mock_worker: WorkerAgent,
+        mock_developer: DeveloperAgent,
     ) -> None:
         """Test that execute() correctly aggregates tool counts from messages."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector)
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -623,8 +762,16 @@ class TestDirectWorkflowToolCounts:
             ],
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.execute_query = AsyncMock(return_value=sample_metrics)
+        mock_worker.get_tool_invocations = MagicMock(return_value=[])
+        mock_worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -636,8 +783,6 @@ class TestDirectWorkflowToolCounts:
 # =============================================================================
 # PlanThenImplementWorkflow Tests
 # =============================================================================
-
-from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
 
 
 class TestPlanThenImplementWorkflowInitialization:
@@ -711,8 +856,9 @@ class TestPlanThenImplementWorkflowInitialization:
 class TestPlanThenImplementWorkflowExecution:
     """Tests for PlanThenImplementWorkflow execution."""
 
-    def create_mock_evaluation(self) -> Evaluation:
-        """Create a mock Evaluation for testing."""
+    @staticmethod
+    def create_mock_agents() -> tuple[DeveloperAgent, WorkerAgent]:
+        """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
             execution_mode=ExecutionMode.sdk,
@@ -720,20 +866,23 @@ class TestPlanThenImplementWorkflowExecution:
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
+        return developer, worker
 
-        evaluation = Evaluation(
+    @staticmethod
+    def create_mock_evaluation(tmp_path=None) -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        return Evaluation(
             task_description="Implement a simple calculator function",
             workflow_type=WorkflowType.plan_then_implement,
-            developer_agent=developer,
-            worker_agent=worker,
+            workspace_path=str(tmp_path) if tmp_path else "/tmp/test",
         )
-        return evaluation
 
     def test_execute_calls_planning_phase_first(self) -> None:
         """Test that execute calls the planning phase first."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         planning_metrics = QueryMetrics(
             query_index=1,
@@ -760,7 +909,9 @@ class TestPlanThenImplementWorkflowExecution:
         phases_called = []
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str,  # noqa: ARG001
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
@@ -769,9 +920,18 @@ class TestPlanThenImplementWorkflowExecution:
                 return planning_metrics
             return implementation_metrics
 
-        evaluation.worker_agent.execute_query = mock_execute_query
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -781,18 +941,19 @@ class TestPlanThenImplementWorkflowExecution:
     def test_execute_sets_plan_permission_for_planning(self) -> None:
         """Test that execute sets plan permission mode for planning phase."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         permission_modes = []
 
-        original_set_permission_mode = evaluation.worker_agent.set_permission_mode
+        original_set_permission_mode = worker.set_permission_mode
 
         def capture_permission_mode(mode: PermissionMode) -> None:
             permission_modes.append(mode)
             original_set_permission_mode(mode)
 
-        evaluation.worker_agent.set_permission_mode = capture_permission_mode
+        worker.set_permission_mode = capture_permission_mode
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -806,9 +967,18 @@ class TestPlanThenImplementWorkflowExecution:
             response="response",
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = AsyncMock(return_value=sample_metrics)
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -818,18 +988,19 @@ class TestPlanThenImplementWorkflowExecution:
     def test_execute_sets_accept_edits_for_implementation(self) -> None:
         """Test that execute sets acceptEdits permission for implementation phase."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         permission_modes = []
 
-        original_set_permission_mode = evaluation.worker_agent.set_permission_mode
+        original_set_permission_mode = worker.set_permission_mode
 
         def capture_permission_mode(mode: PermissionMode) -> None:
             permission_modes.append(mode)
             original_set_permission_mode(mode)
 
-        evaluation.worker_agent.set_permission_mode = capture_permission_mode
+        worker.set_permission_mode = capture_permission_mode
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -843,9 +1014,18 @@ class TestPlanThenImplementWorkflowExecution:
             response="response",
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = AsyncMock(return_value=sample_metrics)
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -855,13 +1035,16 @@ class TestPlanThenImplementWorkflowExecution:
     def test_execute_formats_planning_prompt_with_task(self) -> None:
         """Test that planning prompt includes the task description."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         captured_queries = []
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             captured_queries.append((phase, query))
             return QueryMetrics(
@@ -876,9 +1059,18 @@ class TestPlanThenImplementWorkflowExecution:
                 response="response",
             )
 
-        evaluation.worker_agent.execute_query = mock_execute_query
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -889,15 +1081,18 @@ class TestPlanThenImplementWorkflowExecution:
     def test_execute_stores_planning_response(self) -> None:
         """Test that execute stores the planning phase response."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         planning_response = "Here is my detailed plan for the implementation..."
 
         call_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
@@ -914,9 +1109,18 @@ class TestPlanThenImplementWorkflowExecution:
                 response=response,
             )
 
-        evaluation.worker_agent.execute_query = mock_execute_query
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -925,8 +1129,9 @@ class TestPlanThenImplementWorkflowExecution:
     def test_execute_runs_both_phases(self) -> None:
         """Test that workflow runs both planning and implementation phases."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -940,8 +1145,18 @@ class TestPlanThenImplementWorkflowExecution:
             response="response",
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        worker.execute_query = AsyncMock(return_value=sample_metrics)
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -952,8 +1167,9 @@ class TestPlanThenImplementWorkflowExecution:
 class TestPlanThenImplementWorkflowMetrics:
     """Tests for PlanThenImplementWorkflow metrics collection."""
 
-    def create_mock_evaluation(self) -> Evaluation:
-        """Create a mock Evaluation for testing."""
+    @staticmethod
+    def create_mock_agents() -> tuple[DeveloperAgent, WorkerAgent]:
+        """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
             execution_mode=ExecutionMode.sdk,
@@ -961,20 +1177,23 @@ class TestPlanThenImplementWorkflowMetrics:
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
+        return developer, worker
 
-        evaluation = Evaluation(
+    @staticmethod
+    def create_mock_evaluation() -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        return Evaluation(
             task_description="Implement feature",
             workflow_type=WorkflowType.plan_then_implement,
-            developer_agent=developer,
-            worker_agent=worker,
+            workspace_path="/tmp/test",
         )
-        return evaluation
 
     def test_execute_collects_metrics_from_both_phases(self) -> None:
         """Test that metrics are collected from both planning and implementation phases."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         planning_metrics = QueryMetrics(
             query_index=1,
@@ -1000,15 +1219,25 @@ class TestPlanThenImplementWorkflowMetrics:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str,  # noqa: ARG001
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
 
-        evaluation.worker_agent.execute_query = mock_execute_query
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -1021,8 +1250,9 @@ class TestPlanThenImplementWorkflowMetrics:
     def test_execute_tracks_prompts_from_both_phases(self) -> None:
         """Test that prompt count includes both phases."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         sample_metrics = QueryMetrics(
             query_index=1,
@@ -1036,9 +1266,18 @@ class TestPlanThenImplementWorkflowMetrics:
             response="response",
         )
 
-        evaluation.worker_agent.execute_query = AsyncMock(return_value=sample_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = AsyncMock(return_value=sample_metrics)
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -1047,8 +1286,9 @@ class TestPlanThenImplementWorkflowMetrics:
     def test_execute_aggregates_tool_counts_from_messages(self) -> None:
         """Test that tool counts are aggregated from message content."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         planning_metrics = QueryMetrics(
             query_index=1,
@@ -1114,15 +1354,25 @@ class TestPlanThenImplementWorkflowMetrics:
 
         call_count = 0
 
-        async def return_metrics(**kwargs) -> QueryMetrics:  # type: ignore
+        async def return_metrics(**kwargs) -> QueryMetrics:  # type: ignore  # noqa: ARG001
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 return planning_metrics
             return implementation_metrics
 
-        evaluation.worker_agent.execute_query = AsyncMock(side_effect=return_metrics)
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
+        worker.execute_query = AsyncMock(side_effect=return_metrics)
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -1134,8 +1384,9 @@ class TestPlanThenImplementWorkflowMetrics:
     def test_execute_tracks_phases_separately(self) -> None:
         """Test that phases are tracked separately in phase_tokens."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         planning_metrics = QueryMetrics(
             query_index=1,
@@ -1161,15 +1412,26 @@ class TestPlanThenImplementWorkflowMetrics:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str,  # noqa: ARG001
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
             return implementation_metrics
 
-        evaluation.worker_agent.execute_query = mock_execute_query
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        # Patch _create_agents to set workflow's internal agents
+        def mock_create_agents(_eval_obj: Evaluation) -> tuple:
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -1182,8 +1444,9 @@ class TestPlanThenImplementWorkflowMetrics:
 class TestPlanThenImplementWorkflowErrorHandling:
     """Tests for PlanThenImplementWorkflow error handling."""
 
-    def create_mock_evaluation(self) -> Evaluation:
-        """Create a mock Evaluation for testing."""
+    @staticmethod
+    def create_mock_agents() -> tuple[DeveloperAgent, WorkerAgent]:
+        """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
             execution_mode=ExecutionMode.sdk,
@@ -1191,29 +1454,42 @@ class TestPlanThenImplementWorkflowErrorHandling:
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
+        return developer, worker
 
-        evaluation = Evaluation(
+    @staticmethod
+    def create_mock_evaluation() -> Evaluation:
+        """Create a mock Evaluation for testing."""
+        return Evaluation(
             task_description="Implement feature",
             workflow_type=WorkflowType.plan_then_implement,
-            developer_agent=developer,
-            worker_agent=worker,
+            workspace_path="/tmp/test",
         )
-        return evaluation
 
     def test_planning_phase_error_transitions_to_failed(self) -> None:
         """Test that an error in planning phase transitions evaluation to failed."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         async def mock_execute_query_error(
-            query: str, phase: str, resume_session: bool = False
+            query: str,  # noqa: ARG001
+            phase: str,  # noqa: ARG001
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             raise RuntimeError("Planning phase failed")
 
-        evaluation.worker_agent.execute_query = mock_execute_query_error
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query_error
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         with pytest.raises(RuntimeError, match="Planning phase failed"):
             asyncio.run(workflow.execute(evaluation))
@@ -1223,13 +1499,16 @@ class TestPlanThenImplementWorkflowErrorHandling:
     def test_implementation_phase_error_transitions_to_failed(self) -> None:
         """Test that an error in implementation phase transitions evaluation to failed."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         call_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal call_count
             call_count += 1
@@ -1247,9 +1526,17 @@ class TestPlanThenImplementWorkflowErrorHandling:
                 response="Plan",
             )
 
-        evaluation.worker_agent.execute_query = mock_execute_query
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         with pytest.raises(RuntimeError, match="Implementation phase failed"):
             asyncio.run(workflow.execute(evaluation))
@@ -1259,30 +1546,41 @@ class TestPlanThenImplementWorkflowErrorHandling:
     def test_error_sets_failure_reason(self) -> None:
         """Test that error message is captured as failure reason."""
         collector = MetricsCollector()
-        workflow = PlanThenImplementWorkflow(collector)
+        workflow = PlanThenImplementWorkflow(collector, enable_question_handling=False)
         evaluation = self.create_mock_evaluation()
+        developer, worker = self.create_mock_agents()
 
         async def mock_execute_query_error(
-            query: str, phase: str, resume_session: bool = False
+            query: str,  # noqa: ARG001
+            phase: str,  # noqa: ARG001
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Specific error message")
 
-        evaluation.worker_agent.execute_query = mock_execute_query_error
-        evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-        evaluation.worker_agent.clear_tool_invocations = MagicMock()
+        worker.execute_query = mock_execute_query_error
+        worker.get_tool_invocations = MagicMock(return_value=[])
+        worker.clear_tool_invocations = MagicMock()
+        worker.clear_session = AsyncMock()
+
+        def mock_create_agents(_eval_obj):
+            workflow._developer = developer
+            workflow._worker = worker
+            return developer, worker
+
+        workflow._create_agents = mock_create_agents
 
         with pytest.raises(ValueError):
             asyncio.run(workflow.execute(evaluation))
 
-        assert "Specific error message" in evaluation.error
+        assert (
+            evaluation.error is not None
+            and "Specific error message" in evaluation.error
+        )
 
 
 # =============================================================================
 # MultiCommandWorkflow Tests
 # =============================================================================
-
-from claude_evaluator.config.models import Phase
-from claude_evaluator.workflows.multi_command import MultiCommandWorkflow
 
 
 class TestMultiCommandWorkflowInitialization:
@@ -1390,9 +1688,9 @@ class TestMultiCommandWorkflowExecution:
     #             response=f"Result from {phase}",
     #         )
 
-    #     evaluation.worker_agent.execute_query = mock_query
-    #     evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-    #     evaluation.worker_agent.clear_tool_invocations = MagicMock()
+    #     worker.execute_query = mock_query
+    #     worker.get_tool_invocations = MagicMock(return_value=[])
+    #     worker.clear_tool_invocations = MagicMock()
 
     #     asyncio.run(workflow.execute(evaluation))
 
@@ -1411,13 +1709,13 @@ class TestMultiCommandWorkflowExecution:
 
     #     permission_sequence: list[PermissionMode] = []
 
-    #     original_set_mode = evaluation.worker_agent.set_permission_mode
+    #     original_set_mode = worker.set_permission_mode
 
     #     def capture_mode(mode: PermissionMode) -> None:
     #         permission_sequence.append(mode)
     #         original_set_mode(mode)
 
-    #     evaluation.worker_agent.set_permission_mode = capture_mode
+    #     worker.set_permission_mode = capture_mode
 
     #     sample_metrics = QueryMetrics(
     #         query_index=1,
@@ -1434,9 +1732,9 @@ class TestMultiCommandWorkflowExecution:
     #     async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
     #         return sample_metrics
 
-    #     evaluation.worker_agent.execute_query = mock_query
-    #     evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-    #     evaluation.worker_agent.clear_tool_invocations = MagicMock()
+    #     worker.execute_query = mock_query
+    #     worker.get_tool_invocations = MagicMock(return_value=[])
+    #     worker.clear_tool_invocations = MagicMock()
 
     #     asyncio.run(workflow.execute(evaluation))
 
@@ -1469,9 +1767,9 @@ class TestMultiCommandWorkflowExecution:
     #             response=f"Result from {phase} phase",
     #         )
 
-    #     evaluation.worker_agent.execute_query = mock_query
-    #     evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-    #     evaluation.worker_agent.clear_tool_invocations = MagicMock()
+    #     worker.execute_query = mock_query
+    #     worker.get_tool_invocations = MagicMock(return_value=[])
+    #     worker.clear_tool_invocations = MagicMock()
 
     #     asyncio.run(workflow.execute(evaluation))
 
@@ -1534,9 +1832,9 @@ class TestMultiCommandWorkflowExecution:
 #                 response="Design output: Logger class with levels" if phase == "design" else "Done",
 #             )
 
-#         evaluation.worker_agent.execute_query = capture_query
-#         evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-#         evaluation.worker_agent.clear_tool_invocations = MagicMock()
+#         worker.execute_query = capture_query
+#         worker.get_tool_invocations = MagicMock(return_value=[])
+#         worker.clear_tool_invocations = MagicMock()
 
 #         asyncio.run(workflow.execute(evaluation))
 
@@ -1573,9 +1871,9 @@ class TestMultiCommandWorkflowExecution:
 #                 response="Analysis complete",
 #             )
 
-#         evaluation.worker_agent.execute_query = capture_query
-#         evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-#         evaluation.worker_agent.clear_tool_invocations = MagicMock()
+#         worker.execute_query = capture_query
+#         worker.get_tool_invocations = MagicMock(return_value=[])
+#         worker.clear_tool_invocations = MagicMock()
 
 #         asyncio.run(workflow.execute(evaluation))
 
@@ -1613,9 +1911,9 @@ class TestMultiCommandWorkflowExecution:
 #                 response="Tests passed",
 #             )
 
-#         evaluation.worker_agent.execute_query = capture_query
-#         evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-#         evaluation.worker_agent.clear_tool_invocations = MagicMock()
+#         worker.execute_query = capture_query
+#         worker.get_tool_invocations = MagicMock(return_value=[])
+#         worker.clear_tool_invocations = MagicMock()
 
 #         asyncio.run(workflow.execute(evaluation))
 
@@ -1670,9 +1968,9 @@ class TestMultiCommandWorkflowExecution:
 #                 response=f"Done {phase}",
 #             )
 
-#         evaluation.worker_agent.execute_query = mock_query
-#         evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-#         evaluation.worker_agent.clear_tool_invocations = MagicMock()
+#         worker.execute_query = mock_query
+#         worker.get_tool_invocations = MagicMock(return_value=[])
+#         worker.clear_tool_invocations = MagicMock()
 
 #         result = asyncio.run(workflow.execute(evaluation))
 
@@ -1718,9 +2016,9 @@ class TestMultiCommandWorkflowExecution:
 #                 response="Code",
 #             )
 
-#         evaluation.worker_agent.execute_query = mock_query
-#         evaluation.worker_agent.get_tool_invocations = MagicMock(return_value=[])
-#         evaluation.worker_agent.clear_tool_invocations = MagicMock()
+#         worker.execute_query = mock_query
+#         worker.get_tool_invocations = MagicMock(return_value=[])
+#         worker.clear_tool_invocations = MagicMock()
 
 #         result = asyncio.run(workflow.execute(evaluation))
 
