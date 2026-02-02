@@ -94,7 +94,7 @@ Implement the individual dimension scorers.
 - [x] T210 [US1] [US2] Add file content reading and truncation for large files (scorers/code_quality.py)
 
 ### Checkpoint
-- [ ] T211 [US1] [US2] CHECKPOINT: Verify all scorers produce valid DimensionScore objects
+- [x] T211 [US1] [US2] CHECKPOINT: Verify all scorers produce valid DimensionScore objects
 
 ---
 
@@ -103,35 +103,35 @@ Implement the individual dimension scorers.
 Step-by-step execution analysis, AST parsing, and code inspection.
 
 ### AST Parser (tree-sitter)
-- [ ] T300 [US4] Implement language detection from file extension (ast/languages.py)
-- [ ] T301 [US4] Create grammar loader for supported languages: Python, JS/TS, Go, Rust, Java, C/C++ (ast/languages.py)
-- [ ] T302 [US4] Implement ASTParser class with parse() method returning tree-sitter tree (ast/parser.py)
-- [ ] T303 [US4] Add graceful fallback when grammar not available for a language (ast/parser.py)
+- [x] T300 [US4] Implement language detection from file extension (ast/languages.py)
+- [x] T301 [US4] Create grammar loader for supported languages: Python, JS/TS, Go, Rust, Java, C/C++ (ast/languages.py)
+- [x] T302 [US4] Implement ASTParser class with parse() method returning tree-sitter tree (ast/parser.py)
+- [x] T303 [US4] Add graceful fallback when grammar not available for a language (ast/parser.py)
 
 ### AST Metrics Extraction
-- [ ] T304 [US4] Implement function/method counter traversing AST nodes (ast/metrics.py)
-- [ ] T305 [US4] Implement class counter for OOP languages (ast/metrics.py)
-- [ ] T306 [US4] Implement cyclomatic complexity calculator (decision points per function) (ast/metrics.py)
-- [ ] T307 [US4] Implement max nesting depth calculator (ast/metrics.py)
-- [ ] T308 [US4] Implement import analyzer (count and organization) (ast/metrics.py)
-- [ ] T309 [US4] Implement LOC breakdown: code lines, comment lines, blank lines (ast/metrics.py)
-- [ ] T310 [US4] Create MetricsExtractor class aggregating all metrics into ASTMetrics model (ast/metrics.py)
+- [x] T304 [US4] Implement function/method counter traversing AST nodes (ast/metrics.py)
+- [x] T305 [US4] Implement class counter for OOP languages (ast/metrics.py)
+- [x] T306 [US4] Implement cyclomatic complexity calculator (decision points per function) (ast/metrics.py)
+- [x] T307 [US4] Implement max nesting depth calculator (ast/metrics.py)
+- [x] T308 [US4] Implement import analyzer (count and organization) (ast/metrics.py)
+- [x] T309 [US4] Implement LOC breakdown: code lines, comment lines, blank lines (ast/metrics.py)
+- [x] T310 [US4] Create MetricsExtractor class aggregating all metrics into ASTMetrics model (ast/metrics.py)
 
 ### Step Analyzer
-- [ ] T311 [US3] Implement rule-based pattern detection for redundant steps (analyzers/step_analyzer.py)
-- [ ] T312 [US3] Define patterns: repeated reads, redundant searches, unnecessary tool calls (analyzers/step_analyzer.py)
-- [ ] T313 [US3] Implement StepAnalyzer.analyze() returning list of StepAnalysis (analyzers/step_analyzer.py)
-- [ ] T314 [US3] Add LLM commentary generation for strategy assessment (analyzers/step_analyzer.py)
+- [x] T311 [US3] Implement rule-based pattern detection for redundant steps (analyzers/step_analyzer.py)
+- [x] T312 [US3] Define patterns: repeated reads, redundant searches, unnecessary tool calls (analyzers/step_analyzer.py)
+- [x] T313 [US3] Implement StepAnalyzer.analyze() returning list of StepAnalysis (analyzers/step_analyzer.py)
+- [x] T314 [US3] Add LLM commentary generation for strategy assessment (analyzers/step_analyzer.py)
 
 ### Code Analyzer
-- [ ] T315 [US4] Implement file discovery from evaluation.json tool calls (analyzers/code_analyzer.py)
-- [ ] T316 [US4] Add source file type detection for: .py, .ts, .js, .go, .rs, .java, etc. (analyzers/code_analyzer.py)
-- [ ] T317 [US4] Integrate ASTParser and MetricsExtractor into CodeAnalyzer (analyzers/code_analyzer.py)
-- [ ] T318 [US4] Implement CodeAnalyzer.analyze() returning CodeAnalysis with FileAnalysis + ASTMetrics (analyzers/code_analyzer.py)
-- [ ] T319 [US4] Handle missing files gracefully with file_missing status (analyzers/code_analyzer.py)
+- [x] T315 [US4] Implement file discovery from evaluation.json tool calls (analyzers/code_analyzer.py)
+- [x] T316 [US4] Add source file type detection for: .py, .ts, .js, .go, .rs, .java, etc. (analyzers/code_analyzer.py)
+- [x] T317 [US4] Integrate ASTParser and MetricsExtractor into CodeAnalyzer (analyzers/code_analyzer.py)
+- [x] T318 [US4] Implement CodeAnalyzer.analyze() returning CodeAnalysis with FileAnalysis + ASTMetrics (analyzers/code_analyzer.py)
+- [x] T319 [US4] Handle missing files gracefully with file_missing status (analyzers/code_analyzer.py)
 
 ### Checkpoint
-- [ ] T320 [US3] [US4] CHECKPOINT: Verify AST parsing works for all supported languages and analyzers produce valid output
+- [x] T320 [US3] [US4] CHECKPOINT: Verify AST parsing works for all supported languages and analyzers produce valid output
 
 ---
 
@@ -140,17 +140,17 @@ Step-by-step execution analysis, AST parsing, and code inspection.
 Main EvaluatorAgent that coordinates all components.
 
 ### Agent Implementation
-- [ ] T400 [US1] Create EvaluatorAgent class with async evaluate() method (agent.py)
-- [ ] T401 [US1] Implement evaluation.json parsing using existing EvaluationReport model (agent.py)
-- [ ] T402 [US1] Wire together: ASTParser, StepAnalyzer, CodeAnalyzer, all Scorers (agent.py)
-- [ ] T403 [US1] Pass AST metrics to CodeQualityScorer for informed LLM prompts (agent.py)
-- [ ] T404 [US1] Implement ScoreReport assembly from component outputs (agent.py)
-- [ ] T405 [US1] Implement save_report() with JSON serialization to score_report.json (agent.py)
+- [x] T400 [US1] Create EvaluatorAgent class with async evaluate() method (agent.py)
+- [x] T401 [US1] Implement evaluation.json parsing using existing EvaluationReport model (agent.py)
+- [x] T402 [US1] Wire together: ASTParser, StepAnalyzer, CodeAnalyzer, all Scorers (agent.py)
+- [x] T403 [US1] Pass AST metrics to CodeQualityScorer for informed LLM prompts (agent.py)
+- [x] T404 [US1] Implement ScoreReport assembly from component outputs (agent.py)
+- [x] T405 [US1] Implement save_report() with JSON serialization to score_report.json (agent.py)
 
 ### Error Handling
-- [ ] T406 [US1] Add graceful handling for malformed evaluation.json (agent.py)
-- [ ] T407 [US1] Add Gemini API error handling with retry and fallback (agent.py)
-- [ ] T408 [US1] Add AST parsing error handling - continue with LLM-only if AST fails (agent.py)
+- [x] T406 [US1] Add graceful handling for malformed evaluation.json (agent.py)
+- [x] T407 [US1] Add Gemini API error handling with retry and fallback (agent.py)
+- [x] T408 [US1] Add AST parsing error handling - continue with LLM-only if AST fails (agent.py)
 
 ### Checkpoint
 - [ ] T409 [US1] CHECKPOINT: Verify EvaluatorAgent produces complete ScoreReport with AST metrics from sample evaluation
@@ -162,11 +162,11 @@ Main EvaluatorAgent that coordinates all components.
 Command-line interface for running the evaluator.
 
 ### CLI Command
-- [ ] T500 [US1] Create score command with argparse in cli/commands/score.py
-- [ ] T501 [US1] Add arguments: evaluation_path, --workspace, --output, --model, --verbose, --no-ast
-- [ ] T502 [US1] Implement command handler calling EvaluatorAgent.evaluate()
-- [ ] T503 [US1] Add formatted console output showing scores, AST metrics summary, and rationale
-- [ ] T504 [US1] Register score command in cli/parser.py
+- [x] T500 [US1] Create score command with argparse in cli/commands/score.py
+- [x] T501 [US1] Add arguments: evaluation_path, --workspace, --output, --model, --verbose, --no-ast
+- [x] T502 [US1] Implement command handler calling EvaluatorAgent.evaluate()
+- [x] T503 [US1] Add formatted console output showing scores, AST metrics summary, and rationale
+- [x] T504 [US1] Register score command in cli/parser.py
 
 ### Checkpoint
 - [ ] T505 [US1] CHECKPOINT: Verify `claude-evaluator score` command works end-to-end with AST metrics
