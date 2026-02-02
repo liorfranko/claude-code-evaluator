@@ -84,7 +84,7 @@ Implement the individual dimension scorers.
 - [x] T204 [US1] [US2] Implement weight redistribution when code_quality is N/A (70/30) (scorers/aggregate.py)
 
 ### Task Completion Scorer (LLM-Based)
-- [ ] T205 [US1] [US2] Create Gemini client wrapper with retry logic (core/agents/evaluator/gemini_client.py)
+- [x] T205 [US1] [US2] Create Gemini client wrapper with retry logic (core/agents/evaluator/gemini_client.py)
 - [ ] T206 [US1] [US2] Define task completion scoring prompt template (prompts.py)
 - [ ] T207 [US1] [US2] Implement TaskCompletionScorer with structured output using Pydantic schema (scorers/task_completion.py)
 
