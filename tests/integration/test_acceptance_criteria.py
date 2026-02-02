@@ -8,20 +8,22 @@ Task IDs: T700-T708
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.models.enums import (
     DeveloperState,
     ExecutionMode,
     PermissionMode,
 )
-from claude_evaluator.models.question import QuestionContext, QuestionItem, QuestionOption
+from claude_evaluator.models.question import (
+    QuestionContext,
+    QuestionItem,
+    QuestionOption,
+)
 from claude_evaluator.models.tool_invocation import ToolInvocation
-
 
 # =============================================================================
 # Mock SDK Classes
@@ -32,13 +34,17 @@ class AskUserQuestionBlock:
     """Mock for AskUserQuestionBlock from claude-agent-sdk."""
 
     def __init__(self, questions: list[dict[str, Any]] | None = None) -> None:
-        self.questions = questions if questions is not None else [{"question": "What should I do?"}]
+        """Initialize mock AskUserQuestionBlock."""
+        self.questions = (
+            questions if questions is not None else [{"question": "What should I do?"}]
+        )
 
 
 class TextBlock:
     """Mock for TextBlock from claude-agent-sdk."""
 
     def __init__(self, text: str = "Sample text") -> None:
+        """Initialize mock TextBlock."""
         self.text = text
 
 
@@ -46,6 +52,7 @@ class AssistantMessage:
     """Mock for AssistantMessage from claude-agent-sdk."""
 
     def __init__(self, content: list[Any] | None = None) -> None:
+        """Initialize mock AssistantMessage."""
         self.content = content or []
 
 
@@ -60,6 +67,7 @@ class ResultMessage:
         total_cost_usd: float = 0.01,
         usage: dict[str, int] | None = None,
     ) -> None:
+        """Initialize mock ResultMessage."""
         self.result = result
         self.duration_ms = duration_ms
         self.num_turns = num_turns
@@ -71,6 +79,7 @@ class MockClaudeSDKClient:
     """Mock for ClaudeSDKClient from claude-agent-sdk."""
 
     def __init__(self, options: Any = None) -> None:
+        """Initialize mock ClaudeSDKClient."""
         self.options = options
         self.session_id = "test-session-abc"
         self._connected = False
@@ -79,12 +88,15 @@ class MockClaudeSDKClient:
         self._response_index = 0
 
     async def connect(self) -> None:
+        """Connect the mock client."""
         self._connected = True
 
     async def disconnect(self) -> None:
+        """Disconnect the mock client."""
         self._connected = False
 
     async def query(self, prompt: str) -> None:
+        """Send a query to the mock client."""
         self._queries.append(prompt)
 
     async def receive_response(self) -> Any:
@@ -153,7 +165,10 @@ class TestT700WorkerToDeveloperQuestionFlow:
                     "question": "Which testing framework should I use?",
                     "options": [
                         {"label": "pytest", "description": "Modern Python testing"},
-                        {"label": "unittest", "description": "Standard library testing"},
+                        {
+                            "label": "unittest",
+                            "description": "Standard library testing",
+                        },
                     ],
                 }
             ]
@@ -176,7 +191,9 @@ class TestT700WorkerToDeveloperQuestionFlow:
         )
 
         # VERIFY: Developer (callback) received the question
-        assert len(received_contexts) == 1, "Developer should have received exactly one question"
+        assert len(received_contexts) == 1, (
+            "Developer should have received exactly one question"
+        )
 
         # VERIFY: Question context contains correct data
         ctx = received_contexts[0]
@@ -196,7 +213,9 @@ class TestT700WorkerToDeveloperQuestionFlow:
         assert mock_client._queries[1] == "Developer's answer to the question"
 
     @pytest.mark.asyncio
-    async def test_developer_answer_question_integrated_with_worker_callback(self) -> None:
+    async def test_developer_answer_question_integrated_with_worker_callback(
+        self,
+    ) -> None:
         """Test integration where Worker callback triggers DeveloperAgent.answer_question.
 
         This test verifies the complete integration:
@@ -219,7 +238,9 @@ class TestT700WorkerToDeveloperQuestionFlow:
             async def mock_sdk_query(*args, **kwargs):
                 return "Use pytest for its simplicity and powerful fixtures"
 
-            with patch("claude_evaluator.agents.developer.sdk_query", mock_sdk_query):
+            with patch(
+                "claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query
+            ):
                 answer_result = await developer.answer_question(context)
                 return answer_result.answer
 
@@ -288,7 +309,9 @@ class TestT700WorkerToDeveloperQuestionFlow:
         mock_client = MockClaudeSDKClient()
 
         # First an assistant message without question, then one with question
-        first_message = AssistantMessage(content=[TextBlock("Let me analyze your code...")])
+        first_message = AssistantMessage(
+            content=[TextBlock("Let me analyze your code...")]
+        )
         question_block = AskUserQuestionBlock(questions=[{"question": "Question?"}])
         second_message = AssistantMessage(content=[question_block])
 
@@ -662,8 +685,6 @@ class TestT701DeveloperLLMAnswerGeneration:
         - When developer_qa_model is specified, it is used for answer generation
         - The model_used field in AnswerResult reflects the specified model
         """
-        from claude_evaluator.models.answer import AnswerResult
-
         # Create Developer with custom model
         developer = DeveloperAgent(
             developer_qa_model="claude-sonnet-4-5@20251001",
@@ -688,8 +709,10 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", capture_model_call):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query", capture_model_call
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 developer.transition_to(DeveloperState.prompting)
                 developer.transition_to(DeveloperState.awaiting_response)
 
@@ -724,23 +747,30 @@ class TestT701DeveloperLLMAnswerGeneration:
                 QuestionItem(
                     question="Should I use PostgreSQL or MongoDB?",
                     options=[
-                        QuestionOption(label="PostgreSQL", description="Relational database"),
-                        QuestionOption(label="MongoDB", description="Document database"),
+                        QuestionOption(
+                            label="PostgreSQL", description="Relational database"
+                        ),
+                        QuestionOption(
+                            label="MongoDB", description="Document database"
+                        ),
                     ],
                     header="Database Selection",
                 )
             ],
             conversation_history=[
                 {"role": "user", "content": "Create a user management system"},
-                {"role": "assistant", "content": "I'll set up user management with authentication."},
+                {
+                    "role": "assistant",
+                    "content": "I'll set up user management with authentication.",
+                },
                 {"role": "user", "content": "We need to support complex queries"},
             ],
             session_id="t701-context-test",
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", capture_prompt):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 developer.transition_to(DeveloperState.prompting)
                 developer.transition_to(DeveloperState.awaiting_response)
 
@@ -793,8 +823,10 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", track_query_call):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query", track_query_call
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 developer.transition_to(DeveloperState.prompting)
                 developer.transition_to(DeveloperState.awaiting_response)
 
@@ -810,7 +842,9 @@ class TestT701DeveloperLLMAnswerGeneration:
 
                 # VERIFY: query received a model
                 assert "model" in query_kwargs
-                assert query_kwargs["model"] == "claude-haiku-4-5@20251001"  # DEFAULT_QA_MODEL
+                assert (
+                    query_kwargs["model"] == "claude-haiku-4-5@20251001"
+                )  # DEFAULT_QA_MODEL
 
     @pytest.mark.asyncio
     async def test_developer_returns_answer_result_with_answer(self) -> None:
@@ -846,8 +880,8 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", return_answer):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", return_answer):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 developer.transition_to(DeveloperState.prompting)
                 developer.transition_to(DeveloperState.awaiting_response)
 
@@ -906,7 +940,10 @@ class TestT701DeveloperLLMAnswerGeneration:
             questions=[QuestionItem(question="Which library should I use?")],
             conversation_history=[
                 {"role": "user", "content": "I'm building a machine learning model"},
-                {"role": "assistant", "content": "I'll help with the ML implementation."},
+                {
+                    "role": "assistant",
+                    "content": "I'll help with the ML implementation.",
+                },
             ],
             session_id="ml-session",
             attempt_number=1,
@@ -923,8 +960,11 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", capture_contextual_prompt):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query",
+            capture_contextual_prompt,
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 # Test ML context
                 developer.reset()
                 developer.transition_to(DeveloperState.prompting)
@@ -979,14 +1019,20 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         async def developer_callback(context: QuestionContext) -> str:
             flow_events.append("Developer callback invoked")
-            with patch("claude_evaluator.agents.developer.sdk_query", mock_llm_call):
-                with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+            with patch(
+                "claude_evaluator.core.agents.developer.sdk_query", mock_llm_call
+            ):
+                with patch(
+                    "claude_evaluator.core.agents.developer.SDK_AVAILABLE", True
+                ):
                     # Need to transition Developer to the right state
                     if developer.current_state == DeveloperState.initializing:
                         developer.transition_to(DeveloperState.prompting)
                         developer.transition_to(DeveloperState.awaiting_response)
                     result = await developer.answer_question(context)
-                    flow_events.append(f"Developer generated answer: {result.answer[:50]}...")
+                    flow_events.append(
+                        f"Developer generated answer: {result.answer[:50]}..."
+                    )
                     return result.answer
 
         # Create Worker with Developer callback
@@ -1122,7 +1168,9 @@ class TestT702SessionContinuity:
         )
 
         tracking_client = TrackingClient()
-        question_block = AskUserQuestionBlock(questions=[{"question": "Test question?"}])
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Test question?"}]
+        )
         tracking_client.set_responses(
             [
                 [AssistantMessage(content=[question_block])],
@@ -1174,7 +1222,9 @@ class TestT702SessionContinuity:
             ]
         )
 
-        await worker._stream_sdk_messages_with_client("Multi-question task", mock_client)
+        await worker._stream_sdk_messages_with_client(
+            "Multi-question task", mock_client
+        )
 
         # VERIFY: All questions received the same session_id
         assert len(received_session_ids) == 2, "Expected 2 questions"
@@ -1208,7 +1258,9 @@ class TestT702SessionContinuity:
         )
 
         mock_client = MockClaudeSDKClient()
-        question_block = AskUserQuestionBlock(questions=[{"question": "Create new client?"}])
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Create new client?"}]
+        )
         mock_client.set_responses(
             [
                 [AssistantMessage(content=[question_block])],
@@ -1402,7 +1454,9 @@ class TestT702SessionContinuity:
                 self._response_index = 0
 
         tracking_client = SequenceTrackingClient()
-        question_block = AskUserQuestionBlock(questions=[{"question": "Async question?"}])
+        question_block = AskUserQuestionBlock(
+            questions=[{"question": "Async question?"}]
+        )
         tracking_client.set_responses(
             [
                 [AssistantMessage(content=[question_block])],
@@ -1423,7 +1477,9 @@ class TestT702SessionContinuity:
         # Callback should complete before the answer is sent
         # Find the answer query (second query)
         answer_query_indices = [
-            i for i, x in enumerate(execution_sequence) if x.startswith("query:") and "Async" in x
+            i
+            for i, x in enumerate(execution_sequence)
+            if x.startswith("query:") and "Async" in x
         ]
         if answer_query_indices:
             assert answer_query_indices[0] > callback_end_idx, (
@@ -1554,6 +1610,7 @@ class ToolUseBlock:
         name: str = "Read",
         tool_input: dict[str, Any] | None = None,
     ) -> None:
+        """Initialize mock ToolUseBlock."""
         self.id = block_id
         self.name = name
         self.input = tool_input or {}
@@ -1568,6 +1625,7 @@ class ToolResultBlock:
         content: str = "Tool result",
         is_error: bool = False,
     ) -> None:
+        """Initialize mock ToolResultBlock."""
         self.tool_use_id = tool_use_id
         self.content = content
         self.is_error = is_error
@@ -1577,6 +1635,7 @@ class UserMessage:
     """Mock for UserMessage from claude-agent-sdk."""
 
     def __init__(self, content: list[Any] | str | None = None) -> None:
+        """Initialize mock UserMessage."""
         self.content = content or []
 
 
@@ -1634,14 +1693,17 @@ class TestT703WorkerContinuesAfterAnswer:
             ]
         )
 
-        result, response_content, all_messages = await worker._stream_sdk_messages_with_client(
-            "Create tests", mock_client
-        )
+        (
+            result,
+            response_content,
+            all_messages,
+        ) = await worker._stream_sdk_messages_with_client("Create tests", mock_client)
 
         # VERIFY: Worker processed messages after the answer
         # All messages should be in the history
         text_messages = [
-            msg for msg in all_messages
+            msg
+            for msg in all_messages
             if msg.get("role") == "assistant" and isinstance(msg.get("content"), list)
         ]
         text_contents = []
@@ -1670,6 +1732,7 @@ class TestT703WorkerContinuesAfterAnswer:
         This verifies that the Worker continues to track tool usage after
         the Developer provides an answer, demonstrating actual work is happening.
         """
+
         async def answer_callback(context: QuestionContext) -> str:
             return "Yes, create the file"
 
@@ -1718,13 +1781,14 @@ class TestT703WorkerContinuesAfterAnswer:
 
         # VERIFY: Tool invocation was tracked after the answer
         tool_invocations = worker.get_tool_invocations()
-        assert len(tool_invocations) >= 1, "Worker should have tracked tool invocations after answer"
-
-        write_tool = next(
-            (t for t in tool_invocations if t.tool_name == "Write"),
-            None
+        assert len(tool_invocations) >= 1, (
+            "Worker should have tracked tool invocations after answer"
         )
-        assert write_tool is not None, "Write tool invocation should be tracked after answer"
+
+        write_tool = next((t for t in tool_invocations if t.tool_name == "Write"), None)
+        assert write_tool is not None, (
+            "Write tool invocation should be tracked after answer"
+        )
         assert write_tool.tool_use_id == "tool-after-answer-1"
 
         # VERIFY: Completion
@@ -1778,12 +1842,24 @@ class TestT703WorkerContinuesAfterAnswer:
                 ],
                 # Work phase after answer (multiple steps)
                 [
-                    AssistantMessage(content=[TextBlock("Step 1: Creating REST endpoints...")]),
-                    AssistantMessage(content=[TextBlock("Step 2: Setting up routes...")]),
-                    AssistantMessage(content=[TextBlock("Step 3: Implementing handlers...")]),
-                    AssistantMessage(content=[TextBlock("Step 4: Adding authentication...")]),
-                    AssistantMessage(content=[TextBlock("Step 5: Writing integration tests...")]),
-                    ResultMessage(result="REST API implementation complete with 5 endpoints"),
+                    AssistantMessage(
+                        content=[TextBlock("Step 1: Creating REST endpoints...")]
+                    ),
+                    AssistantMessage(
+                        content=[TextBlock("Step 2: Setting up routes...")]
+                    ),
+                    AssistantMessage(
+                        content=[TextBlock("Step 3: Implementing handlers...")]
+                    ),
+                    AssistantMessage(
+                        content=[TextBlock("Step 4: Adding authentication...")]
+                    ),
+                    AssistantMessage(
+                        content=[TextBlock("Step 5: Writing integration tests...")]
+                    ),
+                    ResultMessage(
+                        result="REST API implementation complete with 5 endpoints"
+                    ),
                 ],
             ]
         )
@@ -1850,12 +1926,16 @@ class TestT703WorkerContinuesAfterAnswer:
                 ],
                 # Work after first answer, then second question
                 [
-                    AssistantMessage(content=[TextBlock("Configuring based on first answer...")]),
+                    AssistantMessage(
+                        content=[TextBlock("Configuring based on first answer...")]
+                    ),
                     AssistantMessage(content=[q2]),
                 ],
                 # Work after second answer, then third question
                 [
-                    AssistantMessage(content=[TextBlock("Setting up based on second answer...")]),
+                    AssistantMessage(
+                        content=[TextBlock("Setting up based on second answer...")]
+                    ),
                     AssistantMessage(content=[q3]),
                 ],
                 # Final work and completion
@@ -2154,16 +2234,16 @@ class TestT703WorkerContinuesAfterAnswer:
         # CRITERION 1: Worker continues streaming after answer
         # Verified by: answer was sent, then more responses were received
         verification_results["continues_streaming_after_answer"] = (
-            len(queries_sent) >= 2 and  # Initial + answer
-            "Verification answer" in queries_sent
+            len(queries_sent) >= 2  # Initial + answer
+            and "Verification answer" in queries_sent
         )
 
         # CRITERION 2: Worker processes subsequent messages
         # Verified by: messages after the answer are in the history
         verification_results["processes_subsequent_messages"] = (
-            "Processing answer..." in messages_after_answer and
-            "Doing more work..." in messages_after_answer and
-            "Final processing..." in messages_after_answer
+            "Processing answer..." in messages_after_answer
+            and "Doing more work..." in messages_after_answer
+            and "Final processing..." in messages_after_answer
         )
 
         # CRITERION 3: Worker completes task after receiving answer
@@ -2236,13 +2316,25 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         mock_client.set_responses(
             [
                 # First stream: context + question 1
-                [AssistantMessage(content=[TextBlock("Starting...")]), AssistantMessage(content=[q1])],
+                [
+                    AssistantMessage(content=[TextBlock("Starting...")]),
+                    AssistantMessage(content=[q1]),
+                ],
                 # After answer 1: context + question 2
-                [AssistantMessage(content=[TextBlock("Working...")]), AssistantMessage(content=[q2])],
+                [
+                    AssistantMessage(content=[TextBlock("Working...")]),
+                    AssistantMessage(content=[q2]),
+                ],
                 # After answer 2: context + question 3
-                [AssistantMessage(content=[TextBlock("More work...")]), AssistantMessage(content=[q3])],
+                [
+                    AssistantMessage(content=[TextBlock("More work...")]),
+                    AssistantMessage(content=[q3]),
+                ],
                 # After answer 3: context + question 4
-                [AssistantMessage(content=[TextBlock("Almost done...")]), AssistantMessage(content=[q4])],
+                [
+                    AssistantMessage(content=[TextBlock("Almost done...")]),
+                    AssistantMessage(content=[q4]),
+                ],
                 # After answer 4: final result
                 [ResultMessage(result="Completed with 4 exchanges")],
             ]
@@ -2264,7 +2356,9 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         assert result.result == "Completed with 4 exchanges"
 
     @pytest.mark.asyncio
-    async def test_conversation_history_accumulates_across_multiple_exchanges(self) -> None:
+    async def test_conversation_history_accumulates_across_multiple_exchanges(
+        self,
+    ) -> None:
         """Verify conversation history accumulates correctly across multiple exchanges.
 
         Each subsequent question should see more conversation history than the previous,
@@ -2331,7 +2425,9 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         )
 
         # VERIFY: History length increased with each exchange
-        assert len(history_lengths) == 3, f"Expected 3 questions, got {len(history_lengths)}"
+        assert len(history_lengths) == 3, (
+            f"Expected 3 questions, got {len(history_lengths)}"
+        )
         assert history_lengths[0] < history_lengths[1] < history_lengths[2], (
             f"History should accumulate: {history_lengths}"
         )
@@ -2525,12 +2621,16 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
                 [AssistantMessage(content=[q1])],
                 # After answer 1: context mentioning answer, then question 2
                 [
-                    AssistantMessage(content=[TextBlock("Processing DISTINCTIVE_ANSWER_1...")]),
+                    AssistantMessage(
+                        content=[TextBlock("Processing DISTINCTIVE_ANSWER_1...")]
+                    ),
                     AssistantMessage(content=[q2]),
                 ],
                 # After answer 2: context mentioning answer, then question 3
                 [
-                    AssistantMessage(content=[TextBlock("Processing DISTINCTIVE_ANSWER_2...")]),
+                    AssistantMessage(
+                        content=[TextBlock("Processing DISTINCTIVE_ANSWER_2...")]
+                    ),
                     AssistantMessage(content=[q3]),
                 ],
                 # After answer 3: final result
@@ -2586,7 +2686,9 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         # Simulate: Q1, Q2, Q2 retry, Q3
         q1 = AskUserQuestionBlock(questions=[{"question": "First question?"}])
         q2 = AskUserQuestionBlock(questions=[{"question": "Second question?"}])
-        q2_retry = AskUserQuestionBlock(questions=[{"question": "Second question?"}])  # Retry
+        q2_retry = AskUserQuestionBlock(
+            questions=[{"question": "Second question?"}]
+        )  # Retry
         q3 = AskUserQuestionBlock(questions=[{"question": "Third question?"}])
 
         mock_client.set_responses(
@@ -2662,15 +2764,21 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         )
 
         # First call - add response before calling
-        reusable_client.add_response([ResultMessage(result="First done", duration_ms=100, num_turns=1)])
+        reusable_client.add_response(
+            [ResultMessage(result="First done", duration_ms=100, num_turns=1)]
+        )
         await worker._stream_sdk_messages_with_client("First query", reusable_client)
 
         # Second call - same client instance
-        reusable_client.add_response([ResultMessage(result="Second done", duration_ms=100, num_turns=1)])
+        reusable_client.add_response(
+            [ResultMessage(result="Second done", duration_ms=100, num_turns=1)]
+        )
         await worker._stream_sdk_messages_with_client("Second query", reusable_client)
 
         # Third call - same client instance
-        reusable_client.add_response([ResultMessage(result="Third done", duration_ms=100, num_turns=1)])
+        reusable_client.add_response(
+            [ResultMessage(result="Third done", duration_ms=100, num_turns=1)]
+        )
         await worker._stream_sdk_messages_with_client("Third query", reusable_client)
 
         # VERIFY: All queries went through the same client
@@ -2692,12 +2800,14 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         exchange_contexts: list[dict[str, Any]] = []
 
         async def capture_context_callback(context: QuestionContext) -> str:
-            exchange_contexts.append({
-                "question": context.questions[0].question,
-                "session_id": context.session_id,
-                "history_length": len(context.conversation_history),
-                "attempt": context.attempt_number,
-            })
+            exchange_contexts.append(
+                {
+                    "question": context.questions[0].question,
+                    "session_id": context.session_id,
+                    "history_length": len(context.conversation_history),
+                    "attempt": context.attempt_number,
+                }
+            )
             return f"Answer at history length {len(context.conversation_history)}"
 
         worker = WorkerAgent(
@@ -2717,7 +2827,9 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         tool_result1 = ToolResultBlock("tool-1", "Config contents")
         tool_result2 = ToolResultBlock("tool-2", "File written")
 
-        q1 = AskUserQuestionBlock(questions=[{"question": "How to proceed with config?"}])
+        q1 = AskUserQuestionBlock(
+            questions=[{"question": "How to proceed with config?"}]
+        )
         q2 = AskUserQuestionBlock(questions=[{"question": "Confirm file write?"}])
 
         # Structure: Each response ends with either a question (continues loop)
@@ -2733,7 +2845,9 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
                 ],
                 # After answer 1: work phases + question 2
                 [
-                    AssistantMessage(content=[TextBlock("Processing based on answer...")]),
+                    AssistantMessage(
+                        content=[TextBlock("Processing based on answer...")]
+                    ),
                     AssistantMessage(content=[TextBlock("Transforming data...")]),
                     AssistantMessage(content=[tool2]),
                     UserMessage(content=[tool_result2]),
@@ -2756,9 +2870,10 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         assert exchange_contexts[1]["session_id"] == "mixed-work-session"
 
         # VERIFY: History accumulated (second question has more history)
-        assert exchange_contexts[1]["history_length"] > exchange_contexts[0]["history_length"], (
-            "Second question should have more context from accumulated work"
-        )
+        assert (
+            exchange_contexts[1]["history_length"]
+            > exchange_contexts[0]["history_length"]
+        ), "Second question should have more context from accumulated work"
 
         # VERIFY: Task completed
         assert result.result == "Mixed workflow complete"
@@ -2839,11 +2954,26 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
 
         verification_client.set_responses(
             [
-                [AssistantMessage(content=[TextBlock("Context 1")]), AssistantMessage(content=[q1])],
-                [AssistantMessage(content=[TextBlock("Context 2")]), AssistantMessage(content=[q2])],
-                [AssistantMessage(content=[TextBlock("Context 3")]), AssistantMessage(content=[q3])],
-                [AssistantMessage(content=[TextBlock("Context 4")]), AssistantMessage(content=[q4])],
-                [AssistantMessage(content=[TextBlock("Context 5")]), AssistantMessage(content=[q5])],
+                [
+                    AssistantMessage(content=[TextBlock("Context 1")]),
+                    AssistantMessage(content=[q1]),
+                ],
+                [
+                    AssistantMessage(content=[TextBlock("Context 2")]),
+                    AssistantMessage(content=[q2]),
+                ],
+                [
+                    AssistantMessage(content=[TextBlock("Context 3")]),
+                    AssistantMessage(content=[q3]),
+                ],
+                [
+                    AssistantMessage(content=[TextBlock("Context 4")]),
+                    AssistantMessage(content=[q4]),
+                ],
+                [
+                    AssistantMessage(content=[TextBlock("Context 5")]),
+                    AssistantMessage(content=[q5]),
+                ],
                 [ResultMessage(result="T704 Complete")],
             ]
         )
@@ -2860,23 +2990,21 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
 
         # CRITERION 2: Conversation history accumulates correctly
         # Verified by: History length increases with each question
-        verification_results["history_accumulates"] = (
-            len(history_lengths) == 5 and
-            all(history_lengths[i] < history_lengths[i + 1] for i in range(len(history_lengths) - 1))
+        verification_results["history_accumulates"] = len(history_lengths) == 5 and all(
+            history_lengths[i] < history_lengths[i + 1]
+            for i in range(len(history_lengths) - 1)
         )
 
         # CRITERION 3: Session ID remains constant throughout
         # Verified by: All questions received the same session ID
-        verification_results["session_id_constant"] = (
-            len(session_ids) == 5 and
-            all(sid == "t704-verification-session" for sid in session_ids)
+        verification_results["session_id_constant"] = len(session_ids) == 5 and all(
+            sid == "t704-verification-session" for sid in session_ids
         )
 
         # CRITERION 4: Multiple questions can be asked and answered within the same session
         # Verified by: All 5 questions were answered and task completed
         verification_results["multiple_qa_works"] = (
-            questions_answered == 5 and
-            result.result == "T704 Complete"
+            questions_answered == 5 and result.result == "T704 Complete"
         )
 
         # VERIFY: All criteria pass
@@ -2910,6 +3038,7 @@ class TestT705WorkerRemembersPreviousMessages:
         accumulate all AssistantMessage, UserMessage, and SystemMessage objects
         throughout the entire execution, including those before and after Q&A.
         """
+
         async def simple_callback(context: QuestionContext) -> str:
             return "Memory test answer"
 
@@ -2945,9 +3074,11 @@ class TestT705WorkerRemembersPreviousMessages:
             ]
         )
 
-        result, response_content, all_messages = await worker._stream_sdk_messages_with_client(
-            "Test memory", mock_client
-        )
+        (
+            result,
+            response_content,
+            all_messages,
+        ) = await worker._stream_sdk_messages_with_client("Test memory", mock_client)
 
         # VERIFY: all_messages contains messages from all phases
         assert len(all_messages) >= 4, (
@@ -3029,10 +3160,14 @@ class TestT705WorkerRemembersPreviousMessages:
             ]
         )
 
-        await worker._stream_sdk_messages_with_client("Context access test", mock_client)
+        await worker._stream_sdk_messages_with_client(
+            "Context access test", mock_client
+        )
 
         # VERIFY: Two questions were asked
-        assert len(context_snapshots) == 2, f"Expected 2 questions, got {len(context_snapshots)}"
+        assert len(context_snapshots) == 2, (
+            f"Expected 2 questions, got {len(context_snapshots)}"
+        )
 
         # VERIFY: First question sees initial context
         first_context = " ".join(context_snapshots[0])
@@ -3084,7 +3219,9 @@ class TestT705WorkerRemembersPreviousMessages:
                 self._response_index = 0
 
         async def unique_answer_callback(context: QuestionContext) -> str:
-            question_text = context.questions[0].question if context.questions else "unknown"
+            question_text = (
+                context.questions[0].question if context.questions else "unknown"
+            )
             return f"ANSWER_FOR_[{question_text}]"
 
         worker = WorkerAgent(
@@ -3131,7 +3268,10 @@ class TestT705WorkerRemembersPreviousMessages:
             content = msg.get("content", [])
             if isinstance(content, list):
                 for block in content:
-                    if isinstance(block, dict) and block.get("type") == "AskUserQuestionBlock":
+                    if (
+                        isinstance(block, dict)
+                        and block.get("type") == "AskUserQuestionBlock"
+                    ):
                         question_blocks_found += 1
 
         assert question_blocks_found >= 2, (
@@ -3145,6 +3285,7 @@ class TestT705WorkerRemembersPreviousMessages:
         The message history is returned in QueryMetrics.messages and should
         be available for analysis and debugging of the evaluation.
         """
+
         async def tracking_callback(context: QuestionContext) -> str:
             return "Tracked answer"
 
@@ -3239,10 +3380,14 @@ class TestT705WorkerRemembersPreviousMessages:
         # Structure: work -> Q1 -> work -> Q2 -> work -> Q3 -> work -> Q4 -> work -> Q5 -> result
         responses = []
         for i, q in enumerate(questions):
-            responses.append([
-                AssistantMessage(content=[TextBlock(f"Work before exchange {i + 1}")]),
-                AssistantMessage(content=[q]),
-            ])
+            responses.append(
+                [
+                    AssistantMessage(
+                        content=[TextBlock(f"Work before exchange {i + 1}")]
+                    ),
+                    AssistantMessage(content=[q]),
+                ]
+            )
         responses.append([ResultMessage(result="5 exchanges completed with memory")])
 
         mock_client.set_responses(responses)
@@ -3327,7 +3472,10 @@ class TestT705WorkerRemembersPreviousMessages:
                 content = msg.get("content", [])
                 if isinstance(content, list):
                     for block in content:
-                        if isinstance(block, dict) and block.get("type") == "AskUserQuestionBlock":
+                        if (
+                            isinstance(block, dict)
+                            and block.get("type") == "AskUserQuestionBlock"
+                        ):
                             question_blocks_in_history += 1
 
             # Capture context at Q2 to verify it includes Q1's context
@@ -3336,7 +3484,10 @@ class TestT705WorkerRemembersPreviousMessages:
                     content = msg.get("content", [])
                     if isinstance(content, list):
                         for block in content:
-                            if isinstance(block, dict) and block.get("type") == "TextBlock":
+                            if (
+                                isinstance(block, dict)
+                                and block.get("type") == "TextBlock"
+                            ):
                                 context_at_q2.append(block.get("text", ""))
 
             return f"T705_ANSWER_{question_number}"
@@ -3391,26 +3542,26 @@ class TestT705WorkerRemembersPreviousMessages:
                         text_contents.append(block.get("text", ""))
 
         verification_results["maintains_message_list"] = (
-            "BEFORE_Q1_CONTEXT" in text_contents and
-            "AFTER_A1_WORK" in text_contents and
-            "FINAL_WORK" in text_contents
+            "BEFORE_Q1_CONTEXT" in text_contents
+            and "AFTER_A1_WORK" in text_contents
+            and "FINAL_WORK" in text_contents
         )
 
         # CRITERION 2: After Developer answers, Worker can access previous context
         # Verified by: Q2 sees context from before Q1 AND after A1
         context_at_q2_joined = " ".join(context_at_q2)
         verification_results["accesses_previous_context"] = (
-            "BEFORE_Q1_CONTEXT" in context_at_q2_joined and
-            "AFTER_A1_WORK" in context_at_q2_joined
+            "BEFORE_Q1_CONTEXT" in context_at_q2_joined
+            and "AFTER_A1_WORK" in context_at_q2_joined
         )
 
         # CRITERION 3: Message history includes both questions and answers
         # Verified by: Question blocks in history + answer queries sent to client
         verification_results["includes_questions_and_answers"] = (
-            question_blocks_in_history >= 1 and
-            len(answer_queries_sent) == 2 and
-            "T705_ANSWER_1" in answer_queries_sent[0] and
-            "T705_ANSWER_2" in answer_queries_sent[1]
+            question_blocks_in_history >= 1
+            and len(answer_queries_sent) == 2
+            and "T705_ANSWER_1" in answer_queries_sent[0]
+            and "T705_ANSWER_2" in answer_queries_sent[1]
         )
 
         # CRITERION 4: Worker uses this history for subsequent work
@@ -3420,13 +3571,16 @@ class TestT705WorkerRemembersPreviousMessages:
             content = msg.get("content", [])
             if isinstance(content, list):
                 for block in content:
-                    if isinstance(block, dict) and block.get("type") == "AskUserQuestionBlock":
+                    if (
+                        isinstance(block, dict)
+                        and block.get("type") == "AskUserQuestionBlock"
+                    ):
                         final_question_blocks += 1
 
         verification_results["uses_history_for_work"] = (
-            final_question_blocks >= 2 and
-            len(all_messages) >= 5 and
-            result.result == "T705 Complete"
+            final_question_blocks >= 2
+            and len(all_messages) >= 5
+            and result.result == "T705 Complete"
         )
 
         # VERIFY: All criteria pass
@@ -3492,8 +3646,10 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         # Patch the SDK client class
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", TrackingClaudeSDKClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", TrackingClaudeSDKClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Execute query - this should create a new client
                 await worker.execute_query("Test client creation")
 
@@ -3540,12 +3696,16 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", SequenceTrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", SequenceTrackingClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Sequence test query")
 
         # VERIFY: Correct sequence
-        assert len(call_sequence) >= 3, f"Expected at least 3 calls, got {call_sequence}"
+        assert len(call_sequence) >= 3, (
+            f"Expected at least 3 calls, got {call_sequence}"
+        )
 
         # VERIFY: __init__ comes first
         assert call_sequence[0] == "__init__", (
@@ -3554,7 +3714,9 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
 
         # VERIFY: connect comes before any query
         connect_index = call_sequence.index("connect")
-        query_indices = [i for i, c in enumerate(call_sequence) if c.startswith("query:")]
+        query_indices = [
+            i for i, c in enumerate(call_sequence) if c.startswith("query:")
+        ]
 
         assert len(query_indices) > 0, "Expected at least one query call"
         assert all(connect_index < qi for qi in query_indices), (
@@ -3567,6 +3729,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
 
         After connect() succeeds, the worker._client should reference the client.
         """
+
         class StorageTestClient:
             """Client for testing storage."""
 
@@ -3597,8 +3760,8 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         # Before evaluation, no client should exist
         assert worker._client is None, "Client should be None before evaluation"
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", StorageTestClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", StorageTestClient):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Storage test query")
 
         # VERIFY: After evaluation, client is stored
@@ -3644,8 +3807,10 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ConnectionStateClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", ConnectionStateClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Connection state test")
 
         # VERIFY: When streaming started (query called), connection was already established
@@ -3695,8 +3860,8 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", CountingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", CountingClient):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First evaluation
                 await worker.execute_query("First evaluation", resume_session=False)
 
@@ -3750,8 +3915,10 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ReuseTrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", ReuseTrackingClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First query creates a client
                 await worker.execute_query("First query", resume_session=False)
 
@@ -3802,9 +3969,13 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailingConnectClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
-                with pytest.raises(ConnectionError, match="Simulated connection failure"):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailingConnectClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
+                with pytest.raises(
+                    ConnectionError, match="Simulated connection failure"
+                ):
                     await worker.execute_query("Should fail to connect")
 
         # VERIFY: Connect was called but query was not (connection failed first)
@@ -3865,8 +4036,10 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", VerificationClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", VerificationClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("T706 verification query")
 
         # CRITERION 1: Client is instantiated when evaluation starts
@@ -3877,25 +4050,34 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
 
         # CRITERION 2: Async context manager pattern used correctly
         # Verified by: CONNECTED appears after INSTANTIATED
-        instantiated_idx = lifecycle_events.index("INSTANTIATED") if "INSTANTIATED" in lifecycle_events else -1
-        connected_idx = lifecycle_events.index("CONNECTED") if "CONNECTED" in lifecycle_events else -1
+        instantiated_idx = (
+            lifecycle_events.index("INSTANTIATED")
+            if "INSTANTIATED" in lifecycle_events
+            else -1
+        )
+        connected_idx = (
+            lifecycle_events.index("CONNECTED")
+            if "CONNECTED" in lifecycle_events
+            else -1
+        )
         verification_results["connect_pattern_used_correctly"] = (
-            instantiated_idx >= 0 and
-            connected_idx >= 0 and
-            instantiated_idx < connected_idx
+            instantiated_idx >= 0
+            and connected_idx >= 0
+            and instantiated_idx < connected_idx
         )
 
         # CRITERION 3: Connection established before queries
         # Verified by: QUERY:True means query was called with connected=True
         query_events = [e for e in lifecycle_events if e.startswith("QUERY:")]
-        verification_results["connection_before_queries"] = (
-            len(query_events) > 0 and
-            all(e == "QUERY:True" for e in query_events)
-        )
+        verification_results["connection_before_queries"] = len(
+            query_events
+        ) > 0 and all(e == "QUERY:True" for e in query_events)
 
         # VERIFY: All criteria pass
         for criterion, passed in verification_results.items():
-            assert passed, f"T706 criterion '{criterion}' failed. Events: {lifecycle_events}"
+            assert passed, (
+                f"T706 criterion '{criterion}' failed. Events: {lifecycle_events}"
+            )
 
 
 # =============================================================================
@@ -3953,8 +4135,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", DisconnectTrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", DisconnectTrackingClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Execute a successful query
                 await worker.execute_query("Success query")
 
@@ -4009,8 +4193,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailingConnectClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailingConnectClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 with pytest.raises(ConnectionError, match="T707: Connection failed"):
                     await worker.execute_query("Should fail")
 
@@ -4066,8 +4252,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailingStreamClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailingStreamClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 with pytest.raises(RuntimeError, match="T707: Streaming failed"):
                     await worker.execute_query("Should fail during streaming")
 
@@ -4120,8 +4308,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", DoubleFailureClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", DoubleFailureClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 try:
                     await worker.execute_query("Should fail")
                 except ValueError as e:
@@ -4164,12 +4354,14 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 self.session_id = f"tracking-session-{self.client_id}"
                 self._connected = False
                 self._disconnected = False
-                clients.append({
-                    "id": self.client_id,
-                    "client": self,
-                    "connected": False,
-                    "disconnected": False,
-                })
+                clients.append(
+                    {
+                        "id": self.client_id,
+                        "client": self,
+                        "connected": False,
+                        "disconnected": False,
+                    }
+                )
 
             async def connect(self) -> None:
                 self._connected = True
@@ -4197,8 +4389,8 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", TrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", TrackingClient):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First query - creates client 1
                 await worker.execute_query("First query", resume_session=False)
                 assert len(clients) == 1
@@ -4215,9 +4407,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         # VERIFY: Second client was connected
-        assert clients[1]["connected"] is True, (
-            "Second client should be connected"
-        )
+        assert clients[1]["connected"] is True, "Second client should be connected"
 
     @pytest.mark.asyncio
     async def test_no_connection_leaks_after_multiple_evaluations(self) -> None:
@@ -4260,8 +4450,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", LeakTrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", LeakTrackingClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 5 sequential evaluations with cleanup
                 for i in range(5):
                     await worker.execute_query(f"Evaluation {i + 1}")
@@ -4274,7 +4466,9 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                     )
 
         # VERIFY: All operations show proper connect/disconnect pairs
-        connect_count = sum(1 for op in all_operations if "connected" in op and "disconnected" not in op)
+        connect_count = sum(
+            1 for op in all_operations if "connected" in op and "disconnected" not in op
+        )
         disconnect_count = sum(1 for op in all_operations if "disconnected" in op)
 
         assert connect_count == disconnect_count, (
@@ -4322,8 +4516,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", IdempotentTestClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", IdempotentTestClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Test query")
 
                 # Call clear_session multiple times
@@ -4345,6 +4541,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
 
         The method should return True when a client exists, False after cleanup.
         """
+
         class StateTestClient:
             """Test has_active_client state."""
 
@@ -4374,8 +4571,8 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         # Before any query
         assert worker.has_active_client() is False, "No client before query"
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", StateTestClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", StateTestClient):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Test query")
 
         # After query
@@ -4443,15 +4640,18 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ComprehensiveVerificationClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            ComprehensiveVerificationClient,
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # SCENARIO 1: Successful query with explicit cleanup
                 await worker.execute_query("T707 success query")
                 await worker.clear_session()
 
                 # CRITERION 1: disconnect called on success via clear_session
-                verification_results["disconnect_on_success_via_clear_session"] = (
-                    any("DISCONNECTED" in e for e in lifecycle_events)
+                verification_results["disconnect_on_success_via_clear_session"] = any(
+                    "DISCONNECTED" in e for e in lifecycle_events
                 )
 
                 # Reset for failure scenario
@@ -4466,8 +4666,8 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                     pass  # Expected
 
                 # CRITERION 2: disconnect called on failure
-                verification_results["disconnect_on_failure"] = (
-                    any("DISCONNECTED" in e for e in lifecycle_events)
+                verification_results["disconnect_on_failure"] = any(
+                    "DISCONNECTED" in e for e in lifecycle_events
                 )
 
                 # CRITERION 3: cleanup happens in exception path
@@ -4477,9 +4677,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 )
 
         # CRITERION 4: No connection leaks
-        verification_results["no_connection_leaks"] = (
-            len(active_connections) == 0
-        )
+        verification_results["no_connection_leaks"] = len(active_connections) == 0
 
         # VERIFY: All criteria pass
         for criterion, passed in verification_results.items():
@@ -4559,8 +4757,11 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", LeakTrackingSequentialClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient",
+            LeakTrackingSequentialClient,
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 50 sequential evaluations
                 for i in range(50):
                     await worker.execute_query(f"Evaluation {i + 1}")
@@ -4573,9 +4774,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                     )
 
         # VERIFY: 50 connects and 50 disconnects
-        assert total_connects == 50, (
-            f"Expected 50 connects, got {total_connects}"
-        )
+        assert total_connects == 50, f"Expected 50 connects, got {total_connects}"
         assert total_disconnects == 50, (
             f"Expected 50 disconnects, got {total_disconnects}"
         )
@@ -4627,8 +4826,10 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", AccumulationTrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", AccumulationTrackingClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 10 sequential evaluations
                 for i in range(10):
                     await worker.execute_query(f"Eval {i + 1}")
@@ -4684,7 +4885,9 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                     yield AssistantMessage(content=[question_block])
                 else:
                     # Second query gets the result
-                    yield ResultMessage(result=f"{self.client_id} completed with answer")
+                    yield ResultMessage(
+                        result=f"{self.client_id} completed with answer"
+                    )
 
         async def count_and_answer(context: QuestionContext) -> str:
             nonlocal question_count
@@ -4699,8 +4902,10 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             on_question_callback=count_and_answer,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", QuestionLeakTrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", QuestionLeakTrackingClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 10 sequential evaluations, each with a question
                 for i in range(10):
                     await worker.execute_query(f"Evaluation with question {i + 1}")
@@ -4771,8 +4976,10 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         success_count = 0
         failure_count = 0
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", FailureLeakTrackingClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", FailureLeakTrackingClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 30 sequential evaluations with some failures
                 for i in range(30):
                     try:
@@ -4806,6 +5013,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
 
         This ensures no memory accumulation from tool invocation tracking.
         """
+
         class SimpleClient:
             """Simple client for tool invocation test."""
 
@@ -4832,11 +5040,12 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", SimpleClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch("claude_evaluator.core.agents.worker.ClaudeSDKClient", SimpleClient):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 for i in range(10):
                     # Before query, add some tool invocations to simulate previous state
                     from datetime import datetime
+
                     worker.tool_invocations.append(
                         ToolInvocation(
                             timestamp=datetime.now(),
@@ -4888,7 +5097,9 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 if self._query_count == 1:
                     # Ask a question on first query
                     yield AssistantMessage(
-                        content=[AskUserQuestionBlock(questions=[{"question": "Test?"}])]
+                        content=[
+                            AskUserQuestionBlock(questions=[{"question": "Test?"}])
+                        ]
                     )
                 else:
                     yield ResultMessage(result="Done")
@@ -4905,8 +5116,10 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             on_question_callback=track_attempts,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", CounterCheckClient):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", CounterCheckClient
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 5 sequential evaluations, each with a question
                 for i in range(5):
                     await worker.execute_query(f"Eval {i + 1}")
@@ -4974,8 +5187,10 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.agents.worker.ClaudeSDKClient", ComprehensiveT708Client):
-            with patch("claude_evaluator.agents.worker.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.worker.ClaudeSDKClient", ComprehensiveT708Client
+        ):
+            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # Run 55 sequential evaluations (exceeding 50 requirement)
                 for i in range(55):
                     await worker.execute_query(f"Verification eval {i + 1}")
@@ -4986,10 +5201,10 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                         cleanup_verified_count += 1
 
         # CRITERION 1: No connection accumulation (max 1 concurrent)
-        verification_results["no_connection_accumulation"] = (max_concurrent == 1)
+        verification_results["no_connection_accumulation"] = max_concurrent == 1
 
         # CRITERION 2: Each evaluation properly cleaned up
-        verification_results["proper_cleanup_each_eval"] = (cleanup_verified_count == 55)
+        verification_results["proper_cleanup_each_eval"] = cleanup_verified_count == 55
 
         # CRITERION 3: Resources released (no active connections at end)
         verification_results["resources_released_between_evals"] = (
@@ -5065,16 +5280,26 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
         mock_client.session_id = "t709-sequential-session"
 
         # Create 3 sequential questions
-        q1 = AskUserQuestionBlock(questions=[{"question": "What database should I use?"}])
+        q1 = AskUserQuestionBlock(
+            questions=[{"question": "What database should I use?"}]
+        )
         q2 = AskUserQuestionBlock(questions=[{"question": "Which ORM library?"}])
         q3 = AskUserQuestionBlock(questions=[{"question": "Should I add caching?"}])
 
         mock_client.set_responses(
             [
-                [AssistantMessage(content=[TextBlock("Setting up the project..."), q1])],
+                [
+                    AssistantMessage(
+                        content=[TextBlock("Setting up the project..."), q1]
+                    )
+                ],
                 [AssistantMessage(content=[TextBlock("Configuring database..."), q2])],
                 [AssistantMessage(content=[TextBlock("Adding ORM layer..."), q3])],
-                [ResultMessage(result="Project setup complete with all configurations")],
+                [
+                    ResultMessage(
+                        result="Project setup complete with all configurations"
+                    )
+                ],
             ]
         )
 
@@ -5134,7 +5359,9 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             + [[ResultMessage(result="Done")]]
         )
 
-        await worker._stream_sdk_messages_with_client("Multi-question task", mock_client)
+        await worker._stream_sdk_messages_with_client(
+            "Multi-question task", mock_client
+        )
 
         # VERIFY: All questions had the same session_id
         assert len(session_ids) == 5
@@ -5181,7 +5408,9 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             ]
         )
 
-        await worker._stream_sdk_messages_with_client("Growing history task", mock_client)
+        await worker._stream_sdk_messages_with_client(
+            "Growing history task", mock_client
+        )
 
         # VERIFY: History length should grow or stay stable (not shrink)
         assert len(history_lengths) == 4
@@ -5198,6 +5427,7 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
         Each answer from Developer should trigger a client.query() call
         to continue the conversation.
         """
+
         async def answer_callback(context: QuestionContext) -> str:
             # Return distinctive answers that we can verify
             q = context.questions[0].question
@@ -5274,28 +5504,34 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
 
         # Questions with different options
         q1 = AskUserQuestionBlock(
-            questions=[{
-                "question": "Choose framework?",
-                "options": [
-                    {"label": "Django", "description": "Full-featured"},
-                    {"label": "Flask", "description": "Lightweight"},
-                    {"label": "FastAPI", "description": "Modern"},
-                ],
-            }]
+            questions=[
+                {
+                    "question": "Choose framework?",
+                    "options": [
+                        {"label": "Django", "description": "Full-featured"},
+                        {"label": "Flask", "description": "Lightweight"},
+                        {"label": "FastAPI", "description": "Modern"},
+                    ],
+                }
+            ]
         )
         q2 = AskUserQuestionBlock(
-            questions=[{
-                "question": "Choose database?",
-                "options": [
-                    {"label": "PostgreSQL"},
-                    {"label": "MySQL"},
-                ],
-            }]
+            questions=[
+                {
+                    "question": "Choose database?",
+                    "options": [
+                        {"label": "PostgreSQL"},
+                        {"label": "MySQL"},
+                    ],
+                }
+            ]
         )
         q3 = AskUserQuestionBlock(
-            questions=[{
-                "question": "Free-form question without options?",
-            }]
+            questions=[
+                {
+                    "question": "Free-form question without options?",
+                }
+            ]
         )
 
         mock_client.set_responses(
@@ -5390,7 +5626,9 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
 
         # Create 20 sequential questions
         questions = [
-            AskUserQuestionBlock(questions=[{"question": f"Sequential question number {i}?"}])
+            AskUserQuestionBlock(
+                questions=[{"question": f"Sequential question number {i}?"}]
+            )
             for i in range(1, question_count + 1)
         ]
 
@@ -5442,10 +5680,12 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
                         if isinstance(block, dict) and "text" in block:
                             history_texts.append(block["text"])
 
-            interactions.append({
-                "question": context.questions[0].question,
-                "history_text_count": len(history_texts),
-            })
+            interactions.append(
+                {
+                    "question": context.questions[0].question,
+                    "history_text_count": len(history_texts),
+                }
+            )
             return f"Answer for {context.questions[0].question}"
 
         worker = WorkerAgent(
@@ -5465,19 +5705,33 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             [
                 # After initial query: work text followed by question
                 [
-                    AssistantMessage(content=[TextBlock("Analyzing project structure...")]),
-                    AssistantMessage(content=[TextBlock("Found 5 modules to process.")]),
-                    AssistantMessage(content=[
-                        AskUserQuestionBlock(questions=[{"question": "Process all modules?"}])
-                    ]),
+                    AssistantMessage(
+                        content=[TextBlock("Analyzing project structure...")]
+                    ),
+                    AssistantMessage(
+                        content=[TextBlock("Found 5 modules to process.")]
+                    ),
+                    AssistantMessage(
+                        content=[
+                            AskUserQuestionBlock(
+                                questions=[{"question": "Process all modules?"}]
+                            )
+                        ]
+                    ),
                 ],
                 # After first answer: more work and another question
                 [
                     AssistantMessage(content=[TextBlock("Processing modules...")]),
-                    AssistantMessage(content=[TextBlock("Detected configuration issue.")]),
-                    AssistantMessage(content=[
-                        AskUserQuestionBlock(questions=[{"question": "How to handle config?"}])
-                    ]),
+                    AssistantMessage(
+                        content=[TextBlock("Detected configuration issue.")]
+                    ),
+                    AssistantMessage(
+                        content=[
+                            AskUserQuestionBlock(
+                                questions=[{"question": "How to handle config?"}]
+                            )
+                        ]
+                    ),
                 ],
                 # After second answer: final work and result
                 [ResultMessage(result="Project analysis complete")],
@@ -5496,7 +5750,10 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
         assert interactions[1]["question"] == "How to handle config?"
 
         # VERIFY: Second question has more history than first
-        assert interactions[1]["history_text_count"] >= interactions[0]["history_text_count"]
+        assert (
+            interactions[1]["history_text_count"]
+            >= interactions[0]["history_text_count"]
+        )
 
         # VERIFY: Task completed
         assert result.result == "Project analysis complete"
@@ -5551,18 +5808,26 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
         q1 = AskUserQuestionBlock(questions=[{"question": "Architecture question?"}])
         q2 = AskUserQuestionBlock(questions=[{"question": "Database design question?"}])
         q3 = AskUserQuestionBlock(
-            questions=[{
-                "question": "API design question?",
-                "options": [{"label": "REST"}, {"label": "GraphQL"}],
-            }]
+            questions=[
+                {
+                    "question": "API design question?",
+                    "options": [{"label": "REST"}, {"label": "GraphQL"}],
+                }
+            ]
         )
-        q4 = AskUserQuestionBlock(questions=[{"question": "Testing strategy question?"}])
+        q4 = AskUserQuestionBlock(
+            questions=[{"question": "Testing strategy question?"}]
+        )
         q5 = AskUserQuestionBlock(questions=[{"question": "Deployment question?"}])
 
         mock_client.set_responses(
             [
                 [AssistantMessage(content=[TextBlock("Starting analysis..."), q1])],
-                [AssistantMessage(content=[TextBlock("Proceeding with architecture..."), q2])],
+                [
+                    AssistantMessage(
+                        content=[TextBlock("Proceeding with architecture..."), q2]
+                    )
+                ],
                 [AssistantMessage(content=[TextBlock("Database configured..."), q3])],
                 [AssistantMessage(content=[TextBlock("API designed..."), q4])],
                 [AssistantMessage(content=[TextBlock("Tests planned..."), q5])],
@@ -5588,13 +5853,15 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             "Deployment question?",
         ]
         all_questions_correct = all(
-            qa[0] == expected for qa, expected in zip(questions_and_answers, expected_questions)
+            qa[0] == expected
+            for qa, expected in zip(questions_and_answers, expected_questions)
         )
         verification_results["each_question_handled_correctly"] = all_questions_correct
 
         # CRITERION 3: Answers provided for each
         all_answers_provided = all(
-            qa[1].startswith("Comprehensive answer for:") for qa in questions_and_answers
+            qa[1].startswith("Comprehensive answer for:")
+            for qa in questions_and_answers
         )
         verification_results["answers_provided_for_each"] = all_answers_provided
 
@@ -5604,7 +5871,9 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             if history_sizes[i] < history_sizes[i - 1]:
                 context_maintained = False
                 break
-        verification_results["context_maintained_between_questions"] = context_maintained
+        verification_results["context_maintained_between_questions"] = (
+            context_maintained
+        )
 
         # Additional verification: All answers were sent
         assert len(mock_client._queries) == 6  # 1 initial + 5 answers
@@ -5646,7 +5915,9 @@ class TestT710TimeoutTriggersGracefulFailure:
     """
 
     @pytest.mark.asyncio
-    async def test_timeout_triggers_graceful_failure_with_descriptive_error(self) -> None:
+    async def test_timeout_triggers_graceful_failure_with_descriptive_error(
+        self,
+    ) -> None:
         """Verify that timeout produces a descriptive and helpful error message.
 
         When the callback exceeds the timeout:
@@ -5654,6 +5925,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         - The error message should include the timeout duration
         - The error message should include the question text for debugging
         """
+
         async def slow_callback(context: QuestionContext) -> str:
             await asyncio.sleep(10)  # Much longer than timeout
             return "this will never be returned"
@@ -5671,13 +5943,13 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_client.session_id = "t710-timeout-session"
 
         question_text = "What architecture pattern should we use for the service layer?"
-        question_block = AskUserQuestionBlock(
-            questions=[{"question": question_text}]
-        )
+        question_block = AskUserQuestionBlock(questions=[{"question": question_text}])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[TextBlock("Analyzing..."), question_block])],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[TextBlock("Analyzing..."), question_block])],
+            ]
+        )
 
         with pytest.raises(asyncio.TimeoutError) as exc_info:
             await worker._stream_sdk_messages_with_client("Design service", mock_client)
@@ -5690,9 +5962,10 @@ class TestT710TimeoutTriggersGracefulFailure:
         )
 
         # VERIFY: Error message includes question text for debugging
-        assert "architecture pattern" in error_message.lower() or question_text in error_message, (
-            f"Error should include question text for debugging. Got: {error_message}"
-        )
+        assert (
+            "architecture pattern" in error_message.lower()
+            or question_text in error_message
+        ), f"Error should include question text for debugging. Got: {error_message}"
 
         # VERIFY: Error message mentions it was a callback timeout
         assert "timed out" in error_message.lower(), (
@@ -5733,9 +6006,11 @@ class TestT710TimeoutTriggersGracefulFailure:
             questions=[{"question": "This will timeout?"}]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[question_block])],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+            ]
+        )
 
         with pytest.raises(asyncio.TimeoutError):
             await worker._stream_sdk_messages_with_client("Start", mock_client)
@@ -5788,9 +6063,11 @@ class TestT710TimeoutTriggersGracefulFailure:
             questions=[{"question": "Cleanup test question?"}]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[question_block])],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+            ]
+        )
 
         # Track tasks before timeout
         cleanup_tracker["tasks_before"] = len(asyncio.all_tasks())
@@ -5825,6 +6102,7 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         The WorkerAgent should have a default question_timeout_seconds of 60.
         """
+
         async def dummy_callback(context: QuestionContext) -> str:
             return "answer"
 
@@ -5873,13 +6151,13 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         mock_client = MockClaudeSDKClient()
 
-        question_block = AskUserQuestionBlock(
-            questions=[{"question": "Timing test?"}]
-        )
+        question_block = AskUserQuestionBlock(questions=[{"question": "Timing test?"}])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[question_block])],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+            ]
+        )
 
         start_time = time.monotonic()
         with pytest.raises(asyncio.TimeoutError):
@@ -5897,6 +6175,7 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         The error message should summarize the questions appropriately.
         """
+
         async def slow_callback(context: QuestionContext) -> str:
             await asyncio.sleep(10)
             return "answer"
@@ -5921,9 +6200,11 @@ class TestT710TimeoutTriggersGracefulFailure:
             ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[multi_question_block])],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[multi_question_block])],
+            ]
+        )
 
         with pytest.raises(asyncio.TimeoutError) as exc_info:
             await worker._stream_sdk_messages_with_client("Multi-question", mock_client)
@@ -5931,9 +6212,10 @@ class TestT710TimeoutTriggersGracefulFailure:
         error_message = str(exc_info.value)
 
         # VERIFY: Error includes at least the first question for context
-        assert "databases" in error_message.lower() or "First important question" in error_message, (
-            f"Error should mention the question content. Got: {error_message}"
-        )
+        assert (
+            "databases" in error_message.lower()
+            or "First important question" in error_message
+        ), f"Error should mention the question content. Got: {error_message}"
 
     @pytest.mark.asyncio
     async def test_timeout_does_not_affect_subsequent_operations(self) -> None:
@@ -5960,9 +6242,17 @@ class TestT710TimeoutTriggersGracefulFailure:
         )
 
         mock_client_1 = MockClaudeSDKClient()
-        mock_client_1.set_responses([
-            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": "Slow?"}])])],
-        ])
+        mock_client_1.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[
+                            AskUserQuestionBlock(questions=[{"question": "Slow?"}])
+                        ]
+                    )
+                ],
+            ]
+        )
 
         # First operation times out
         with pytest.raises(asyncio.TimeoutError):
@@ -5970,13 +6260,23 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         # Create a new client for second operation
         mock_client_2 = MockClaudeSDKClient()
-        mock_client_2.set_responses([
-            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": "Fast?"}])])],
-            [ResultMessage(result="Success after timeout")],
-        ])
+        mock_client_2.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[
+                            AskUserQuestionBlock(questions=[{"question": "Fast?"}])
+                        ]
+                    )
+                ],
+                [ResultMessage(result="Success after timeout")],
+            ]
+        )
 
         # Second operation should succeed
-        result, _, _ = await worker._stream_sdk_messages_with_client("Second", mock_client_2)
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Second", mock_client_2
+        )
 
         # VERIFY: Second operation completed successfully
         assert result.result == "Success after timeout"
@@ -5989,6 +6289,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         The error should help developers understand what question timed out
         and in what context.
         """
+
         async def slow_callback(context: QuestionContext) -> str:
             await asyncio.sleep(10)
             return "answer"
@@ -6006,27 +6307,42 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_client.session_id = "debug-session-xyz-123"
 
         question_block = AskUserQuestionBlock(
-            questions=[{
-                "question": "Should we use microservices or monolith?",
-                "options": [
-                    {"label": "Microservices", "description": "Distributed architecture"},
-                    {"label": "Monolith", "description": "Single deployment unit"},
-                ],
-            }]
+            questions=[
+                {
+                    "question": "Should we use microservices or monolith?",
+                    "options": [
+                        {
+                            "label": "Microservices",
+                            "description": "Distributed architecture",
+                        },
+                        {"label": "Monolith", "description": "Single deployment unit"},
+                    ],
+                }
+            ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[question_block])],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+            ]
+        )
 
         with pytest.raises(asyncio.TimeoutError) as exc_info:
-            await worker._stream_sdk_messages_with_client("Architecture decision", mock_client)
+            await worker._stream_sdk_messages_with_client(
+                "Architecture decision", mock_client
+            )
 
         error_message = str(exc_info.value)
 
         # VERIFY: Error is informative for debugging
-        assert "Question callback timed out" in error_message or "timed out" in error_message.lower()
-        assert "microservices" in error_message.lower() or "monolith" in error_message.lower()
+        assert (
+            "Question callback timed out" in error_message
+            or "timed out" in error_message.lower()
+        )
+        assert (
+            "microservices" in error_message.lower()
+            or "monolith" in error_message.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_fast_callback_completes_before_timeout(self) -> None:
@@ -6057,12 +6373,16 @@ class TestT710TimeoutTriggersGracefulFailure:
             questions=[{"question": "Quick question?"}]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[question_block])],
-            [ResultMessage(result="Task completed successfully")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[question_block])],
+                [ResultMessage(result="Task completed successfully")],
+            ]
+        )
 
-        result, _, _ = await worker._stream_sdk_messages_with_client("Fast task", mock_client)
+        result, _, _ = await worker._stream_sdk_messages_with_client(
+            "Fast task", mock_client
+        )
 
         # VERIFY: No timeout occurred
         assert callback_completed, "Callback should have completed"
@@ -6121,9 +6441,15 @@ class TestT710TimeoutTriggersGracefulFailure:
             questions=[{"question": "Verification timeout question for T710?"}]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[TextBlock("Processing..."), question_block])],
-        ])
+        mock_client.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[TextBlock("Processing..."), question_block]
+                    )
+                ],
+            ]
+        )
 
         tasks_before = len(asyncio.all_tasks())
 
@@ -6138,7 +6464,9 @@ class TestT710TimeoutTriggersGracefulFailure:
             # CRITERION 2: Error message is descriptive
             has_timeout_info = "timed out" in error_message.lower()
             has_duration = "1 seconds" in error_message
-            has_question_context = "T710" in error_message or "verification" in error_message.lower()
+            has_question_context = (
+                "T710" in error_message or "verification" in error_message.lower()
+            )
             verification_results["error_message_is_descriptive"] = (
                 has_timeout_info and has_duration
             )
@@ -6219,11 +6547,13 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         q1 = AskUserQuestionBlock(questions=[{"question": same_question}])
         q2 = AskUserQuestionBlock(questions=[{"question": same_question}])  # Retry
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[q1])],  # First ask
-            [AssistantMessage(content=[q2])],  # Retry (same question)
-            [ResultMessage(result="Completed after retry")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],  # First ask
+                [AssistantMessage(content=[q2])],  # Retry (same question)
+                [ResultMessage(result="Completed after retry")],
+            ]
+        )
 
         result, _, _ = await worker._stream_sdk_messages_with_client(
             "Choose database", mock_client
@@ -6302,7 +6632,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,  # Retry
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", mock_sdk_query):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query):
             # First attempt
             result_1 = await developer.answer_question(context_attempt_1)
             context_sizes_used.append(result_1.context_size)
@@ -6368,7 +6698,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", mock_sdk_query):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query):
             # First attempt
             await developer.answer_question(context_attempt_1)
             decisions_after_first = len(developer.decisions_log)
@@ -6431,12 +6761,14 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         q2 = AskUserQuestionBlock(questions=[{"question": "Q?"}])
         q3 = AskUserQuestionBlock(questions=[{"question": "Q?"}])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[q1])],
-            [AssistantMessage(content=[q2])],
-            [AssistantMessage(content=[q3])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],
+                [AssistantMessage(content=[q2])],
+                [AssistantMessage(content=[q3])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Test", mock_client)
 
@@ -6472,11 +6804,20 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         # History with important early context
         history = [
             {"role": "user", "content": "We are building a financial trading system"},
-            {"role": "assistant", "content": "I understand, a financial trading system requires high reliability"},
+            {
+                "role": "assistant",
+                "content": "I understand, a financial trading system requires high reliability",
+            },
             {"role": "user", "content": "It needs to handle millions of transactions"},
-            {"role": "assistant", "content": "For high-volume transactions, we should consider message queues"},
+            {
+                "role": "assistant",
+                "content": "For high-volume transactions, we should consider message queues",
+            },
             {"role": "user", "content": "We need microsecond latency"},
-            {"role": "assistant", "content": "For ultra-low latency, we might use in-memory solutions"},
+            {
+                "role": "assistant",
+                "content": "For ultra-low latency, we might use in-memory solutions",
+            },
         ]
 
         # First attempt - limited context (only last 2 messages)
@@ -6495,7 +6836,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", capture_prompt):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
             await developer.answer_question(context_1)
             developer.current_state = DeveloperState.awaiting_response
             await developer.answer_question(context_2)
@@ -6529,11 +6870,13 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         answer_attempts: list[dict[str, Any]] = []
 
         async def developer_callback_with_tracking(context: QuestionContext) -> str:
-            answer_attempts.append({
-                "attempt": context.attempt_number,
-                "history_size": len(context.conversation_history),
-                "question": context.questions[0].question,
-            })
+            answer_attempts.append(
+                {
+                    "attempt": context.attempt_number,
+                    "history_size": len(context.conversation_history),
+                    "question": context.questions[0].question,
+                }
+            )
 
             if context.attempt_number == 1:
                 return "Use PostgreSQL"  # May be rejected
@@ -6556,13 +6899,26 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         q1 = AskUserQuestionBlock(questions=[{"question": db_question}])
         q1_retry = AskUserQuestionBlock(questions=[{"question": db_question}])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[TextBlock("Analyzing requirements..."), q1])],
-            # Worker asks same question again (simulating rejection of first answer)
-            [AssistantMessage(content=[TextBlock("I need more specific guidance..."), q1_retry])],
-            # Worker accepts second answer
-            [ResultMessage(result="Database configured with read replicas")],
-        ])
+        mock_client.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[TextBlock("Analyzing requirements..."), q1]
+                    )
+                ],
+                # Worker asks same question again (simulating rejection of first answer)
+                [
+                    AssistantMessage(
+                        content=[
+                            TextBlock("I need more specific guidance..."),
+                            q1_retry,
+                        ]
+                    )
+                ],
+                # Worker accepts second answer
+                [ResultMessage(result="Database configured with read replicas")],
+            ]
+        )
 
         result, _, all_messages = await worker._stream_sdk_messages_with_client(
             "Configure database", mock_client
@@ -6592,7 +6948,10 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         # VERIFY: Both answers were sent to the client
         assert len(mock_client._queries) == 3  # Initial + 2 answers
         assert mock_client._queries[1] == "Use PostgreSQL"
-        assert mock_client._queries[2] == "Use PostgreSQL with read replicas for high availability"
+        assert (
+            mock_client._queries[2]
+            == "Use PostgreSQL with read replicas for high availability"
+        )
 
     @pytest.mark.asyncio
     async def test_max_retries_exceeded_results_in_answer_result_tracking(self) -> None:
@@ -6628,7 +6987,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", mock_query):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_query):
             result_1 = await developer.answer_question(context_1)
             developer.current_state = DeveloperState.awaiting_response
             result_2 = await developer.answer_question(context_2)
@@ -6670,11 +7029,21 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
 
         # First query with two questions (should be 1, 2)
         mock_client_1 = MockClaudeSDKClient()
-        mock_client_1.set_responses([
-            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": "Q1?"}])])],
-            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": "Q1?"}])])],  # Retry
-            [ResultMessage(result="Done 1")],
-        ])
+        mock_client_1.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[AskUserQuestionBlock(questions=[{"question": "Q1?"}])]
+                    )
+                ],
+                [
+                    AssistantMessage(
+                        content=[AskUserQuestionBlock(questions=[{"question": "Q1?"}])]
+                    )
+                ],  # Retry
+                [ResultMessage(result="Done 1")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Query 1", mock_client_1)
 
@@ -6683,10 +7052,16 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
 
         # Second query - counter should reset, first question should be attempt 1
         mock_client_2 = MockClaudeSDKClient()
-        mock_client_2.set_responses([
-            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": "Q2?"}])])],
-            [ResultMessage(result="Done 2")],
-        ])
+        mock_client_2.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[AskUserQuestionBlock(questions=[{"question": "Q2?"}])]
+                    )
+                ],
+                [ResultMessage(result="Done 2")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Query 2", mock_client_2)
 
@@ -6748,24 +7123,26 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         mock_client.session_id = "t711-verification"
 
         same_q = AskUserQuestionBlock(questions=[{"question": "Same question?"}])
-        mock_client.set_responses([
-            [AssistantMessage(content=[same_q])],
-            [AssistantMessage(content=[same_q])],  # Retry
-            [ResultMessage(result="Verified")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[same_q])],
+                [AssistantMessage(content=[same_q])],  # Retry
+                [ResultMessage(result="Verified")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Verify T711", mock_client)
 
         # CRITERION 1: Retry detected via attempt_number
         verification_results["retry_detected_via_attempt_number"] = (
-            len(test_state["attempt_numbers"]) == 2 and
-            test_state["attempt_numbers"][1] == 2
+            len(test_state["attempt_numbers"]) == 2
+            and test_state["attempt_numbers"][1] == 2
         )
 
         # CRITERION 3: Attempt number increments from 1 to 2
-        verification_results["attempt_number_increments"] = (
-            test_state["attempt_numbers"] == [1, 2]
-        )
+        verification_results["attempt_number_increments"] = test_state[
+            "attempt_numbers"
+        ] == [1, 2]
 
         # Test Developer-side full history usage
         developer = DeveloperAgent(
@@ -6796,7 +7173,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.agents.developer.sdk_query", capture_prompt):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
             result_1 = await developer.answer_question(context_1)
             test_state["context_sizes"].append(result_1.context_size)
 
@@ -6807,16 +7184,15 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
 
         # CRITERION 2: Full history used on retry
         verification_results["full_history_used_on_retry"] = (
-            test_state["context_sizes"][0] == 2 and  # Limited
-            test_state["context_sizes"][1] == 6  # Full
+            test_state["context_sizes"][0] == 2  # Limited
+            and test_state["context_sizes"][1] == 6  # Full
         )
 
         # CRITERION 4: More context on retry
         first_prompt = test_state["prompts"][0]
         retry_prompt = test_state["prompts"][1]
         verification_results["more_context_on_retry"] = (
-            "Early context" not in first_prompt and
-            "Early context" in retry_prompt
+            "Early context" not in first_prompt and "Early context" in retry_prompt
         )
 
         # VERIFY: All criteria pass
@@ -6876,10 +7252,12 @@ class TestT712EmptyInvalidQuestionHandling:
             questions=[{"question": "", "options": []}]  # Empty question text
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[empty_question_block])],
-            [ResultMessage(result="Handled gracefully")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[empty_question_block])],
+                [ResultMessage(result="Handled gracefully")],
+            ]
+        )
 
         result, _, _ = await worker._stream_sdk_messages_with_client(
             "Test empty question", mock_client
@@ -6910,6 +7288,7 @@ class TestT712EmptyInvalidQuestionHandling:
         and currently raise a ValueError during QuestionItem creation.
         This test documents this behavior as expected edge case handling.
         """
+
         async def capture_callback(context: QuestionContext) -> str:
             return "Answer for whitespace question"
 
@@ -6929,16 +7308,20 @@ class TestT712EmptyInvalidQuestionHandling:
             questions=[{"question": "   \t\n  "}]  # Only whitespace
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[whitespace_question_block])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[whitespace_question_block])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         # VERIFY: The whitespace question triggers an error or is handled
         # Current behavior: whitespace passes the initial empty check but fails
         # QuestionItem validation. This is a known edge case.
         with pytest.raises(ValueError) as exc_info:
-            await worker._stream_sdk_messages_with_client("Test whitespace", mock_client)
+            await worker._stream_sdk_messages_with_client(
+                "Test whitespace", mock_client
+            )
 
         # VERIFY: Error message is descriptive
         assert "non-empty" in str(exc_info.value).lower()
@@ -6970,10 +7353,12 @@ class TestT712EmptyInvalidQuestionHandling:
         # Question block with empty questions array
         no_questions_block = AskUserQuestionBlock(questions=[])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[no_questions_block])],
-            [ResultMessage(result="Completed")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[no_questions_block])],
+                [ResultMessage(result="Completed")],
+            ]
+        )
 
         result, _, _ = await worker._stream_sdk_messages_with_client(
             "Test no questions", mock_client
@@ -7013,16 +7398,20 @@ class TestT712EmptyInvalidQuestionHandling:
 
         # Question with only 1 option (invalid - needs at least 2)
         single_option_block = AskUserQuestionBlock(
-            questions=[{
-                "question": "Choose an option?",
-                "options": [{"label": "Only One Option"}],  # Only 1 option
-            }]
+            questions=[
+                {
+                    "question": "Choose an option?",
+                    "options": [{"label": "Only One Option"}],  # Only 1 option
+                }
+            ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[single_option_block])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[single_option_block])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Test single option", mock_client)
 
@@ -7061,20 +7450,24 @@ class TestT712EmptyInvalidQuestionHandling:
 
         # Question with all valid options (no empty labels)
         valid_options_block = AskUserQuestionBlock(
-            questions=[{
-                "question": "Which do you prefer?",
-                "options": [
-                    {"label": "Valid Option 1"},
-                    {"label": "Valid Option 2"},
-                    {"label": "Valid Option 3"},
-                ],
-            }]
+            questions=[
+                {
+                    "question": "Which do you prefer?",
+                    "options": [
+                        {"label": "Valid Option 1"},
+                        {"label": "Valid Option 2"},
+                        {"label": "Valid Option 3"},
+                    ],
+                }
+            ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[valid_options_block])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[valid_options_block])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Test valid options", mock_client)
 
@@ -7122,10 +7515,12 @@ class TestT712EmptyInvalidQuestionHandling:
             ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[malformed_block])],
-            [ResultMessage(result="Survived malformed data")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[malformed_block])],
+                [ResultMessage(result="Survived malformed data")],
+            ]
+        )
 
         try:
             result, _, _ = await worker._stream_sdk_messages_with_client(
@@ -7148,6 +7543,7 @@ class TestT712EmptyInvalidQuestionHandling:
         the current implementation raises a TypeError when iterating.
         This test documents this behavior as an expected edge case.
         """
+
         async def track_callback(context: QuestionContext) -> str:
             return "Answered"
 
@@ -7165,10 +7561,12 @@ class TestT712EmptyInvalidQuestionHandling:
         block = AskUserQuestionBlock(questions=[])
         block.questions = None  # Simulate None attribute
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[block])],
-            [ResultMessage(result="Handled None questions")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[block])],
+                [ResultMessage(result="Handled None questions")],
+            ]
+        )
 
         # VERIFY: None questions attribute raises TypeError
         with pytest.raises(TypeError) as exc_info:
@@ -7177,7 +7575,9 @@ class TestT712EmptyInvalidQuestionHandling:
             )
 
         # VERIFY: Error is about iteration
-        assert "NoneType" in str(exc_info.value) or "not iterable" in str(exc_info.value)
+        assert "NoneType" in str(exc_info.value) or "not iterable" in str(
+            exc_info.value
+        )
 
     @pytest.mark.asyncio
     async def test_valid_questions_only_works_correctly(self) -> None:
@@ -7210,10 +7610,12 @@ class TestT712EmptyInvalidQuestionHandling:
             ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[valid_block])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[valid_block])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Test valid", mock_client)
 
@@ -7246,16 +7648,20 @@ class TestT712EmptyInvalidQuestionHandling:
 
         # Question with empty header
         empty_header_block = AskUserQuestionBlock(
-            questions=[{
-                "question": "Real question here?",
-                "header": "",  # Empty header
-            }]
+            questions=[
+                {
+                    "question": "Real question here?",
+                    "header": "",  # Empty header
+                }
+            ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[empty_header_block])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[empty_header_block])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Test empty header", mock_client)
 
@@ -7294,10 +7700,12 @@ class TestT712EmptyInvalidQuestionHandling:
         # Trigger fallback by providing only invalid questions
         invalid_block = AskUserQuestionBlock(questions=[{"question": ""}])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[invalid_block])],
-            [ResultMessage(result="Clarified")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[invalid_block])],
+                [ResultMessage(result="Clarified")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Need fallback", mock_client)
 
@@ -7310,9 +7718,10 @@ class TestT712EmptyInvalidQuestionHandling:
 
         # VERIFY: Fallback contains keywords indicating it's asking for clarification
         # The actual fallback message is "Claude is asking for clarification."
-        assert any(word in fallback.lower() for word in [
-            "clarification", "claude", "asking", "question"
-        ]), f"Fallback '{fallback}' should indicate clarification is needed"
+        assert any(
+            word in fallback.lower()
+            for word in ["clarification", "claude", "asking", "question"]
+        ), f"Fallback '{fallback}' should indicate clarification is needed"
 
     @pytest.mark.asyncio
     async def test_options_with_missing_description_works(self) -> None:
@@ -7340,20 +7749,24 @@ class TestT712EmptyInvalidQuestionHandling:
 
         # Options with and without descriptions
         options_block = AskUserQuestionBlock(
-            questions=[{
-                "question": "Choose one?",
-                "options": [
-                    {"label": "Option A"},  # No description
-                    {"label": "Option B", "description": "Has description"},
-                    {"label": "Option C", "description": None},  # Explicit None
-                ],
-            }]
+            questions=[
+                {
+                    "question": "Choose one?",
+                    "options": [
+                        {"label": "Option A"},  # No description
+                        {"label": "Option B", "description": "Has description"},
+                        {"label": "Option C", "description": None},  # Explicit None
+                    ],
+                }
+            ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[options_block])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[options_block])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Test descriptions", mock_client)
 
@@ -7412,10 +7825,12 @@ class TestT712EmptyInvalidQuestionHandling:
             ]
         )
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[problematic_block])],
-            [ResultMessage(result="All validated")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[problematic_block])],
+                [ResultMessage(result="All validated")],
+            ]
+        )
 
         result, _, _ = await worker._stream_sdk_messages_with_client(
             "Validate context", mock_client
@@ -7442,6 +7857,7 @@ class TestT712EmptyInvalidQuestionHandling:
 
         When the questions array is empty, a fallback is created and the answer is sent.
         """
+
         async def answer_callback(ctx: QuestionContext) -> str:
             return "UNIQUE_ANSWER_FOR_T712_TEST"
 
@@ -7458,10 +7874,12 @@ class TestT712EmptyInvalidQuestionHandling:
         # Empty questions array - will trigger fallback
         empty_questions_block = AskUserQuestionBlock(questions=[])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[empty_questions_block])],
-            [ResultMessage(result="Received answer")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[empty_questions_block])],
+                [ResultMessage(result="Received answer")],
+            ]
+        )
 
         await worker._stream_sdk_messages_with_client("Send answer", mock_client)
 
@@ -7500,12 +7918,14 @@ class TestT712EmptyInvalidQuestionHandling:
         q2 = AskUserQuestionBlock(questions=[])
         q3 = AskUserQuestionBlock(questions=[])
 
-        mock_client.set_responses([
-            [AssistantMessage(content=[q1])],
-            [AssistantMessage(content=[q2])],
-            [AssistantMessage(content=[q3])],
-            [ResultMessage(result="All handled")],
-        ])
+        mock_client.set_responses(
+            [
+                [AssistantMessage(content=[q1])],
+                [AssistantMessage(content=[q2])],
+                [AssistantMessage(content=[q3])],
+                [ResultMessage(result="All handled")],
+            ]
+        )
 
         result, _, _ = await worker._stream_sdk_messages_with_client(
             "Multiple empty", mock_client
@@ -7553,17 +7973,23 @@ class TestT712EmptyInvalidQuestionHandling:
         )
 
         mock_client_1 = MockClaudeSDKClient()
-        mock_client_1.set_responses([
-            [AssistantMessage(content=[AskUserQuestionBlock(questions=[{"question": ""}])])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client_1.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[AskUserQuestionBlock(questions=[{"question": ""}])]
+                    )
+                ],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker_1._stream_sdk_messages_with_client("Test 1", mock_client_1)
 
         verification_results["empty_question_handled_gracefully"] = (
-            test_1_callback_invoked and
-            bool(test_1_question_received) and
-            len(mock_client_1._queries) == 2
+            test_1_callback_invoked
+            and bool(test_1_question_received)
+            and len(mock_client_1._queries) == 2
         )
 
         # Test 2: No options works correctly
@@ -7583,12 +8009,20 @@ class TestT712EmptyInvalidQuestionHandling:
         )
 
         mock_client_2 = MockClaudeSDKClient()
-        mock_client_2.set_responses([
-            [AssistantMessage(content=[AskUserQuestionBlock(
-                questions=[{"question": "No options question?"}]
-            )])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client_2.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[
+                            AskUserQuestionBlock(
+                                questions=[{"question": "No options question?"}]
+                            )
+                        ]
+                    )
+                ],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker_2._stream_sdk_messages_with_client("Test 2", mock_client_2)
 
@@ -7612,18 +8046,30 @@ class TestT712EmptyInvalidQuestionHandling:
         )
 
         mock_client_3 = MockClaudeSDKClient()
-        mock_client_3.set_responses([
-            [AssistantMessage(content=[AskUserQuestionBlock(
-                questions=[{}, {"question": None}, {"not_question": "bad"}]
-            )])],
-            [ResultMessage(result="Completed")],
-        ])
+        mock_client_3.set_responses(
+            [
+                [
+                    AssistantMessage(
+                        content=[
+                            AskUserQuestionBlock(
+                                questions=[
+                                    {},
+                                    {"question": None},
+                                    {"not_question": "bad"},
+                                ]
+                            )
+                        ]
+                    )
+                ],
+                [ResultMessage(result="Completed")],
+            ]
+        )
 
         try:
             result_3, _, _ = await worker_3._stream_sdk_messages_with_client(
                 "Test 3", mock_client_3
             )
-            test_3_completed = (result_3.result == "Completed")
+            test_3_completed = result_3.result == "Completed"
         except Exception:
             test_3_crashed = True
 
@@ -7650,20 +8096,23 @@ class TestT712EmptyInvalidQuestionHandling:
         mock_client_4 = MockClaudeSDKClient()
         # Completely invalid - should trigger fallback
         block_4 = AskUserQuestionBlock(questions=[])
-        mock_client_4.set_responses([
-            [AssistantMessage(content=[block_4])],
-            [ResultMessage(result="Done")],
-        ])
+        mock_client_4.set_responses(
+            [
+                [AssistantMessage(content=[block_4])],
+                [ResultMessage(result="Done")],
+            ]
+        )
 
         await worker_4._stream_sdk_messages_with_client("Test 4", mock_client_4)
 
         # Check that the fallback is meaningful
         is_meaningful_fallback = (
-            bool(test_4_fallback_question) and
-            len(test_4_fallback_question) > 5 and
-            any(word in test_4_fallback_question.lower() for word in [
-                "clarification", "claude", "asking"
-            ])
+            bool(test_4_fallback_question)
+            and len(test_4_fallback_question) > 5
+            and any(
+                word in test_4_fallback_question.lower()
+                for word in ["clarification", "claude", "asking"]
+            )
         )
         verification_results["sensible_defaults_provided"] = is_meaningful_fallback
 

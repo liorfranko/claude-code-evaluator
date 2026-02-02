@@ -1,18 +1,20 @@
-"""TimelineEvent dataclass for claude-evaluator.
+"""TimelineEvent model for claude-evaluator.
 
-This module defines the TimelineEvent dataclass which represents a significant
+This module defines the TimelineEvent model which represents a significant
 event in the evaluation timeline.
 """
 
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Any
+
+from pydantic import Field
+
+from claude_evaluator.models.base import BaseSchema
 
 __all__ = ["TimelineEvent"]
 
 
-@dataclass
-class TimelineEvent:
+class TimelineEvent(BaseSchema):
     """A significant event in the evaluation timeline.
 
     Captures key moments during evaluation including prompts, responses,
@@ -24,10 +26,11 @@ class TimelineEvent:
         actor: Which agent (developer, worker, system).
         summary: Brief description of the event.
         details: Additional event-specific data (optional).
+
     """
 
     timestamp: datetime
     event_type: str
     actor: str
     summary: str
-    details: Optional[dict] = field(default_factory=dict)
+    details: dict[str, Any] | None = Field(default_factory=dict)

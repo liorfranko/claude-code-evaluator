@@ -9,15 +9,13 @@ Tests mock the SDK client to run without external dependencies.
 """
 
 import asyncio
-from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.config.models import Phase
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
@@ -27,7 +25,6 @@ from claude_evaluator.models.enums import (
 )
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows.multi_command import MultiCommandWorkflow
 
@@ -66,7 +63,9 @@ class TestMultiCommandE2ESequentialExecution:
 
         execution_order: list[str] = []
 
-        async def capture_order(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def capture_order(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             execution_order.append(phase)
             return QueryMetrics(
                 query_index=len(execution_order),
@@ -100,7 +99,9 @@ class TestMultiCommandE2ESequentialExecution:
 
         events: list[tuple[str, str]] = []  # (phase, event_type)
 
-        async def capture_events(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def capture_events(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             events.append((phase, "start"))
             events.append((phase, "end"))
             return QueryMetrics(
@@ -163,7 +164,9 @@ class TestMultiCommandE2ESequentialExecution:
             response="Done",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -198,7 +201,9 @@ class TestMultiCommandE2ESequentialExecution:
             response="Single step done",
         )
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
         evaluation.worker_agent.execute_query = mock_query
@@ -256,7 +261,9 @@ class TestMultiCommandE2EContextPassing:
 
         received_prompts: list[tuple[str, str]] = []  # (phase, prompt)
 
-        async def capture_prompts(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def capture_prompts(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             received_prompts.append((phase, query))
             responses = {
                 "design": "Design: CLI with argparse, file handlers, progress bar",
@@ -309,7 +316,9 @@ class TestMultiCommandE2EContextPassing:
 
         received_prompts: list[str] = []
 
-        async def capture_prompts(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def capture_prompts(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             received_prompts.append(query)
             return QueryMetrics(
                 query_index=len(received_prompts),
@@ -363,7 +372,9 @@ class TestMultiCommandE2EContextPassing:
 
         call_count = [0]
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             call_count[0] += 1
             return QueryMetrics(
                 query_index=call_count[0],
@@ -403,7 +414,9 @@ class TestMultiCommandE2EContextPassing:
 
         received_prompt: str | None = None
 
-        async def capture_prompt(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def capture_prompt(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             nonlocal received_prompt
             received_prompt = query
             return QueryMetrics(
@@ -466,7 +479,9 @@ class TestMultiCommandE2EMetrics:
             "load": (200, 400),
         }
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             inp, out = phase_tokens[phase]
             return QueryMetrics(
                 query_index=1,
@@ -508,7 +523,9 @@ class TestMultiCommandE2EMetrics:
             "phase3": (300, 600, 0.009, 15),
         }
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             inp, out, cost, turns = phase_metrics[phase]
             return QueryMetrics(
                 query_index=1,
@@ -569,7 +586,9 @@ class TestMultiCommandE2EMetrics:
 
         call_count = [0]
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             nonlocal call_count
             call_count[0] += 1
             messages = read_messages if call_count[0] == 1 else write_messages
@@ -608,7 +627,9 @@ class TestMultiCommandE2EMetrics:
         workflow = MultiCommandWorkflow(collector, phases)
         evaluation = self.create_evaluation()
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=1,
                 prompt=query,
@@ -669,7 +690,9 @@ class TestMultiCommandE2EErrorHandling:
 
         executed_phases: list[str] = []
 
-        async def mock_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             executed_phases.append(phase)
             if phase == "phase2":
                 raise RuntimeError("Phase 2 failed")
@@ -703,7 +726,9 @@ class TestMultiCommandE2EErrorHandling:
         workflow = MultiCommandWorkflow(collector, phases)
         evaluation = self.create_evaluation()
 
-        async def mock_query_error(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_query_error(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Specific failure reason")
 
         evaluation.worker_agent.execute_query = mock_query_error

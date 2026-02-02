@@ -5,14 +5,13 @@ WorkerAgent, and DeveloperAgent as specified in tasks T600-T610.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.config.models import EvalDefaults
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.enums import (
@@ -22,10 +21,9 @@ from claude_evaluator.models.enums import (
 )
 from claude_evaluator.models.query_metrics import QueryMetrics
 from claude_evaluator.models.question import QuestionContext, QuestionItem
-from claude_evaluator.workflows.base import BaseWorkflow, QuestionHandlingError
+from claude_evaluator.workflows.base import QuestionHandlingError
 from claude_evaluator.workflows.direct import DirectWorkflow
 from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
-
 
 # =============================================================================
 # T600: BaseWorkflow creates callback connecting Worker to Developer
@@ -67,7 +65,7 @@ class TestBaseWorkflowQuestionCallback:
         developer_agent: DeveloperAgent,
     ) -> None:
         """Test that the callback invokes DeveloperAgent.answer_question."""
-        # Mock the answer_question method
+        # Mock the answer_question method at the class level
         mock_result = AnswerResult(
             answer="Test answer",
             model_used="test-model",
@@ -75,7 +73,6 @@ class TestBaseWorkflowQuestionCallback:
             generation_time_ms=100,
             attempt_number=1,
         )
-        developer_agent.answer_question = AsyncMock(return_value=mock_result)
 
         # Create callback and invoke it
         callback = direct_workflow.create_question_callback(developer_agent)
@@ -87,11 +84,13 @@ class TestBaseWorkflowQuestionCallback:
             attempt_number=1,
         )
 
-        result = asyncio.run(callback(context))
+        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+            mock_answer.return_value = mock_result
+            result = asyncio.run(callback(context))
 
-        # Verify answer_question was called
-        developer_agent.answer_question.assert_called_once_with(context)
-        assert result == "Test answer"
+            # Verify answer_question was called
+            mock_answer.assert_called_once_with(context)
+            assert result == "Test answer"
 
     def test_question_callback_returns_answer_string(
         self,
@@ -106,7 +105,6 @@ class TestBaseWorkflowQuestionCallback:
             generation_time_ms=200,
             attempt_number=1,
         )
-        developer_agent.answer_question = AsyncMock(return_value=mock_result)
 
         callback = direct_workflow.create_question_callback(developer_agent)
         context = QuestionContext(
@@ -116,9 +114,11 @@ class TestBaseWorkflowQuestionCallback:
             attempt_number=1,
         )
 
-        result = asyncio.run(callback(context))
+        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+            mock_answer.return_value = mock_result
+            result = asyncio.run(callback(context))
 
-        assert result == "Use the Read tool to check the file contents"
+            assert result == "Use the Read tool to check the file contents"
 
     def test_question_callback_wraps_errors_in_question_handling_error(
         self,
@@ -126,10 +126,6 @@ class TestBaseWorkflowQuestionCallback:
         developer_agent: DeveloperAgent,
     ) -> None:
         """Test that errors from answer_question are wrapped in QuestionHandlingError."""
-        developer_agent.answer_question = AsyncMock(
-            side_effect=RuntimeError("SDK not available")
-        )
-
         callback = direct_workflow.create_question_callback(developer_agent)
         context = QuestionContext(
             questions=[QuestionItem(question="What next?")],
@@ -138,12 +134,15 @@ class TestBaseWorkflowQuestionCallback:
             attempt_number=1,
         )
 
-        with pytest.raises(QuestionHandlingError) as exc_info:
-            asyncio.run(callback(context))
+        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+            mock_answer.side_effect = RuntimeError("SDK not available")
 
-        assert "SDK not available" in str(exc_info.value)
-        assert isinstance(exc_info.value.original_error, RuntimeError)
-        assert exc_info.value.question_context is not None
+            with pytest.raises(QuestionHandlingError) as exc_info:
+                asyncio.run(callback(context))
+
+            assert "SDK not available" in str(exc_info.value)
+            assert isinstance(exc_info.value.original_error, RuntimeError)
+            assert exc_info.value.question_context is not None
 
 
 # =============================================================================
@@ -182,7 +181,9 @@ class TestWorkflowConfigurationPassing:
         """Test that configure_worker_for_questions sets developer_qa_model."""
         defaults = EvalDefaults(developer_qa_model="claude-sonnet")
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector, defaults=defaults, enable_question_handling=False)
+        workflow = DirectWorkflow(
+            collector, defaults=defaults, enable_question_handling=False
+        )
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -206,7 +207,9 @@ class TestWorkflowConfigurationPassing:
         """Test that configure_worker_for_questions sets context_window_size."""
         defaults = EvalDefaults(context_window_size=50)
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector, defaults=defaults, enable_question_handling=False)
+        workflow = DirectWorkflow(
+            collector, defaults=defaults, enable_question_handling=False
+        )
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -256,7 +259,9 @@ class TestWorkflowConfigurationPassing:
         """Test that configure_worker_for_questions sets question_timeout_seconds."""
         defaults = EvalDefaults(question_timeout_seconds=90)
         collector = MetricsCollector()
-        workflow = DirectWorkflow(collector, defaults=defaults, enable_question_handling=False)
+        workflow = DirectWorkflow(
+            collector, defaults=defaults, enable_question_handling=False
+        )
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -477,8 +482,12 @@ class TestPlanThenImplementWorkflowQuestionHandling:
 
         callbacks_during_execution: list = []
 
-        async def capture_callback(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
-            callbacks_during_execution.append(evaluation.worker_agent.on_question_callback)
+        async def capture_callback(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
+            callbacks_during_execution.append(
+                evaluation.worker_agent.on_question_callback
+            )
             return sample_metrics
 
         evaluation.worker_agent.execute_query = capture_callback
@@ -526,9 +535,6 @@ class TestQuestionHandlingErrorPropagation:
         workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         developer = DeveloperAgent()
-        developer.answer_question = AsyncMock(
-            side_effect=RuntimeError("Failed to generate answer")
-        )
 
         callback = workflow.create_question_callback(developer)
         context = QuestionContext(
@@ -538,11 +544,14 @@ class TestQuestionHandlingErrorPropagation:
             attempt_number=1,
         )
 
-        with pytest.raises(QuestionHandlingError) as exc_info:
-            asyncio.run(callback(context))
+        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+            mock_answer.side_effect = RuntimeError("Failed to generate answer")
 
-        assert isinstance(exc_info.value.original_error, RuntimeError)
-        assert "Failed to generate answer" in str(exc_info.value.original_error)
+            with pytest.raises(QuestionHandlingError) as exc_info:
+                asyncio.run(callback(context))
+
+            assert isinstance(exc_info.value.original_error, RuntimeError)
+            assert "Failed to generate answer" in str(exc_info.value.original_error)
 
 
 # =============================================================================

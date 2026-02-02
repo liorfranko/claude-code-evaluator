@@ -5,30 +5,22 @@ present in the generated evaluation reports.
 """
 
 import json
-from datetime import datetime
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.config.models import Phase
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     ExecutionMode,
-    Outcome,
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
 from claude_evaluator.report.generator import ReportGenerator
-from claude_evaluator.report.models import EvaluationReport
 from claude_evaluator.workflows import DirectWorkflow, MultiCommandWorkflow
-
 
 # Required fields in the metrics schema
 REQUIRED_METRICS_FIELDS = [
@@ -99,7 +91,9 @@ class TestMetricsSchemaValidation:
             }
         ]
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:  # noqa: ARG001
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=0,
                 prompt=query,
@@ -369,7 +363,9 @@ class TestMultiPhaseMetricsCompleteness:
 
         self.call_count = 0
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             self.call_count += 1
             return QueryMetrics(
                 query_index=self.call_count - 1,

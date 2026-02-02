@@ -5,14 +5,14 @@ direct implementation without planning phases. It executes a task in a single
 shot with acceptEdits permission mode.
 """
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
     from claude_evaluator.config.models import EvalDefaults
-    from claude_evaluator.evaluation import Evaluation
+    from claude_evaluator.core import Evaluation
     from claude_evaluator.metrics.collector import MetricsCollector
     from claude_evaluator.models.metrics import Metrics
 
@@ -43,12 +43,13 @@ class DirectWorkflow(BaseWorkflow):
         collector = MetricsCollector()
         workflow = DirectWorkflow(collector)
         metrics = await workflow.execute(evaluation)
+
     """
 
     def __init__(
         self,
         metrics_collector: "MetricsCollector",
-        defaults: Optional["EvalDefaults"] = None,
+        defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
     ) -> None:
         """Initialize the DirectWorkflow.
@@ -61,6 +62,7 @@ class DirectWorkflow(BaseWorkflow):
             enable_question_handling: Whether to configure the WorkerAgent
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
+
         """
         super().__init__(metrics_collector, defaults)
         self._enable_question_handling = enable_question_handling
@@ -90,6 +92,7 @@ class DirectWorkflow(BaseWorkflow):
         Raises:
             Exception: If the workflow execution fails.
             QuestionHandlingError: If question handling fails during execution.
+
         """
         self.on_execution_start(evaluation)
 
@@ -106,16 +109,22 @@ class DirectWorkflow(BaseWorkflow):
             worker.set_permission_mode(PermissionMode.acceptEdits)
 
             # Emit phase start event for verbose output
-            from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-            worker._emit_progress(ProgressEvent(
-                event_type=ProgressEventType.PHASE_START,
-                message="Starting phase: implementation",
-                data={
-                    "phase_name": "implementation",
-                    "phase_index": 0,
-                    "total_phases": 1,
-                },
-            ))
+            from claude_evaluator.models.progress import (
+                ProgressEvent,
+                ProgressEventType,
+            )
+
+            worker._emit_progress(
+                ProgressEvent(
+                    event_type=ProgressEventType.PHASE_START,
+                    message="Starting phase: implementation",
+                    data={
+                        "phase_name": "implementation",
+                        "phase_index": 0,
+                        "total_phases": 1,
+                    },
+                )
+            )
 
             # Execute the task prompt directly
             query_metrics = await worker.execute_query(

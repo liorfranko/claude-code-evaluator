@@ -9,12 +9,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.config.models import Phase
-from claude_evaluator.evaluation import Evaluation
+from claude_evaluator.core import Evaluation
+from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
-from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
@@ -43,7 +41,9 @@ class TestDeveloperWorkerCommunication:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
                 prompt=query,
@@ -221,7 +221,9 @@ class TestAgentCoordinationInWorkflows:
             permission_mode=PermissionMode.plan,
         )
 
-        async def mock_execute_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def mock_execute_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(
                 query_index=call_counter[0] - 1,
@@ -328,7 +330,9 @@ class TestAgentCoordinationInWorkflows:
             permission_mode=PermissionMode.plan,
         )
 
-        async def capture_query(query: str, phase: str, resume_session: bool = False) -> QueryMetrics:
+        async def capture_query(
+            query: str, phase: str, resume_session: bool = False
+        ) -> QueryMetrics:
             received_queries.append(query)
             return QueryMetrics(
                 query_index=0,

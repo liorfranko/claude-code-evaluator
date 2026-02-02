@@ -2,9 +2,6 @@
 
 from argparse import Namespace
 from pathlib import Path
-from typing import Any
-
-import pytest
 
 from claude_evaluator.cli import (
     _determine_workflow_type,
@@ -32,7 +29,9 @@ class TestCreateParser:
         parser = create_parser()
         # The version action should be present
         version_actions = [
-            a for a in parser._actions if "--version" in getattr(a, "option_strings", [])
+            a
+            for a in parser._actions
+            if "--version" in getattr(a, "option_strings", [])
         ]
         assert len(version_actions) == 1
 
@@ -201,8 +200,12 @@ class TestValidateArgs:
 class TestDetermineWorkflowType:
     """Tests for _determine_workflow_type function."""
 
-    def test_single_phase_returns_direct(self) -> None:
-        """Test that single phase returns direct workflow."""
+    def test_single_phase_returns_multi_command(self) -> None:
+        """Test that single phase returns multi_command workflow.
+
+        Note: The implementation now always returns multi_command for YAML-based
+        configs to enable custom prompts from the config.
+        """
         config = EvaluationConfig(
             id="test",
             name="Test",
@@ -214,7 +217,7 @@ class TestDetermineWorkflowType:
                 ),
             ],
         )
-        assert _determine_workflow_type(config) == WorkflowType.direct
+        assert _determine_workflow_type(config) == WorkflowType.multi_command
 
     def test_two_phases_with_plan_mode_first(self) -> None:
         """Test that two phases with plan mode first returns plan_then_implement."""

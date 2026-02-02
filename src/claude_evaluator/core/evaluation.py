@@ -1,37 +1,33 @@
-"""Evaluation dataclass for claude-evaluator.
+"""Evaluation model for claude-evaluator.
 
-This module defines the Evaluation dataclass which represents a single end-to-end
+This module defines the Evaluation class which represents a single end-to-end
 test run. It manages state transitions, workspace lifecycle, and collects metrics
 during evaluation execution.
 """
 
-import logging
 import shutil
 import tempfile
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-logger = logging.getLogger(__name__)
+from pydantic import ConfigDict, Field, PrivateAttr
 
-from .agents.developer import DeveloperAgent
-from .agents.worker import WorkerAgent
-from .models.enums import EvaluationStatus, WorkflowType
-from .models.metrics import Metrics
+from claude_evaluator.core.agents.developer import DeveloperAgent
+from claude_evaluator.core.agents.worker_agent import WorkerAgent
+from claude_evaluator.core.exceptions import InvalidEvaluationStateError
+from claude_evaluator.logging_config import get_logger
+from claude_evaluator.models.base import BaseSchema
+from claude_evaluator.models.enums import EvaluationStatus, WorkflowType
+from claude_evaluator.models.metrics import Metrics
 
 if TYPE_CHECKING:
-    from .metrics.collector import MetricsCollector
-    from .workflows.direct import DirectWorkflow
+    from claude_evaluator.metrics.collector import MetricsCollector
+
+logger = get_logger(__name__)
 
 __all__ = ["Evaluation", "InvalidEvaluationStateError"]
-
-
-class InvalidEvaluationStateError(Exception):
-    """Raised when an invalid evaluation state transition is attempted."""
-
-    pass
 
 
 # Define valid state transitions for the Evaluation state machine
@@ -49,8 +45,7 @@ _VALID_TRANSITIONS: dict[EvaluationStatus, set[EvaluationStatus]] = {
 }
 
 
-@dataclass
-class Evaluation:
+class Evaluation(BaseSchema):
     """Represents a single end-to-end evaluation test run.
 
     An Evaluation encapsulates all the context needed for a complete evaluation,
@@ -70,22 +65,29 @@ class Evaluation:
         worker_agent: The Worker agent instance.
         metrics: Collected metrics (populated on completion).
         error: Error message if evaluation failed (optional).
+
     """
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        arbitrary_types_allowed=True,
+    )
 
     task_description: str
     workflow_type: WorkflowType
     developer_agent: DeveloperAgent
     worker_agent: WorkerAgent
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    status: EvaluationStatus = field(default=EvaluationStatus.pending)
-    start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = field(default=None)
-    workspace_path: Optional[str] = field(default=None)
-    metrics: Optional[Metrics] = field(default=None)
-    error: Optional[str] = field(default=None)
-    _owns_workspace: bool = field(default=True, repr=False)
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    status: EvaluationStatus = Field(default=EvaluationStatus.pending)
+    start_time: datetime = Field(default_factory=datetime.now)
+    end_time: datetime | None = Field(default=None)
+    workspace_path: str | None = Field(default=None)
+    metrics: Metrics | None = Field(default=None)
+    error: str | None = Field(default=None)
+    _owns_workspace: bool = PrivateAttr(default=True)
 
-    def start(self, workspace_path: Optional[str] = None) -> None:
+    def start(self, workspace_path: str | None = None) -> None:
         """Start the evaluation, transitioning from pending to running.
 
         Creates a temporary workspace directory (or uses provided path) and
@@ -97,6 +99,7 @@ class Evaluation:
 
         Raises:
             InvalidEvaluationStateError: If not in pending state.
+
         """
         if self.status != EvaluationStatus.pending:
             raise InvalidEvaluationStateError(
@@ -125,6 +128,7 @@ class Evaluation:
 
         Raises:
             InvalidEvaluationStateError: If not in running state.
+
         """
         if self.status != EvaluationStatus.running:
             raise InvalidEvaluationStateError(
@@ -147,6 +151,7 @@ class Evaluation:
 
         Raises:
             InvalidEvaluationStateError: If already in a terminal state.
+
         """
         valid_states = {EvaluationStatus.pending, EvaluationStatus.running}
         if self.status not in valid_states:
@@ -180,7 +185,9 @@ class Evaluation:
                 except (OSError, PermissionError) as e:
                     # Log but don't raise - cleanup is best effort
                     logger.warning(
-                        f"Failed to clean up workspace {self.workspace_path}: {e}"
+                        "workspace_cleanup_failed",
+                        workspace_path=self.workspace_path,
+                        error=str(e),
                     )
             self.workspace_path = None
 
@@ -189,6 +196,7 @@ class Evaluation:
 
         Returns:
             True if the evaluation is completed or failed.
+
         """
         return self.status in {EvaluationStatus.completed, EvaluationStatus.failed}
 
@@ -200,15 +208,17 @@ class Evaluation:
 
         Returns:
             True if the transition is allowed, False otherwise.
+
         """
         valid_targets = _VALID_TRANSITIONS.get(self.status, set())
         return new_status in valid_targets
 
-    def get_duration_ms(self) -> Optional[int]:
+    def get_duration_ms(self) -> int | None:
         """Get the total duration of the evaluation in milliseconds.
 
         Returns:
             Duration in milliseconds if end_time is set, None otherwise.
+
         """
         if self.end_time is None:
             return None
@@ -243,9 +253,10 @@ class Evaluation:
                 worker_agent=worker,
             )
             metrics = await evaluation.run_direct_workflow(collector)
+
         """
         # Import here to avoid circular imports
-        from .workflows.direct import DirectWorkflow
+        from claude_evaluator.workflows.direct import DirectWorkflow
 
         workflow = DirectWorkflow(metrics_collector)
         return await workflow.execute(self)

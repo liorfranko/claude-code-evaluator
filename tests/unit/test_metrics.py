@@ -4,13 +4,10 @@ This module contains comprehensive pytest tests for the MetricsCollector class,
 covering initialization, adding metrics, phase tracking, aggregation, and reset.
 """
 
-from datetime import datetime
-
 import pytest
 
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
 
 
 class TestMetricsCollectorInitialization:
@@ -745,13 +742,48 @@ class TestToolCountsAggregation:
                 {
                     "role": "assistant",
                     "content": [
-                        {"type": "ToolUseBlock", "id": "1", "name": "Read", "input": {}},
-                        {"type": "ToolUseBlock", "id": "2", "name": "Read", "input": {}},
-                        {"type": "ToolUseBlock", "id": "3", "name": "Edit", "input": {}},
-                        {"type": "ToolUseBlock", "id": "4", "name": "Bash", "input": {}},
-                        {"type": "ToolUseBlock", "id": "5", "name": "Read", "input": {}},
-                        {"type": "ToolUseBlock", "id": "6", "name": "Write", "input": {}},
-                        {"type": "ToolUseBlock", "id": "7", "name": "Bash", "input": {}},
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "1",
+                            "name": "Read",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "2",
+                            "name": "Read",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "3",
+                            "name": "Edit",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "4",
+                            "name": "Bash",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "5",
+                            "name": "Read",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "6",
+                            "name": "Write",
+                            "input": {},
+                        },
+                        {
+                            "type": "ToolUseBlock",
+                            "id": "7",
+                            "name": "Bash",
+                            "input": {},
+                        },
                     ],
                 },
             ],

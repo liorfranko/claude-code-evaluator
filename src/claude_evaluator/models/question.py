@@ -1,17 +1,19 @@
-"""Question-related dataclasses for claude-evaluator.
+"""Question-related models for claude-evaluator.
 
-This module defines dataclasses for representing questions and their context
+This module defines models for representing questions and their context
 when interacting with Claude Code during evaluation workflows.
 """
 
-from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
+
+from pydantic import field_validator, model_validator
+
+from claude_evaluator.models.base import BaseSchema
 
 __all__ = ["QuestionOption", "QuestionItem", "QuestionContext"]
 
 
-@dataclass
-class QuestionOption:
+class QuestionOption(BaseSchema):
     """An option for a question presented to the user.
 
     Represents a selectable choice within a question, with a required label
@@ -20,19 +22,22 @@ class QuestionOption:
     Attributes:
         label: The display text for this option (required, non-empty).
         description: Additional context or explanation (optional).
+
     """
 
     label: str
-    description: Optional[str] = None
+    description: str | None = None
 
-    def __post_init__(self) -> None:
+    @field_validator("label")
+    @classmethod
+    def validate_label(cls, v: str) -> str:
         """Validate that label is non-empty."""
-        if not self.label or not self.label.strip():
+        if not v or not v.strip():
             raise ValueError("QuestionOption.label must be non-empty")
+        return v
 
 
-@dataclass
-class QuestionItem:
+class QuestionItem(BaseSchema):
     """A question item to be presented during evaluation.
 
     Represents a single question with optional multiple-choice options
@@ -42,22 +47,35 @@ class QuestionItem:
         question: The question text (required, non-empty).
         options: List of selectable options (optional, must have >=2 items if provided).
         header: Optional header text for grouping or context.
+
     """
 
     question: str
-    options: Optional[list[QuestionOption]] = None
-    header: Optional[str] = None
+    options: list[QuestionOption] | None = None
+    header: str | None = None
 
-    def __post_init__(self) -> None:
-        """Validate question is non-empty and options have at least 2 items if provided."""
-        if not self.question or not self.question.strip():
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, v: str) -> str:
+        """Validate that question is non-empty."""
+        if not v or not v.strip():
             raise ValueError("QuestionItem.question must be non-empty")
-        if self.options is not None and len(self.options) < 2:
-            raise ValueError("QuestionItem.options must have at least 2 items if provided")
+        return v
+
+    @field_validator("options")
+    @classmethod
+    def validate_options(
+        cls, v: list[QuestionOption] | None
+    ) -> list[QuestionOption] | None:
+        """Validate that options has at least 2 items if provided."""
+        if v is not None and len(v) < 2:
+            raise ValueError(
+                "QuestionItem.options must have at least 2 items if provided"
+            )
+        return v
 
 
-@dataclass
-class QuestionContext:
+class QuestionContext(BaseSchema):
     """Context for a set of questions during an evaluation session.
 
     Contains the questions to be asked, conversation history, session
@@ -68,6 +86,7 @@ class QuestionContext:
         conversation_history: Full conversation history as message dicts (required).
         session_id: The session identifier (required).
         attempt_number: The attempt number, must be 1 or 2 (required).
+
     """
 
     questions: list[QuestionItem]
@@ -75,9 +94,11 @@ class QuestionContext:
     session_id: str
     attempt_number: int
 
-    def __post_init__(self) -> None:
-        """Validate questions has at least one item and attempt_number is 1 or 2."""
+    @model_validator(mode="after")
+    def validate_model(self) -> "QuestionContext":
+        """Validate questions and attempt_number."""
         if not self.questions:
             raise ValueError("QuestionContext.questions must have at least one item")
         if self.attempt_number not in (1, 2):
             raise ValueError("QuestionContext.attempt_number must be 1 or 2")
+        return self

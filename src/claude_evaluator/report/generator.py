@@ -6,25 +6,21 @@ instances from completed evaluations and provides serialization methods.
 
 import json
 import tempfile
-from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from claude_evaluator.evaluation import Evaluation
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, Outcome
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.timeline_event import TimelineEvent
+from claude_evaluator.report.exceptions import ReportGenerationError
 from claude_evaluator.report.models import EvaluationReport
 
+if TYPE_CHECKING:
+    from claude_evaluator.core import Evaluation
+
 __all__ = ["ReportGenerator", "ReportGenerationError"]
-
-
-class ReportGenerationError(Exception):
-    """Raised when report generation fails."""
-
-    pass
 
 
 class ReportGenerator:
@@ -39,13 +35,14 @@ class ReportGenerator:
         report = generator.generate(evaluation)
         json_str = generator.to_json(report)
         generator.save(report, Path("./reports/eval-001.json"))
+
     """
 
     def __init__(self) -> None:
         """Initialize the report generator."""
         pass
 
-    def generate(self, evaluation: Evaluation) -> EvaluationReport:
+    def generate(self, evaluation: "Evaluation") -> EvaluationReport:
         """Generate a report from a completed evaluation.
 
         Creates an EvaluationReport from the evaluation's collected data,
@@ -59,6 +56,7 @@ class ReportGenerator:
 
         Raises:
             ReportGenerationError: If the evaluation is not in a terminal state.
+
         """
         if not evaluation.is_terminal():
             raise ReportGenerationError(
@@ -107,6 +105,7 @@ class ReportGenerator:
 
         Returns:
             A JSON string representation of the report.
+
         """
         report_dict = self._report_to_dict(report)
         return json.dumps(report_dict, indent=indent, default=str)
@@ -123,6 +122,7 @@ class ReportGenerator:
 
         Raises:
             ReportGenerationError: If the file cannot be written or path is invalid.
+
         """
         try:
             # Validate path to prevent directory traversal attacks
@@ -133,10 +133,8 @@ class ReportGenerator:
 
             json_str = self.to_json(report)
             resolved_path.write_text(json_str, encoding="utf-8")
-        except (OSError, IOError) as e:
-            raise ReportGenerationError(
-                f"Failed to save report to {path}: {e}"
-            ) from e
+        except OSError as e:
+            raise ReportGenerationError(f"Failed to save report to {path}: {e}") from e
 
     def _validate_output_path(self, path: Path) -> Path:
         """Validate that output path is within safe boundaries.
@@ -152,6 +150,7 @@ class ReportGenerator:
 
         Raises:
             ReportGenerationError: If the path is outside allowed directories.
+
         """
         resolved_path = path.resolve()
         cwd = Path.cwd().resolve()
@@ -174,7 +173,7 @@ class ReportGenerator:
             f"Invalid path: {path} must be within current directory or temp directory"
         )
 
-    def build_timeline(self, evaluation: Evaluation) -> list[TimelineEvent]:
+    def build_timeline(self, evaluation: "Evaluation") -> list[TimelineEvent]:
         """Build a timeline from evaluation events.
 
         Creates an ordered list of TimelineEvent objects from the evaluation's
@@ -185,6 +184,7 @@ class ReportGenerator:
 
         Returns:
             An ordered list of TimelineEvent objects.
+
         """
         timeline: list[TimelineEvent] = []
 
@@ -219,9 +219,7 @@ class ReportGenerator:
 
         # Add evaluation end event if completed
         if evaluation.end_time is not None:
-            summary = (
-                f"Evaluation completed with status: {evaluation.status.value}"
-            )
+            summary = f"Evaluation completed with status: {evaluation.status.value}"
             if evaluation.error is not None:
                 summary = f"Evaluation failed: {evaluation.error[:50]}..."
 
@@ -243,7 +241,7 @@ class ReportGenerator:
 
         return timeline
 
-    def _determine_outcome(self, evaluation: Evaluation) -> Outcome:
+    def _determine_outcome(self, evaluation: "Evaluation") -> Outcome:
         """Determine the outcome from an evaluation's status.
 
         Maps the evaluation status to an Outcome enum value.
@@ -253,6 +251,7 @@ class ReportGenerator:
 
         Returns:
             The corresponding Outcome value.
+
         """
         # Guard: Success case
         if evaluation.status == EvaluationStatus.completed:
@@ -282,6 +281,7 @@ class ReportGenerator:
 
         Returns:
             A Metrics instance with all values set to zero/empty.
+
         """
         return Metrics(
             total_runtime_ms=0,
@@ -303,6 +303,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the report.
+
         """
         return {
             "evaluation_id": report.evaluation_id,
@@ -310,12 +311,8 @@ class ReportGenerator:
             "workflow_type": report.workflow_type.value,
             "outcome": report.outcome.value,
             "metrics": self._metrics_to_dict(report.metrics),
-            "timeline": [
-                self._timeline_event_to_dict(e) for e in report.timeline
-            ],
-            "decisions": [
-                self._decision_to_dict(d) for d in report.decisions
-            ],
+            "timeline": [self._timeline_event_to_dict(e) for e in report.timeline],
+            "decisions": [self._decision_to_dict(d) for d in report.decisions],
             "errors": report.errors,
             "generated_at": report.generated_at.isoformat(),
         }
@@ -328,6 +325,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the metrics.
+
         """
         result = {
             "total_runtime_seconds": round(metrics.total_runtime_ms / 1000, 2),
@@ -378,6 +376,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the event.
+
         """
         return {
             "timestamp": event.timestamp.isoformat(),
@@ -395,6 +394,7 @@ class ReportGenerator:
 
         Returns:
             A dictionary representation of the decision.
+
         """
         return {
             "timestamp": decision.timestamp.isoformat(),

@@ -10,10 +10,15 @@ This module tests the YAML suite loader functionality including:
 from pathlib import Path
 
 import pytest
-import yaml
 
+from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import apply_defaults, load_suite
-from claude_evaluator.config.models import EvalDefaults, EvaluationConfig, EvaluationSuite, Phase
+from claude_evaluator.config.models import (
+    EvalDefaults,
+    EvaluationConfig,
+    EvaluationSuite,
+    Phase,
+)
 from claude_evaluator.models.enums import PermissionMode
 
 
@@ -44,7 +49,10 @@ evaluations:
         assert suite.evaluations[0].task == "Complete the test task"
         assert len(suite.evaluations[0].phases) == 1
         assert suite.evaluations[0].phases[0].name == "implementation"
-        assert suite.evaluations[0].phases[0].permission_mode == PermissionMode.bypassPermissions
+        assert (
+            suite.evaluations[0].phases[0].permission_mode
+            == PermissionMode.bypassPermissions
+        )
 
     def test_load_full_suite_with_all_fields(self, tmp_path: Path) -> None:
         """Test loading a suite with all optional fields populated."""
@@ -122,7 +130,9 @@ evaluations:
         impl_phase = eval_config.phases[1]
         assert impl_phase.name == "implementation"
         assert impl_phase.permission_mode == PermissionMode.acceptEdits
-        assert impl_phase.prompt_template == "Implement based on plan: {previous_result}"
+        assert (
+            impl_phase.prompt_template == "Implement based on plan: {previous_result}"
+        )
         assert impl_phase.continue_session is True
 
     def test_load_suite_with_multiple_evaluations(self, tmp_path: Path) -> None:
@@ -191,23 +201,23 @@ class TestLoadSuiteValidationErrors:
             load_suite(non_existent)
 
     def test_empty_yaml_file(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised for empty YAML file."""
+        """Test that ConfigurationError is raised for empty YAML file."""
         suite_file = tmp_path / "empty.yaml"
         suite_file.write_text("")
 
-        with pytest.raises(ValueError, match="Empty YAML file"):
+        with pytest.raises(ConfigurationError, match="Empty YAML file"):
             load_suite(suite_file)
 
     def test_invalid_yaml_structure(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised for non-mapping YAML."""
+        """Test that ConfigurationError is raised for non-mapping YAML."""
         suite_file = tmp_path / "invalid.yaml"
         suite_file.write_text("- just\n- a\n- list")
 
-        with pytest.raises(ValueError, match="expected mapping"):
+        with pytest.raises(ConfigurationError, match="expected mapping"):
             load_suite(suite_file)
 
     def test_missing_name_field(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when 'name' field is missing."""
+        """Test that ConfigurationError is raised when 'name' field is missing."""
         suite_content = """
 evaluations:
   - id: eval-001
@@ -220,11 +230,11 @@ evaluations:
         suite_file = tmp_path / "missing-name.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'name'"):
+        with pytest.raises(ConfigurationError, match="Missing required field 'name'"):
             load_suite(suite_file)
 
     def test_empty_name_field(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when 'name' field is empty."""
+        """Test that ConfigurationError is raised when 'name' field is empty."""
         suite_content = """
 name: ""
 evaluations:
@@ -238,22 +248,22 @@ evaluations:
         suite_file = tmp_path / "empty-name.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'name'"):
+        with pytest.raises(ConfigurationError, match="Invalid 'name'"):
             load_suite(suite_file)
 
     def test_missing_evaluations_field(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when 'evaluations' field is missing."""
+        """Test that ConfigurationError is raised when 'evaluations' field is missing."""
         suite_content = """
 name: test-suite
 """
         suite_file = tmp_path / "missing-evaluations.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'evaluations'"):
+        with pytest.raises(ConfigurationError, match="Missing required field 'evaluations'"):
             load_suite(suite_file)
 
     def test_empty_evaluations_list(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when evaluations list is empty."""
+        """Test that ConfigurationError is raised when evaluations list is empty."""
         suite_content = """
 name: test-suite
 evaluations: []
@@ -261,11 +271,11 @@ evaluations: []
         suite_file = tmp_path / "empty-evaluations.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Empty 'evaluations' list"):
+        with pytest.raises(ConfigurationError, match="Empty 'evaluations' list"):
             load_suite(suite_file)
 
     def test_missing_evaluation_id(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when evaluation 'id' is missing."""
+        """Test that ConfigurationError is raised when evaluation 'id' is missing."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -278,11 +288,11 @@ evaluations:
         suite_file = tmp_path / "missing-eval-id.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'id'"):
+        with pytest.raises(ConfigurationError, match="Missing required field 'id'"):
             load_suite(suite_file)
 
     def test_missing_evaluation_task(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when evaluation 'task' is missing."""
+        """Test that ConfigurationError is raised when evaluation 'task' is missing."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -295,11 +305,11 @@ evaluations:
         suite_file = tmp_path / "missing-eval-task.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'task'"):
+        with pytest.raises(ConfigurationError, match="Missing required field 'task'"):
             load_suite(suite_file)
 
     def test_missing_evaluation_phases(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when evaluation 'phases' is missing."""
+        """Test that ConfigurationError is raised when evaluation 'phases' is missing."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -310,11 +320,11 @@ evaluations:
         suite_file = tmp_path / "missing-eval-phases.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'phases'"):
+        with pytest.raises(ConfigurationError, match="Missing required field 'phases'"):
             load_suite(suite_file)
 
     def test_empty_phases_list(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when phases list is empty."""
+        """Test that ConfigurationError is raised when phases list is empty."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -326,11 +336,11 @@ evaluations:
         suite_file = tmp_path / "empty-phases.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Empty 'phases' list"):
+        with pytest.raises(ConfigurationError, match="Empty 'phases' list"):
             load_suite(suite_file)
 
     def test_missing_phase_name(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when phase 'name' is missing."""
+        """Test that ConfigurationError is raised when phase 'name' is missing."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -343,11 +353,11 @@ evaluations:
         suite_file = tmp_path / "missing-phase-name.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'name'"):
+        with pytest.raises(ConfigurationError, match="Missing required field 'name'"):
             load_suite(suite_file)
 
     def test_missing_phase_permission_mode(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when phase 'permission_mode' is missing."""
+        """Test that ConfigurationError is raised when phase 'permission_mode' is missing."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -360,11 +370,13 @@ evaluations:
         suite_file = tmp_path / "missing-permission-mode.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Missing required field 'permission_mode'"):
+        with pytest.raises(
+            ConfigurationError, match="Missing required field 'permission_mode'"
+        ):
             load_suite(suite_file)
 
     def test_invalid_max_turns_type(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when max_turns is not an integer."""
+        """Test that ConfigurationError is raised when max_turns is not an integer."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -379,11 +391,11 @@ evaluations:
         suite_file = tmp_path / "invalid-max-turns.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'max_turns'"):
+        with pytest.raises(ConfigurationError, match="Invalid 'max_turns'"):
             load_suite(suite_file)
 
     def test_invalid_defaults_type(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when defaults is not a mapping."""
+        """Test that ConfigurationError is raised when defaults is not a mapping."""
         suite_content = """
 name: test-suite
 defaults: "not-a-mapping"
@@ -398,7 +410,7 @@ evaluations:
         suite_file = tmp_path / "invalid-defaults.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid.*defaults|expected mapping"):
+        with pytest.raises(ConfigurationError, match="Invalid.*defaults|expected mapping"):
             load_suite(suite_file)
 
 
@@ -441,7 +453,9 @@ evaluations:
 
         suite = load_suite(suite_file)
 
-        assert suite.evaluations[0].phases[0].permission_mode == PermissionMode.acceptEdits
+        assert (
+            suite.evaluations[0].phases[0].permission_mode == PermissionMode.acceptEdits
+        )
 
     def test_permission_mode_bypass_permissions(self, tmp_path: Path) -> None:
         """Test that 'bypassPermissions' permission mode is correctly parsed."""
@@ -460,10 +474,13 @@ evaluations:
 
         suite = load_suite(suite_file)
 
-        assert suite.evaluations[0].phases[0].permission_mode == PermissionMode.bypassPermissions
+        assert (
+            suite.evaluations[0].phases[0].permission_mode
+            == PermissionMode.bypassPermissions
+        )
 
     def test_invalid_permission_mode(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised for invalid permission mode."""
+        """Test that ConfigurationError is raised for invalid permission mode."""
         suite_content = """
 name: test-suite
 evaluations:
@@ -477,7 +494,7 @@ evaluations:
         suite_file = tmp_path / "invalid-permission-mode.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'permission_mode' value"):
+        with pytest.raises(ConfigurationError, match="Invalid 'permission_mode' value"):
             load_suite(suite_file)
 
     def test_invalid_permission_mode_shows_valid_options(self, tmp_path: Path) -> None:
@@ -495,7 +512,7 @@ evaluations:
         suite_file = tmp_path / "invalid-shows-options.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ConfigurationError) as exc_info:
             load_suite(suite_file)
 
         error_message = str(exc_info.value)
@@ -816,7 +833,9 @@ evaluations:
         assert suite.defaults.question_timeout_seconds == 90
         assert suite.defaults.context_window_size == 15
 
-    def test_load_suite_parses_developer_qa_model_in_evaluation(self, tmp_path: Path) -> None:
+    def test_load_suite_parses_developer_qa_model_in_evaluation(
+        self, tmp_path: Path
+    ) -> None:
         """Test that developer_qa_model is correctly parsed from YAML evaluation."""
         suite_content = """
 name: qa-eval-suite
@@ -934,7 +953,7 @@ evaluations:
         assert suite.evaluations[0].developer_qa_model is None
 
     def test_invalid_question_timeout_seconds_type(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when question_timeout_seconds is not an integer."""
+        """Test that ConfigurationError is raised when question_timeout_seconds is not an integer."""
         suite_content = """
 name: test-suite
 defaults:
@@ -950,11 +969,11 @@ evaluations:
         suite_file = tmp_path / "invalid-qa-timeout.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'question_timeout_seconds'"):
+        with pytest.raises(ConfigurationError, match="Invalid 'question_timeout_seconds'"):
             load_suite(suite_file)
 
     def test_invalid_context_window_size_type(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when context_window_size is not an integer."""
+        """Test that ConfigurationError is raised when context_window_size is not an integer."""
         suite_content = """
 name: test-suite
 defaults:
@@ -970,11 +989,11 @@ evaluations:
         suite_file = tmp_path / "invalid-context-window.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'context_window_size'"):
+        with pytest.raises(ConfigurationError, match="Invalid 'context_window_size'"):
             load_suite(suite_file)
 
     def test_invalid_developer_qa_model_type(self, tmp_path: Path) -> None:
-        """Test that ValueError is raised when developer_qa_model is not a string."""
+        """Test that ConfigurationError is raised when developer_qa_model is not a string."""
         suite_content = """
 name: test-suite
 defaults:
@@ -990,5 +1009,5 @@ evaluations:
         suite_file = tmp_path / "invalid-qa-model.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ValueError, match="Invalid 'developer_qa_model'"):
+        with pytest.raises(ConfigurationError, match="Invalid 'developer_qa_model'"):
             load_suite(suite_file)

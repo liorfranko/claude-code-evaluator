@@ -1,18 +1,17 @@
-"""Decision dataclass for claude-evaluator.
+"""Decision model for claude-evaluator.
 
-This module defines the Decision dataclass which represents an autonomous
+This module defines the Decision model which represents an autonomous
 decision made by the Developer agent during evaluation.
 """
 
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+
+from claude_evaluator.models.base import BaseSchema
 
 __all__ = ["Decision"]
 
 
-@dataclass
-class Decision:
+class Decision(BaseSchema):
     """Record of an autonomous decision made by the Developer agent.
 
     Captures the context, action taken, and reasoning behind decisions
@@ -23,9 +22,10 @@ class Decision:
         context: What prompted the decision.
         action: What action was taken.
         rationale: Why this action was chosen (optional).
+
     """
 
     timestamp: datetime
     context: str
     action: str
-    rationale: Optional[str] = None
+    rationale: str | None = None

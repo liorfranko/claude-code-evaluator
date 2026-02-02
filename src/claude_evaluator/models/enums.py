@@ -23,6 +23,7 @@ class WorkflowType(str, Enum):
         direct: Single-prompt direct implementation without planning.
         plan_then_implement: Plan mode followed by implementation phase.
         multi_command: Sequential command execution (e.g., projspec workflow).
+
     """
 
     direct = "direct"
@@ -38,6 +39,7 @@ class EvaluationStatus(str, Enum):
         running: Evaluation in progress.
         completed: Evaluation finished successfully.
         failed: Evaluation terminated with error.
+
     """
 
     pending = "pending"
@@ -52,6 +54,7 @@ class ExecutionMode(str, Enum):
     Attributes:
         sdk: Use claude-agent-sdk Python package.
         cli: Use claude -p subprocess invocation.
+
     """
 
     sdk = "sdk"
@@ -65,6 +68,7 @@ class PermissionMode(str, Enum):
         plan: Read-only, no file edits or bash commands.
         acceptEdits: Allow file edits with auto-approval.
         bypassPermissions: Allow all tools without prompting.
+
     """
 
     plan = "plan"
@@ -82,6 +86,7 @@ class Outcome(str, Enum):
         timeout: Evaluation exceeded time limit.
         budget_exceeded: Token/cost budget exceeded.
         loop_detected: Repetitive pattern terminated.
+
     """
 
     success = "success"
@@ -106,6 +111,7 @@ class DeveloperState(str, Enum):
         evaluating_completion: Determining if task is done.
         completed: Workflow finished.
         failed: Unrecoverable error.
+
     """
 
     initializing = "initializing"

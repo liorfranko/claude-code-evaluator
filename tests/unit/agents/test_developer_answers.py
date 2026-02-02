@@ -7,20 +7,21 @@ history, and max retries failure handling.
 Task IDs: T415, T416, T417, T418, T419
 """
 
-import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
+from pydantic import ValidationError
 
-from claude_evaluator.agents.developer import (
-    DEFAULT_QA_MODEL,
-    DeveloperAgent,
-)
+from claude_evaluator.core.agents import DeveloperAgent
+from claude_evaluator.core.agents.developer import DEFAULT_QA_MODEL
 from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.enums import DeveloperState
-from claude_evaluator.models.question import QuestionContext, QuestionItem, QuestionOption
-
+from claude_evaluator.models.question import (
+    QuestionContext,
+    QuestionItem,
+    QuestionOption,
+)
 
 # =============================================================================
 # Test Fixtures
@@ -56,7 +57,9 @@ def sample_question_context() -> QuestionContext:
             QuestionItem(
                 question="What framework should I use for the web app?",
                 options=[
-                    QuestionOption(label="React", description="Popular frontend framework"),
+                    QuestionOption(
+                        label="React", description="Popular frontend framework"
+                    ),
                     QuestionOption(label="Vue", description="Progressive framework"),
                 ],
                 header="Framework Selection",
@@ -85,7 +88,9 @@ def long_conversation_history() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def retry_question_context(long_conversation_history: list[dict[str, Any]]) -> QuestionContext:
+def retry_question_context(
+    long_conversation_history: list[dict[str, Any]],
+) -> QuestionContext:
     """Create a QuestionContext for retry testing (attempt_number=2)."""
     return QuestionContext(
         questions=[
@@ -104,11 +109,20 @@ def retry_question_context(long_conversation_history: list[dict[str, Any]]) -> Q
 # =============================================================================
 
 
-class MockSDKResponse:
-    """Mock response from the SDK query function."""
+class ResultMessage:
+    """Mock ResultMessage from the SDK query function.
+
+    Named to match actual SDK class since code checks type(message).__name__.
+    """
 
     def __init__(self, result: str) -> None:
+        """Initialize mock ResultMessage."""
         self.result = result
+
+
+async def create_async_generator(response: ResultMessage):
+    """Create an async generator that yields a response."""
+    yield response
 
 
 # =============================================================================
@@ -121,44 +135,56 @@ class TestAnswerQuestionGeneratesResponse:
 
     @pytest.mark.asyncio
     async def test_answer_question_generates_response(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that answer_question generates a valid response."""
-        mock_response = MockSDKResponse(result="I recommend using React for this project.")
+        mock_response = ResultMessage(
+            result="I recommend using React for this project."
+        )
+
+        def mock_sdk_query(**kwargs):
+            return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
-        ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
-                mock_query.return_value = mock_response
-
+            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 # Transition to awaiting_response first (required for answering_question transition)
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(sample_question_context)
+                result = await base_developer_agent.answer_question(
+                    sample_question_context
+                )
 
                 assert isinstance(result, AnswerResult)
                 assert result.answer == "I recommend using React for this project."
                 assert result.attempt_number == 1
-                assert result.context_size == len(sample_question_context.conversation_history)
+                assert result.context_size == len(
+                    sample_question_context.conversation_history
+                )
                 assert result.generation_time_ms >= 0
 
     @pytest.mark.asyncio
     async def test_answer_question_includes_conversation_context(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that answer_question uses conversation history in the prompt."""
         captured_prompts: list[str] = []
 
-        async def capture_prompt(prompt: str, model: str) -> MockSDKResponse:
-            captured_prompts.append(prompt)
-            return MockSDKResponse(result="Answer based on context")
+        def capture_prompt(**kwargs):
+            captured_prompts.append(kwargs.get("prompt", ""))
+            return create_async_generator(ResultMessage(result="Answer based on context"))
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", side_effect=capture_prompt
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=capture_prompt,
         ):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -195,12 +221,15 @@ class TestAnswerQuestionGeneratesResponse:
 
         captured_prompts: list[str] = []
 
-        async def capture_prompt(prompt: str, model: str) -> MockSDKResponse:
-            captured_prompts.append(prompt)
-            return MockSDKResponse(result="Answer")
+        def capture_prompt(**kwargs):
+            captured_prompts.append(kwargs.get("prompt", ""))
+            return create_async_generator(ResultMessage(result="Answer"))
 
-        with patch("claude_evaluator.agents.developer.sdk_query", side_effect=capture_prompt):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=capture_prompt,
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent.transition_to(DeveloperState.prompting)
                 agent.transition_to(DeveloperState.awaiting_response)
 
@@ -216,21 +245,27 @@ class TestAnswerQuestionGeneratesResponse:
                 assert "USER_MSG_INDEX_0_CONTENT" not in prompt
                 assert "USER_MSG_INDEX_1_CONTENT" not in prompt
                 # Later messages should be present
-                assert "USER_MSG_INDEX_19_CONTENT" in prompt or "ASST_MSG_INDEX_19_CONTENT" in prompt
+                assert (
+                    "USER_MSG_INDEX_19_CONTENT" in prompt
+                    or "ASST_MSG_INDEX_19_CONTENT" in prompt
+                )
 
     @pytest.mark.asyncio
     async def test_answer_question_logs_decision(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that answer_question logs appropriate decisions."""
-        mock_response = MockSDKResponse(result="Decision logged answer")
+        mock_response = ResultMessage(result="Decision logged answer")
+
+        def mock_sdk_query(**kwargs):
+            return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
-        ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
-                mock_query.return_value = mock_response
-
+            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -247,31 +282,39 @@ class TestAnswerQuestionGeneratesResponse:
 
     @pytest.mark.asyncio
     async def test_answer_question_transitions_state(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that answer_question manages state transitions correctly."""
-        mock_response = MockSDKResponse(result="State transition answer")
+        mock_response = ResultMessage(result="State transition answer")
+
+        def mock_sdk_query(**kwargs):
+            return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
-        ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
-                mock_query.return_value = mock_response
-
+            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
                 await base_developer_agent.answer_question(sample_question_context)
 
                 # Should end up back in awaiting_response after answering
-                assert base_developer_agent.current_state == DeveloperState.awaiting_response
+                assert (
+                    base_developer_agent.current_state
+                    == DeveloperState.awaiting_response
+                )
 
     @pytest.mark.asyncio
     async def test_answer_question_raises_without_sdk(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that answer_question raises RuntimeError when SDK is not available."""
-        with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", False):
+        with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", False):
             with pytest.raises(RuntimeError) as exc_info:
                 await base_developer_agent.answer_question(sample_question_context)
 
@@ -288,65 +331,84 @@ class TestDeveloperQAModelSelection:
 
     @pytest.mark.asyncio
     async def test_custom_model_is_used(
-        self, agent_with_custom_model: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        agent_with_custom_model: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that custom developer_qa_model is passed to SDK."""
-        captured_models: list[str] = []
+        captured_options: list[Any] = []
 
-        async def capture_model(prompt: str, model: str) -> MockSDKResponse:
-            captured_models.append(model)
-            return MockSDKResponse(result="Custom model answer")
+        def capture_model(**kwargs):
+            captured_options.append(kwargs.get("options"))
+            return create_async_generator(ResultMessage(result="Custom model answer"))
 
-        with patch("claude_evaluator.agents.developer.sdk_query", side_effect=capture_model):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=capture_model,
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent_with_custom_model.transition_to(DeveloperState.prompting)
                 agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
 
-                result = await agent_with_custom_model.answer_question(sample_question_context)
+                result = await agent_with_custom_model.answer_question(
+                    sample_question_context
+                )
 
-                assert len(captured_models) == 1
-                assert captured_models[0] == "claude-sonnet-4-5@20251001"
+                assert len(captured_options) == 1
+                assert captured_options[0].model == "claude-sonnet-4-5@20251001"
                 assert result.model_used == "claude-sonnet-4-5@20251001"
 
     @pytest.mark.asyncio
     async def test_default_model_used_when_not_specified(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that DEFAULT_QA_MODEL is used when developer_qa_model is None."""
-        captured_models: list[str] = []
+        captured_options: list[Any] = []
 
-        async def capture_model(prompt: str, model: str) -> MockSDKResponse:
-            captured_models.append(model)
-            return MockSDKResponse(result="Default model answer")
+        def capture_model(**kwargs):
+            captured_options.append(kwargs.get("options"))
+            return create_async_generator(ResultMessage(result="Default model answer"))
 
-        with patch("claude_evaluator.agents.developer.sdk_query", side_effect=capture_model):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=capture_model,
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(sample_question_context)
+                result = await base_developer_agent.answer_question(
+                    sample_question_context
+                )
 
-                assert len(captured_models) == 1
-                assert captured_models[0] == DEFAULT_QA_MODEL
+                assert len(captured_options) == 1
+                assert captured_options[0].model == DEFAULT_QA_MODEL
                 assert result.model_used == DEFAULT_QA_MODEL
 
     @pytest.mark.asyncio
     async def test_model_used_recorded_in_result(
-        self, agent_with_custom_model: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        agent_with_custom_model: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that model_used is correctly recorded in AnswerResult."""
-        mock_response = MockSDKResponse(result="Model recorded answer")
+        mock_response = ResultMessage(result="Model recorded answer")
+
+        def mock_sdk_query(**kwargs):
+            return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
-        ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
-                mock_query.return_value = mock_response
-
+            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent_with_custom_model.transition_to(DeveloperState.prompting)
                 agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
 
-                result = await agent_with_custom_model.answer_question(sample_question_context)
+                result = await agent_with_custom_model.answer_question(
+                    sample_question_context
+                )
 
                 assert result.model_used == "claude-sonnet-4-5@20251001"
 
@@ -377,16 +439,21 @@ class TestRetryUsesFullHistory:
         """Test that attempt_number=2 uses full conversation history."""
         captured_prompts: list[str] = []
 
-        async def capture_prompt(prompt: str, model: str) -> MockSDKResponse:
-            captured_prompts.append(prompt)
-            return MockSDKResponse(result="Retry answer with full context")
+        def capture_prompt(**kwargs):
+            captured_prompts.append(kwargs.get("prompt", ""))
+            return create_async_generator(ResultMessage(result="Retry answer with full context"))
 
-        with patch("claude_evaluator.agents.developer.sdk_query", side_effect=capture_prompt):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=capture_prompt,
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(retry_question_context)
+                result = await base_developer_agent.answer_question(
+                    retry_question_context
+                )
 
                 assert len(captured_prompts) == 1
                 prompt = captured_prompts[0]
@@ -418,12 +485,15 @@ class TestRetryUsesFullHistory:
 
         captured_prompts: list[str] = []
 
-        async def capture_prompt(prompt: str, model: str) -> MockSDKResponse:
-            captured_prompts.append(prompt)
-            return MockSDKResponse(result="First attempt answer")
+        def capture_prompt(**kwargs):
+            captured_prompts.append(kwargs.get("prompt", ""))
+            return create_async_generator(ResultMessage(result="First attempt answer"))
 
-        with patch("claude_evaluator.agents.developer.sdk_query", side_effect=capture_prompt):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=capture_prompt,
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent.transition_to(DeveloperState.prompting)
                 agent.transition_to(DeveloperState.awaiting_response)
 
@@ -444,14 +514,15 @@ class TestRetryUsesFullHistory:
         retry_question_context: QuestionContext,
     ) -> None:
         """Test that retry logs indicate full history is being used."""
-        mock_response = MockSDKResponse(result="Logged retry answer")
+        mock_response = ResultMessage(result="Logged retry answer")
+
+        def mock_sdk_query(**kwargs):
+            return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
-        ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
-                mock_query.return_value = mock_response
-
+            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -468,18 +539,21 @@ class TestRetryUsesFullHistory:
         retry_question_context: QuestionContext,
     ) -> None:
         """Test that attempt_number is correctly preserved in AnswerResult."""
-        mock_response = MockSDKResponse(result="Attempt number preserved")
+        mock_response = ResultMessage(result="Attempt number preserved")
+
+        def mock_sdk_query(**kwargs):
+            return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
-        ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
-                mock_query.return_value = mock_response
-
+            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(retry_question_context)
+                result = await base_developer_agent.answer_question(
+                    retry_question_context
+                )
 
                 assert result.attempt_number == 2
 
@@ -508,25 +582,25 @@ class TestMaxRetriesExceeded:
 
     def test_max_answer_retries_validation_rejects_negative(self) -> None:
         """Test that negative max_answer_retries is rejected."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValidationError, match="greater_than_equal"):
             DeveloperAgent(max_answer_retries=-1)
-        assert "max_answer_retries must be between 0 and 5" in str(exc_info.value)
 
     def test_max_answer_retries_validation_rejects_over_max(self) -> None:
         """Test that max_answer_retries over 5 is rejected."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValidationError, match="less_than_equal"):
             DeveloperAgent(max_answer_retries=6)
-        assert "max_answer_retries must be between 0 and 5" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_sdk_failure_transitions_to_failed_state(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that SDK failure causes transition to failed state."""
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.side_effect = Exception("SDK query failed")
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -540,13 +614,15 @@ class TestMaxRetriesExceeded:
 
     @pytest.mark.asyncio
     async def test_sdk_failure_logs_error_decision(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that SDK failure logs an appropriate error decision."""
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.side_effect = Exception("Connection timeout")
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -561,14 +637,16 @@ class TestMaxRetriesExceeded:
 
     @pytest.mark.asyncio
     async def test_empty_response_raises_error(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that empty string response from SDK raises RuntimeError."""
         # Return a plain empty string (not an object with attributes)
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.return_value = ""  # Empty string response
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -581,13 +659,15 @@ class TestMaxRetriesExceeded:
 
     @pytest.mark.asyncio
     async def test_none_response_raises_error(
-        self, base_developer_agent: DeveloperAgent, sample_question_context: QuestionContext
+        self,
+        base_developer_agent: DeveloperAgent,
+        sample_question_context: QuestionContext,
     ) -> None:
         """Test that None response from SDK raises RuntimeError."""
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.return_value = None
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -747,10 +827,7 @@ class TestAnswerGenerationHelpers:
         self, base_developer_agent: DeveloperAgent
     ) -> None:
         """Test that _summarize_questions limits to first 3 questions."""
-        questions = [
-            QuestionItem(question=f"Question {i}?")
-            for i in range(5)
-        ]
+        questions = [QuestionItem(question=f"Question {i}?") for i in range(5)]
 
         summary = base_developer_agent._summarize_questions(questions)
 
@@ -774,7 +851,7 @@ class TestAnswerGenerationHelpers:
         self, base_developer_agent: DeveloperAgent
     ) -> None:
         """Test that _extract_answer_from_response handles ResultMessage-like response."""
-        mock_response = MockSDKResponse(result="Result message answer")
+        mock_response = ResultMessage(result="Result message answer")
 
         answer = base_developer_agent._extract_answer_from_response(mock_response)
 
@@ -808,14 +885,12 @@ class TestAnswerGenerationHelpers:
         assert agent_max.context_window_size == 100
 
         # Invalid: below minimum
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValidationError, match="greater_than_equal"):
             DeveloperAgent(context_window_size=0)
-        assert "context_window_size must be between 1 and 100" in str(exc_info.value)
 
         # Invalid: above maximum
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValidationError, match="less_than_equal"):
             DeveloperAgent(context_window_size=101)
-        assert "context_window_size must be between 1 and 100" in str(exc_info.value)
 
     def test_reset_clears_answer_retry_count(self) -> None:
         """Test that reset() clears the internal answer retry counter."""
@@ -858,14 +933,17 @@ class TestAnswerGenerationIntegration:
             attempt_number=1,
         )
 
-        mock_response = MockSDKResponse(result="Use async for better concurrency.")
+        mock_response = ResultMessage(result="Use async for better concurrency.")
+        captured_options: list[Any] = []
+
+        def mock_sdk_query(**kwargs):
+            captured_options.append(kwargs.get("options"))
+            return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.agents.developer.sdk_query", new_callable=AsyncMock
-        ) as mock_query:
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
-                mock_query.return_value = mock_response
-
+            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -879,12 +957,14 @@ class TestAnswerGenerationIntegration:
                 assert result.generation_time_ms >= 0
 
                 # Verify state management
-                assert base_developer_agent.current_state == DeveloperState.awaiting_response
+                assert (
+                    base_developer_agent.current_state
+                    == DeveloperState.awaiting_response
+                )
 
                 # Verify SDK was called correctly
-                mock_query.assert_called_once()
-                call_args = mock_query.call_args
-                assert call_args.kwargs["model"] == DEFAULT_QA_MODEL
+                assert len(captured_options) == 1
+                assert captured_options[0].model == DEFAULT_QA_MODEL
 
     @pytest.mark.asyncio
     async def test_full_answer_flow_retry_attempt(self) -> None:
@@ -910,12 +990,15 @@ class TestAnswerGenerationIntegration:
 
         captured_prompts: list[str] = []
 
-        async def capture_and_respond(prompt: str, model: str) -> MockSDKResponse:
-            captured_prompts.append(prompt)
-            return MockSDKResponse(result="Here is more detail based on full context.")
+        def capture_and_respond(**kwargs):
+            captured_prompts.append(kwargs.get("prompt", ""))
+            return create_async_generator(ResultMessage(result="Here is more detail based on full context."))
 
-        with patch("claude_evaluator.agents.developer.sdk_query", side_effect=capture_and_respond):
-            with patch("claude_evaluator.agents.developer.SDK_AVAILABLE", True):
+        with patch(
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=capture_and_respond,
+        ):
+            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent.transition_to(DeveloperState.prompting)
                 agent.transition_to(DeveloperState.awaiting_response)
 

@@ -4,8 +4,6 @@ This module defines the MetricsCollector class which aggregates metrics
 from multiple queries and tool invocations during an evaluation run.
 """
 
-from typing import Optional
-
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.query_metrics import QueryMetrics
 
@@ -24,14 +22,15 @@ class MetricsCollector:
         collector.set_phase("planning")
         collector.add_query_metrics(query_metrics)
         metrics = collector.get_metrics()
+
     """
 
     def __init__(self) -> None:
         """Initialize empty metrics collector."""
         self._queries: list[QueryMetrics] = []
-        self._current_phase: Optional[str] = None
-        self._start_time_ms: Optional[int] = None
-        self._end_time_ms: Optional[int] = None
+        self._current_phase: str | None = None
+        self._start_time_ms: int | None = None
+        self._end_time_ms: int | None = None
 
     def add_query_metrics(self, query_metrics: QueryMetrics) -> None:
         """Add a query's metrics to the collector.
@@ -41,6 +40,7 @@ class MetricsCollector:
 
         Args:
             query_metrics: The QueryMetrics object to add.
+
         """
         # If query doesn't have a phase but we have a current phase, use it
         if query_metrics.phase is None and self._current_phase is not None:
@@ -64,6 +64,7 @@ class MetricsCollector:
 
         Args:
             phase: The workflow phase name (e.g., "planning", "implementation").
+
         """
         self._current_phase = phase
 
@@ -72,6 +73,7 @@ class MetricsCollector:
 
         Args:
             time_ms: Start time in milliseconds.
+
         """
         self._start_time_ms = time_ms
 
@@ -80,6 +82,7 @@ class MetricsCollector:
 
         Args:
             time_ms: End time in milliseconds.
+
         """
         self._end_time_ms = time_ms
 
@@ -91,6 +94,7 @@ class MetricsCollector:
 
         Returns:
             A Metrics object containing all aggregated metrics.
+
         """
         # Calculate total tokens
         total_input_tokens = sum(q.input_tokens for q in self._queries)
@@ -117,9 +121,14 @@ class MetricsCollector:
                     content = message.get("content", [])
                     if isinstance(content, list):
                         for block in content:
-                            if isinstance(block, dict) and block.get("type") == "ToolUseBlock":
+                            if (
+                                isinstance(block, dict)
+                                and block.get("type") == "ToolUseBlock"
+                            ):
                                 tool_name = block.get("name", "unknown")
-                                tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
+                                tool_counts[tool_name] = (
+                                    tool_counts.get(tool_name, 0) + 1
+                                )
 
         # Calculate total runtime
         total_runtime_ms = 0

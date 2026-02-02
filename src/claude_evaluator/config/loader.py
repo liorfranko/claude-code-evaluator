@@ -8,12 +8,21 @@ comprehensive validation.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, TypeAlias
 
 import yaml
 
-from ..models.enums import PermissionMode
-from .models import EvalDefaults, EvaluationConfig, EvaluationSuite, Phase
+from claude_evaluator.config.exceptions import ConfigurationError
+from claude_evaluator.config.models import (
+    EvalDefaults,
+    EvaluationConfig,
+    EvaluationSuite,
+    Phase,
+)
+from claude_evaluator.models.enums import PermissionMode
+
+# Type alias for unvalidated data from YAML parsing
+UnvalidatedData: TypeAlias = Any
 
 __all__ = ["load_suite", "apply_defaults"]
 
@@ -35,19 +44,18 @@ def _require_string(data: dict[str, Any], field: str, context: str) -> str:
         The stripped string value.
 
     Raises:
-        ValueError: If field is missing or not a non-empty string.
+        ConfigurationError: If field is missing or not a non-empty string.
+
     """
     if field not in data:
-        raise ValueError(f"Missing required field '{field}' in {context}")
+        raise ConfigurationError(f"Missing required field '{field}' in {context}")
     value = data[field]
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"Invalid '{field}': must be a non-empty string in {context}")
+        raise ConfigurationError(f"Invalid '{field}': must be a non-empty string in {context}")
     return value.strip()
 
 
-def _optional_int(
-    data: dict[str, Any], field: str, context: str
-) -> Optional[int]:
+def _optional_int(data: dict[str, Any], field: str, context: str) -> int | None:
     """Validate and extract an optional integer field.
 
     Args:
@@ -59,17 +67,16 @@ def _optional_int(
         The integer value or None if not present.
 
     Raises:
-        ValueError: If field is present but not an integer.
+        ConfigurationError: If field is present but not an integer.
+
     """
     value = data.get(field)
     if value is not None and not isinstance(value, int):
-        raise ValueError(f"Invalid '{field}': expected integer in {context}")
+        raise ConfigurationError(f"Invalid '{field}': expected integer in {context}")
     return value
 
 
-def _optional_number(
-    data: dict[str, Any], field: str, context: str
-) -> Optional[float]:
+def _optional_number(data: dict[str, Any], field: str, context: str) -> float | None:
     """Validate and extract an optional number (int or float) field.
 
     Args:
@@ -81,17 +88,16 @@ def _optional_number(
         The float value or None if not present.
 
     Raises:
-        ValueError: If field is present but not a number.
+        ConfigurationError: If field is present but not a number.
+
     """
     value = data.get(field)
     if value is not None and not isinstance(value, (int, float)):
-        raise ValueError(f"Invalid '{field}': expected number in {context}")
+        raise ConfigurationError(f"Invalid '{field}': expected number in {context}")
     return float(value) if value is not None else None
 
 
-def _optional_string(
-    data: dict[str, Any], field: str, context: str
-) -> Optional[str]:
+def _optional_string(data: dict[str, Any], field: str, context: str) -> str | None:
     """Validate and extract an optional string field.
 
     Args:
@@ -103,11 +109,12 @@ def _optional_string(
         The string value or None if not present.
 
     Raises:
-        ValueError: If field is present but not a string.
+        ConfigurationError: If field is present but not a string.
+
     """
     value = data.get(field)
     if value is not None and not isinstance(value, str):
-        raise ValueError(f"Invalid '{field}': expected string in {context}")
+        raise ConfigurationError(f"Invalid '{field}': expected string in {context}")
     return value
 
 
@@ -126,17 +133,18 @@ def _optional_bool(
         The boolean value or default if not present.
 
     Raises:
-        ValueError: If field is present but not a boolean.
+        ConfigurationError: If field is present but not a boolean.
+
     """
     value = data.get(field, default)
     if not isinstance(value, bool):
-        raise ValueError(f"Invalid '{field}': expected boolean in {context}")
+        raise ConfigurationError(f"Invalid '{field}': expected boolean in {context}")
     return value
 
 
 def _optional_string_list(
     data: dict[str, Any], field: str, context: str
-) -> Optional[list[str]]:
+) -> list[str] | None:
     """Validate and extract an optional list of strings field.
 
     Args:
@@ -148,15 +156,16 @@ def _optional_string_list(
         The list of strings or None if not present.
 
     Raises:
-        ValueError: If field is not a list or contains non-strings.
+        ConfigurationError: If field is not a list or contains non-strings.
+
     """
     value = data.get(field)
     if value is None:
         return None
     if not isinstance(value, list):
-        raise ValueError(f"Invalid '{field}': expected list in {context}")
+        raise ConfigurationError(f"Invalid '{field}': expected list in {context}")
     if not all(isinstance(item, str) for item in value):
-        raise ValueError(f"Invalid '{field}': all items must be strings in {context}")
+        raise ConfigurationError(f"Invalid '{field}': all items must be strings in {context}")
     return value
 
 
@@ -174,21 +183,22 @@ def _require_non_empty_list(
         The list value.
 
     Raises:
-        ValueError: If field is missing, not a list, or empty.
+        ConfigurationError: If field is missing, not a list, or empty.
+
     """
     if field not in data:
-        raise ValueError(f"Missing required field '{field}' in {context}")
+        raise ConfigurationError(f"Missing required field '{field}' in {context}")
     value = data[field]
     if not isinstance(value, list):
-        raise ValueError(
+        raise ConfigurationError(
             f"Invalid '{field}': expected list, got {type(value).__name__} in {context}"
         )
     if not value:
-        raise ValueError(f"Empty '{field}' list in {context}")
+        raise ConfigurationError(f"Empty '{field}' list in {context}")
     return value
 
 
-def _require_mapping(data: Any, context: str) -> dict[str, Any]:
+def _require_mapping(data: UnvalidatedData, context: str) -> dict[str, Any]:
     """Validate that data is a dictionary/mapping.
 
     Args:
@@ -199,10 +209,11 @@ def _require_mapping(data: Any, context: str) -> dict[str, Any]:
         The data if it's a dict.
 
     Raises:
-        ValueError: If data is not a dict.
+        ConfigurationError: If data is not a dict.
+
     """
     if not isinstance(data, dict):
-        raise ValueError(
+        raise ConfigurationError(
             f"Invalid structure: expected mapping, got {type(data).__name__} in {context}"
         )
     return data
@@ -225,6 +236,7 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
         >>> suite = load_suite("evaluations/my-suite.yaml")
         >>> # Defaults are automatically applied, but can also be called explicitly:
         >>> suite = apply_defaults(suite)
+
     """
     if suite.defaults is None:
         return suite
@@ -245,7 +257,10 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
             evaluation.timeout_seconds = defaults.timeout_seconds
 
         # Apply developer_qa_model default if not overridden
-        if evaluation.developer_qa_model is None and defaults.developer_qa_model is not None:
+        if (
+            evaluation.developer_qa_model is None
+            and defaults.developer_qa_model is not None
+        ):
             evaluation.developer_qa_model = defaults.developer_qa_model
 
         # Apply model default if not overridden
@@ -268,14 +283,14 @@ def load_suite(path: Path | str) -> EvaluationSuite:
         EvaluationSuite: The parsed and validated evaluation suite.
 
     Raises:
-        FileNotFoundError: If the specified file does not exist.
-        ValueError: If required fields are missing or invalid.
-        yaml.YAMLError: If the YAML is malformed.
+        ConfigurationError: If required fields are missing or invalid,
+            the file is empty, or has an invalid YAML structure.
 
     Example:
         >>> suite = load_suite("evaluations/my-suite.yaml")
         >>> print(suite.name)
         'my-suite'
+
     """
     path = Path(path)
 
@@ -291,10 +306,12 @@ def load_suite(path: Path | str) -> EvaluationSuite:
         raise OSError(f"Failed to read YAML file {path}: {e}") from e
 
     if data is None:
-        raise ValueError(f"Empty YAML file: {path}")
+        raise ConfigurationError(f"Empty YAML file: {path}")
 
     if not isinstance(data, dict):
-        raise ValueError(f"Invalid YAML structure: expected mapping, got {type(data).__name__}")
+        raise ConfigurationError(
+            f"Invalid YAML structure: expected mapping, got {type(data).__name__}"
+        )
 
     suite = _parse_suite(data, path)
     return apply_defaults(suite)
@@ -311,7 +328,8 @@ def _parse_suite(data: dict[str, Any], source_path: Path) -> EvaluationSuite:
         EvaluationSuite: The parsed suite.
 
     Raises:
-        ValueError: If required fields are missing or invalid.
+        ConfigurationError: If required fields are missing or invalid.
+
     """
     context = f"suite: {source_path}"
 
@@ -350,7 +368,8 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> EvalDefaults:
         EvalDefaults: The parsed defaults.
 
     Raises:
-        ValueError: If fields have invalid types.
+        ConfigurationError: If fields have invalid types.
+
     """
     context = f"defaults in {source_path}"
     _require_mapping(data, context)
@@ -391,7 +410,8 @@ def _parse_evaluation(
         EvaluationConfig: The parsed evaluation configuration.
 
     Raises:
-        ValueError: If required fields are missing or invalid.
+        ConfigurationError: If required fields are missing or invalid.
+
     """
     context = f"evaluation[{index}] in {source_path}"
     _require_mapping(data, context)
@@ -436,7 +456,8 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
         Phase: The parsed phase configuration.
 
     Raises:
-        ValueError: If required fields are missing or invalid.
+        ConfigurationError: If required fields are missing or invalid.
+
     """
     context = f"phase[{index}] in {parent_context}"
     _require_mapping(data, context)
@@ -450,10 +471,10 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
         permission_mode = PermissionMode(permission_mode_str)
     except ValueError:
         valid_modes = [mode.value for mode in PermissionMode]
-        raise ValueError(
+        raise ConfigurationError(
             f"Invalid 'permission_mode' value '{permission_mode_str}' in {context}. "
             f"Valid values are: {', '.join(valid_modes)}"
-        )
+        ) from None
 
     return Phase(
         name=name,
@@ -462,5 +483,7 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
         prompt_template=_optional_string(data, "prompt_template", context),
         allowed_tools=_optional_string_list(data, "allowed_tools", context),
         max_turns=_optional_int(data, "max_turns", context),
-        continue_session=_optional_bool(data, "continue_session", context, default=True),
+        continue_session=_optional_bool(
+            data, "continue_session", context, default=True
+        ),
     )
