@@ -179,7 +179,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 ### Error Handling Implementation
 
 - [X] T053 Implement SSH URL detection and rejection with helpful error (src/claude_evaluator/config/models.py)
-- [ ] T054 Implement repository not found error handling (src/claude_evaluator/cli/commands/evaluation.py)
+- [X] T054 Implement repository not found error handling (src/claude_evaluator/cli/commands/evaluation.py)
 - [ ] T055 Implement branch not found error with available branches list (src/claude_evaluator/cli/commands/evaluation.py)
 - [ ] T056 Implement network failure retry with 5-second delay (src/claude_evaluator/cli/commands/evaluation.py)
 - [ ] T057 Implement size warning for repositories > 500MB (src/claude_evaluator/cli/commands/evaluation.py)
