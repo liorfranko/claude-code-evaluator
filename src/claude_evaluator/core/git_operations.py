@@ -39,7 +39,7 @@ __all__ = [
 ]
 
 
-def build_clone_command(source: "RepositorySource", target_path: Path) -> list[str]:
+def build_clone_command(source: RepositorySource, target_path: Path) -> list[str]:
     """Build git clone command with appropriate flags.
 
     Constructs a git clone command list based on the RepositorySource
@@ -126,7 +126,7 @@ def is_branch_not_found_error(error_output: str) -> bool:
 
 
 async def clone_repository(
-    source: "RepositorySource",
+    source: RepositorySource,
     target_path: Path,
     retry_delay: float = 5.0,
 ) -> str:
