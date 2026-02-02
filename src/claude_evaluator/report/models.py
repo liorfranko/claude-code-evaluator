@@ -69,6 +69,8 @@ class EvaluationReport(BaseSchema):
         decisions: All Developer agent decisions.
         errors: Any errors encountered (optional).
         generated_at: When report was generated.
+        workspace_path: Path to preserved workspace (brownfield only).
+        change_summary: Summary of changes made (brownfield only).
 
     """
 
@@ -81,6 +83,8 @@ class EvaluationReport(BaseSchema):
     decisions: list[Decision]
     generated_at: datetime = Field(default_factory=datetime.now)
     errors: list[str] = Field(default_factory=list)
+    workspace_path: str | None = None
+    change_summary: ChangeSummary | None = None
 
     def has_errors(self) -> bool:
         """Check if the evaluation encountered any errors.
