@@ -17,6 +17,7 @@ __all__ = [
     "AnalysisStatus",
     "IssueSeverity",
     "TaskComplexityTier",
+    "DimensionScore",
 ]
 
 
@@ -58,3 +59,42 @@ class TaskComplexityTier(str, Enum):
     simple = "simple"
     medium = "medium"
     complex = "complex"
+
+
+class DimensionScore(BaseSchema):
+    """A score for a single quality dimension with weight and rationale.
+
+    Attributes:
+        dimension_name: Name of the scored dimension.
+        score: Numeric score for this dimension (0-100).
+        weight: Weight applied in aggregate calculation (0.0-1.0).
+        rationale: Explanation for this dimension's score.
+        sub_scores: Breakdown of score components (for code_quality).
+
+    """
+
+    dimension_name: DimensionType = Field(
+        ...,
+        description="Name of the scored dimension",
+    )
+    score: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Numeric score for this dimension (0-100)",
+    )
+    weight: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Weight applied in aggregate calculation (0.0-1.0)",
+    )
+    rationale: str = Field(
+        ...,
+        min_length=20,
+        description="Explanation for this dimension's score",
+    )
+    sub_scores: dict[str, int] | None = Field(
+        default=None,
+        description="Breakdown of score components (for code_quality)",
+    )
