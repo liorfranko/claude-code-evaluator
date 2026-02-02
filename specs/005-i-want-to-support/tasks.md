@@ -113,7 +113,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 ### Implementation
 
 - [X] T032 [US1] Ensure workspace is created in brownfield/ subdirectory (src/claude_evaluator/cli/commands/evaluation.py)
-- [ ] T033 [US1] Set _owns_workspace=False for brownfield workspaces to prevent cleanup (src/claude_evaluator/cli/commands/evaluation.py)
+- [X] T033 [US1] Set _owns_workspace=False for brownfield workspaces to prevent cleanup (src/claude_evaluator/cli/commands/evaluation.py)
 - [ ] T034 [US1] Add verbose logging for clone operations (src/claude_evaluator/cli/commands/evaluation.py)
 
 ### Tests
