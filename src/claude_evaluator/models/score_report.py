@@ -21,6 +21,7 @@ __all__ = [
     "StepAnalysis",
     "FileAnalysis",
     "CodeIssue",
+    "CodeAnalysis",
 ]
 
 
@@ -223,4 +224,47 @@ class CodeIssue(BaseSchema):
     suggestion: str | None = Field(
         default=None,
         description="Suggested fix or improvement",
+    )
+
+
+class CodeAnalysis(BaseSchema):
+    """Analysis of code files generated or modified during the evaluation.
+
+    Attributes:
+        files_analyzed: List of analyzed code files.
+        total_lines_added: Total lines of code added across all files.
+        total_lines_modified: Total lines of code modified across all files.
+        languages_detected: Programming languages found in analyzed files.
+        quality_summary: Overall assessment of code quality.
+        issues_found: List of potential issues or anti-patterns detected.
+
+    """
+
+    files_analyzed: list[FileAnalysis] = Field(
+        ...,
+        min_length=1,
+        description="List of analyzed code files",
+    )
+    total_lines_added: int = Field(
+        ...,
+        ge=0,
+        description="Total lines of code added across all files",
+    )
+    total_lines_modified: int = Field(
+        ...,
+        ge=0,
+        description="Total lines of code modified across all files",
+    )
+    languages_detected: list[str] = Field(
+        ...,
+        description="Programming languages found in analyzed files",
+    )
+    quality_summary: str = Field(
+        ...,
+        min_length=10,
+        description="Overall assessment of code quality",
+    )
+    issues_found: list[CodeIssue] = Field(
+        default_factory=list,
+        description="List of potential issues or anti-patterns detected",
     )
