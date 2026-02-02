@@ -292,7 +292,7 @@ class BaseWorkflow(ABC):
 
             """
             try:
-                logger.debug(
+                logger.info(
                     "question_received",
                     session_id=context.session_id,
                     attempt_number=context.attempt_number,

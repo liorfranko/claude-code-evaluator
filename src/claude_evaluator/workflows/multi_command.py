@@ -211,9 +211,9 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         # Have developer agent analyze response and continue if needed
         response = query_metrics.response
+        logger.info("developer_continuation_starting", response=response)
         continuation_count = 0
         developer = evaluation.developer_agent
-
         # Only invoke developer continuation if developer has answer_question capability
         # and there's a response to analyze
         while (
