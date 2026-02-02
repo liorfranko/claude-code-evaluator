@@ -19,68 +19,54 @@ from claude_evaluator.cli.parser import create_parser
 from claude_evaluator.cli.validators import validate_args
 from claude_evaluator.logging_config import configure_logging, get_logger
 
-__all__ = ["main", "CommandDispatcher"]
+__all__ = ["main"]
 
 logger = get_logger(__name__)
 
 
-class CommandDispatcher:
-    """Dispatches CLI commands to appropriate handlers.
+async def _dispatch(args: argparse.Namespace) -> int:
+    """Dispatch to the appropriate command based on arguments.
 
-    Attributes:
-        _suite_cmd: Command handler for running suites.
-        _eval_cmd: Command handler for running individual evaluations.
-        _validate_cmd: Command handler for validating suites.
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for errors).
 
     """
+    # Handle score command
+    if args.score:
+        args.evaluation_path = args.score
+        score_cmd = ScoreCommand()
+        result = await score_cmd.execute(args)
+        if result.message:
+            print(result.message)
+        return result.exit_code
 
-    def __init__(self) -> None:
-        """Initialize the command dispatcher with all command handlers."""
-        self._suite_cmd = RunSuiteCommand()
-        self._eval_cmd = RunEvaluationCommand()
-        self._validate_cmd = ValidateSuiteCommand()
-        self._score_cmd = ScoreCommand()
+    # Handle dry-run (validation only)
+    if args.dry_run:
+        validate_cmd = ValidateSuiteCommand()
+        result = await validate_cmd.execute(args)
+        return result.exit_code
 
-    async def dispatch(self, args: argparse.Namespace) -> int:
-        """Dispatch to the appropriate command based on arguments.
+    # Handle suite execution
+    if args.suite:
+        suite_cmd = RunSuiteCommand()
+        result = await suite_cmd.execute(args)
+        output = format_results(result.reports, json_output=args.json_output)
+        print(output)
+        return result.exit_code
 
-        Args:
-            args: Parsed command-line arguments.
+    # Handle ad-hoc evaluation
+    if args.workflow and args.task:
+        eval_cmd = RunEvaluationCommand()
+        result = await eval_cmd.execute(args)
+        output = format_results(result.reports, json_output=args.json_output)
+        print(output)
+        return result.exit_code
 
-        Returns:
-            Exit code (0 for success, non-zero for errors).
-
-        """
-        # Handle score command
-        if getattr(args, "score", None):
-            # Map score argument to evaluation_path for the command
-            args.evaluation_path = args.score
-            result = await self._score_cmd.execute(args)  # type: ignore
-            if result.message:
-                print(result.message)
-            return result.exit_code
-
-        # Handle dry-run (validation only)
-        if getattr(args, "dry_run", False):
-            result = await self._validate_cmd.execute(args)  # type: ignore
-            return result.exit_code
-
-        # Handle suite execution
-        if getattr(args, "suite", None):
-            result = await self._suite_cmd.execute(args)  # type: ignore
-            output = format_results(result.reports, json_output=getattr(args, "json_output", False))
-            print(output)
-            return result.exit_code
-
-        # Handle ad-hoc evaluation
-        if getattr(args, "workflow", None) and getattr(args, "task", None):
-            result = await self._eval_cmd.execute(args)  # type: ignore
-            output = format_results(result.reports, json_output=getattr(args, "json_output", False))
-            print(output)
-            return result.exit_code
-
-        # Should not reach here if validation passes
-        return 1
+    # Should not reach here if validation passes
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -97,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     # Set up logging
-    _setup_logging(getattr(args, "verbose", False))
+    configure_logging(verbose=args.verbose, json_output=False)
 
     # Validate arguments
     error = validate_args(args)
@@ -106,8 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        dispatcher = CommandDispatcher()
-        return asyncio.run(dispatcher.dispatch(args))
+        return asyncio.run(_dispatch(args))
 
     except KeyboardInterrupt:
         print("\nInterrupted by user")
@@ -116,19 +101,9 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:
         logger.exception("fatal_error", error=str(e))
         print(f"Error: {e}", file=sys.stderr)
-        if getattr(args, "verbose", False):
+        if args.verbose:
             traceback.print_exc()
         return 1
-
-
-def _setup_logging(verbose: bool = False) -> None:
-    """Configure logging for the CLI.
-
-    Args:
-        verbose: Whether to enable debug-level logging to console.
-
-    """
-    configure_logging(verbose=verbose, json_output=False)
 
 
 if __name__ == "__main__":

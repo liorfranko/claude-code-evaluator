@@ -1,12 +1,13 @@
-"""Git operations for brownfield repository support.
+"""Git operations for repository management.
 
-This module provides functions for cloning repositories and detecting
-changes made during brownfield evaluations. It uses subprocess to invoke
-the system git CLI for maximum compatibility and reliability.
+This module provides functions for cloning repositories, initializing
+workspaces, and detecting changes. It uses subprocess to invoke the
+system git CLI for maximum compatibility and reliability.
 
 Functions:
     build_clone_command: Build git clone command with appropriate flags.
     clone_repository: Clone a repository with retry logic.
+    init_greenfield_workspace: Initialize a new git workspace for evaluations.
     is_network_error: Check if an error message indicates a network issue.
     is_branch_not_found_error: Check if an error indicates branch not found.
     get_change_summary: Get summary of changes from git status.
@@ -19,6 +20,7 @@ Classes:
 from __future__ import annotations
 
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -31,9 +33,11 @@ if TYPE_CHECKING:
 __all__ = [
     "build_clone_command",
     "clone_repository",
-    "is_network_error",
-    "is_branch_not_found_error",
     "get_change_summary",
+    "get_current_branch",
+    "init_greenfield_workspace",
+    "is_branch_not_found_error",
+    "is_network_error",
     "parse_git_status",
     "GitStatusError",
 ]
@@ -102,6 +106,26 @@ def is_network_error(error_output: str) -> bool:
     ]
     error_lower = error_output.lower()
     return any(indicator.lower() in error_lower for indicator in network_indicators)
+
+
+def get_current_branch(workspace_path: Path) -> str:
+    """Get the current git branch name.
+
+    Args:
+        workspace_path: Path to the git workspace.
+
+    Returns:
+        The current branch name.
+
+    """
+    result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=workspace_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
 
 
 def is_branch_not_found_error(error_output: str) -> bool:
@@ -189,6 +213,93 @@ async def clone_repository(
         error_message="Clone failed after retry",
         retry_attempted=True,
     )
+
+
+def init_greenfield_workspace(workspace_path: Path, remote_path: Path) -> None:
+    """Initialize a git repository for greenfield evaluations.
+
+    Creates a new git repository with an initial commit, configures
+    user identity, and sets up a bare remote for push operations.
+
+    Args:
+        workspace_path: Path to the workspace directory.
+        remote_path: Path where the bare remote repository will be created.
+
+    Raises:
+        RuntimeError: If git push fails after initialization.
+
+    """
+    # Initialize repository
+    subprocess.run(
+        ["git", "init"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+
+    # Configure user identity
+    subprocess.run(
+        ["git", "config", "user.email", "evaluator@test.local"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Claude Evaluator"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+
+    # Create .gitkeep and initial commit
+    gitkeep_path = workspace_path / ".gitkeep"
+    gitkeep_path.touch()
+    subprocess.run(
+        ["git", "add", "."],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit"],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+
+    # Create and configure bare remote
+    bare_repo_path = remote_path.resolve()
+    subprocess.run(
+        ["git", "init", "--bare", str(bare_repo_path)],
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare_repo_path)],
+        cwd=workspace_path,
+        capture_output=True,
+        check=True,
+    )
+
+    # Push initial commit
+    branch_result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=workspace_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    current_branch = branch_result.stdout.strip()
+    push_result = subprocess.run(
+        ["git", "push", "-u", "origin", current_branch],
+        cwd=workspace_path,
+        capture_output=True,
+        text=True,
+    )
+    if push_result.returncode != 0:
+        raise RuntimeError(
+            f"Git push failed for branch '{current_branch}': {push_result.stderr}"
+        )
 
 
 def parse_git_status(output: str) -> ChangeSummary:

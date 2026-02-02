@@ -3,7 +3,6 @@
 This module implements the command for running a single evaluation.
 """
 
-import subprocess
 from argparse import Namespace
 from datetime import datetime
 from pathlib import Path
@@ -13,8 +12,12 @@ from claude_evaluator.cli.formatters import create_progress_callback
 from claude_evaluator.config.models import Phase, RepositorySource
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
-from claude_evaluator.core.exceptions import CloneError
-from claude_evaluator.core.git_operations import clone_repository, get_change_summary
+from claude_evaluator.core.git_operations import (
+    clone_repository,
+    get_change_summary,
+    get_current_branch,
+    init_greenfield_workspace,
+)
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode, WorkflowType
@@ -112,17 +115,17 @@ class RunEvaluationCommand(BaseCommand):
 
         # Initialize workspace: clone for brownfield, init for greenfield
         ref_used: str | None = None
-        if is_brownfield:
+        if is_brownfield and repository_source is not None:
             # Clone external repository
             ref_used = await self._clone_repository(
                 repository_source, workspace_path, verbose
             )
         else:
             # Initialize empty git repository
-            self._init_git_repo(workspace_path, eval_folder, verbose)
+            init_greenfield_workspace(workspace_path, eval_folder / "remote.git")
 
         # Get current branch name
-        current_branch = self._get_current_branch(workspace_path)
+        current_branch = get_current_branch(workspace_path)
         if verbose:
             print(f"Git branch: {current_branch}")
 
@@ -172,10 +175,8 @@ class RunEvaluationCommand(BaseCommand):
                     print(f"Total tokens: {evaluation.metrics.total_tokens}")
                     print(f"Total cost: ${evaluation.metrics.total_cost_usd:.4f}")
 
-        except WorkflowTimeoutError as e:
-            self._handle_timeout(evaluation, e, verbose)
-        except Exception as e:
-            self._handle_error(evaluation, e, verbose)
+        except (WorkflowTimeoutError, Exception) as e:
+            self._handle_exception(evaluation, e, verbose)
 
         # Generate report with brownfield metadata if applicable
         generator = ReportGenerator()
@@ -200,76 +201,6 @@ class RunEvaluationCommand(BaseCommand):
             print(f"Report saved to: {report_path}")
 
         return report
-
-    def _init_git_repo(
-        self, workspace_path: Path, eval_folder: Path, verbose: bool
-    ) -> None:
-        """Initialize a git repository in the workspace."""
-        subprocess.run(
-            ["git", "init"],
-            cwd=workspace_path,
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.email", "evaluator@test.local"],
-            cwd=workspace_path,
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Claude Evaluator"],
-            cwd=workspace_path,
-            capture_output=True,
-            check=True,
-        )
-        # Create .gitkeep and initial commit
-        gitkeep_path = workspace_path / ".gitkeep"
-        gitkeep_path.touch()
-        subprocess.run(
-            ["git", "add", "."],
-            cwd=workspace_path,
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "commit", "-m", "Initial commit"],
-            cwd=workspace_path,
-            capture_output=True,
-            check=True,
-        )
-        # Add dummy remote
-        bare_repo_path = (eval_folder / "remote.git").resolve()
-        subprocess.run(
-            ["git", "init", "--bare", str(bare_repo_path)],
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "remote", "add", "origin", str(bare_repo_path)],
-            cwd=workspace_path,
-            capture_output=True,
-            check=True,
-        )
-        # Push initial commit
-        branch_result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=workspace_path,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        current_branch = branch_result.stdout.strip()
-        push_result = subprocess.run(
-            ["git", "push", "-u", "origin", current_branch],
-            cwd=workspace_path,
-            capture_output=True,
-            text=True,
-        )
-        if push_result.returncode != 0:
-            raise RuntimeError(
-                f"Git push failed for branch '{current_branch}': {push_result.stderr}"
-            )
 
     async def _clone_repository(
         self,
@@ -305,17 +236,6 @@ class RunEvaluationCommand(BaseCommand):
 
         return ref_used
 
-    def _get_current_branch(self, workspace_path: Path) -> str:
-        """Get the current git branch name."""
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=workspace_path,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stdout.strip()
-
     def _create_workflow(
         self,
         workflow_type: WorkflowType,
@@ -340,40 +260,42 @@ class RunEvaluationCommand(BaseCommand):
         else:
             raise ValueError(f"Unknown workflow type: {workflow_type}")
 
-    def _handle_timeout(
-        self, evaluation: Evaluation, e: WorkflowTimeoutError, verbose: bool
+    def _handle_exception(
+        self,
+        evaluation: Evaluation,
+        error: Exception,
+        verbose: bool,
     ) -> None:
-        """Handle workflow timeout."""
-        timeout_msg = (
-            f"Evaluation timed out after {e.timeout_seconds} seconds.\n"
-            f"  Tip: Increase the timeout using --timeout or timeout_seconds "
-            "in your YAML config."
-        )
-        logger.warning(
-            "evaluation_timeout",
-            evaluation_id=str(evaluation.id),
-            timeout_seconds=e.timeout_seconds,
-        )
+        """Handle evaluation exceptions (timeout or general error).
+
+        Args:
+            evaluation: The evaluation that encountered the exception.
+            error: The exception that was raised.
+            verbose: Whether to print detailed output.
+
+        """
+        if isinstance(error, WorkflowTimeoutError):
+            message = (
+                f"Evaluation timed out after {error.timeout_seconds} seconds.\n"
+                f"  Tip: Increase the timeout using --timeout or timeout_seconds "
+                "in your YAML config."
+            )
+            logger.warning(
+                "evaluation_timeout",
+                evaluation_id=str(evaluation.id),
+                timeout_seconds=error.timeout_seconds,
+            )
+        else:
+            message = f"Evaluation failed: {error}"
+            logger.error(
+                "evaluation_failed",
+                evaluation_id=str(evaluation.id),
+                error=str(error),
+                exc_info=True,
+            )
 
         if not evaluation.is_terminal():
-            evaluation.fail(str(e))
+            evaluation.fail(str(error))
 
         if verbose:
-            print(timeout_msg)
-
-    def _handle_error(
-        self, evaluation: Evaluation, e: Exception, verbose: bool
-    ) -> None:
-        """Handle evaluation error."""
-        logger.error(
-            "evaluation_failed",
-            evaluation_id=str(evaluation.id),
-            error=str(e),
-            exc_info=True,
-        )
-
-        if not evaluation.is_terminal():
-            evaluation.fail(str(e))
-
-        if verbose:
-            print(f"Evaluation failed: {e}")
+            print(message)

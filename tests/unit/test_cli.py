@@ -4,13 +4,11 @@ from argparse import Namespace
 from pathlib import Path
 
 from claude_evaluator.cli import (
-    _determine_workflow_type,
     create_parser,
     format_results,
     validate_args,
 )
-from claude_evaluator.config.models import EvaluationConfig, Phase
-from claude_evaluator.models.enums import Outcome, PermissionMode, WorkflowType
+from claude_evaluator.models.enums import Outcome, WorkflowType
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.report.models import EvaluationReport
 
@@ -195,84 +193,6 @@ class TestValidateArgs:
         error = validate_args(args)
         assert error is not None
         assert "Suite file not found" in error
-
-
-class TestDetermineWorkflowType:
-    """Tests for _determine_workflow_type function."""
-
-    def test_single_phase_returns_multi_command(self) -> None:
-        """Test that single phase returns multi_command workflow.
-
-        Note: The implementation now always returns multi_command for YAML-based
-        configs to enable custom prompts from the config.
-        """
-        config = EvaluationConfig(
-            id="test",
-            name="Test",
-            task="Test task",
-            phases=[
-                Phase(
-                    name="execute",
-                    permission_mode=PermissionMode.acceptEdits,
-                ),
-            ],
-        )
-        assert _determine_workflow_type(config) == WorkflowType.multi_command
-
-    def test_two_phases_with_plan_mode_first(self) -> None:
-        """Test that two phases with plan mode first returns plan_then_implement."""
-        config = EvaluationConfig(
-            id="test",
-            name="Test",
-            task="Test task",
-            phases=[
-                Phase(
-                    name="plan",
-                    permission_mode=PermissionMode.plan,
-                ),
-                Phase(
-                    name="implement",
-                    permission_mode=PermissionMode.acceptEdits,
-                ),
-            ],
-        )
-        # Note: The current implementation uses multi_command for all multi-phase
-        # workflows to respect custom prompts from YAML config. PlanThenImplementWorkflow
-        # has hardcoded prompts that don't use the phase prompts from config.
-        assert _determine_workflow_type(config) == WorkflowType.multi_command
-
-    def test_two_phases_without_plan_returns_multi_command(self) -> None:
-        """Test that two phases without plan mode returns multi_command."""
-        config = EvaluationConfig(
-            id="test",
-            name="Test",
-            task="Test task",
-            phases=[
-                Phase(
-                    name="phase1",
-                    permission_mode=PermissionMode.acceptEdits,
-                ),
-                Phase(
-                    name="phase2",
-                    permission_mode=PermissionMode.acceptEdits,
-                ),
-            ],
-        )
-        assert _determine_workflow_type(config) == WorkflowType.multi_command
-
-    def test_three_or_more_phases_returns_multi_command(self) -> None:
-        """Test that three or more phases returns multi_command."""
-        config = EvaluationConfig(
-            id="test",
-            name="Test",
-            task="Test task",
-            phases=[
-                Phase(name="phase1", permission_mode=PermissionMode.plan),
-                Phase(name="phase2", permission_mode=PermissionMode.acceptEdits),
-                Phase(name="phase3", permission_mode=PermissionMode.acceptEdits),
-            ],
-        )
-        assert _determine_workflow_type(config) == WorkflowType.multi_command
 
 
 class TestFormatResults:

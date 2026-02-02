@@ -39,7 +39,7 @@ class BaseCommand(ABC):
     @abstractmethod
     def name(self) -> str:
         """Get the command name for logging and display."""
-        pass
+        ...
 
     @abstractmethod
     async def execute(self, args: Namespace) -> CommandResult:
@@ -52,4 +52,4 @@ class BaseCommand(ABC):
             CommandResult with exit code and any reports.
 
         """
-        pass
+        ...

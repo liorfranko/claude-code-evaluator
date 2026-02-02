@@ -4,6 +4,9 @@ This module centralizes all hard-coded default values used throughout
 the application, making them easy to discover and modify.
 """
 
+# Output directories
+DEFAULT_OUTPUT_DIR = "evaluations"
+
 # Model defaults
 DEFAULT_WORKER_MODEL = "claude-haiku-4-5@20251001"
 DEFAULT_QA_MODEL = "claude-haiku-4-5@20251001"

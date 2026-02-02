@@ -6,6 +6,7 @@ This module provides the argument parser for the claude-evaluator CLI.
 import argparse
 
 from claude_evaluator import __version__
+from claude_evaluator.config.defaults import DEFAULT_OUTPUT_DIR
 
 __all__ = ["create_parser"]
 
@@ -95,8 +96,8 @@ For more information, see the documentation.
         "-o",
         type=str,
         metavar="DIR",
-        default="evaluations",
-        help="Output directory for evaluation reports (default: evaluations)",
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Output directory for evaluation reports (default: {DEFAULT_OUTPUT_DIR})",
     )
 
     # Resource limits

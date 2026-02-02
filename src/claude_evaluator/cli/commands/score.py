@@ -10,7 +10,9 @@ from pathlib import Path
 import structlog
 
 from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
+from claude_evaluator.config.defaults import DEFAULT_OUTPUT_DIR
 from claude_evaluator.core.agents.evaluator import EvaluatorAgent
+from claude_evaluator.models.score_report import ScoreReport
 
 __all__ = ["ScoreCommand"]
 
@@ -44,9 +46,9 @@ class ScoreCommand(BaseCommand):
         workspace_path = Path(args.workspace) if args.workspace else evaluation_path.parent
 
         # For score command, default output is same directory as evaluation file
-        # Don't use args.output if it's the suite default "evaluations" directory
+        # Don't use args.output if it's the suite default directory
         output_arg = getattr(args, "output", None)
-        if output_arg and output_arg != "evaluations":
+        if output_arg and output_arg != DEFAULT_OUTPUT_DIR:
             output_path = Path(output_arg)
         else:
             output_path = None  # Will default to workspace/score_report.json
@@ -96,7 +98,7 @@ class ScoreCommand(BaseCommand):
                 message=f"Scoring failed: {e}",
             )
 
-    def _print_summary(self, report, verbose: bool) -> None:  # noqa: ANN001
+    def _print_summary(self, report: ScoreReport, verbose: bool) -> None:
         """Print a summary of the score report to console.
 
         Args:
@@ -105,7 +107,7 @@ class ScoreCommand(BaseCommand):
 
         """
         print("\n" + "=" * 60)
-        print(f"EVALUATION SCORE REPORT")
+        print("EVALUATION SCORE REPORT")
         print("=" * 60)
         print(f"Evaluation ID: {report.evaluation_id}")
         print(f"Aggregate Score: {report.aggregate_score}/100")
@@ -127,7 +129,7 @@ class ScoreCommand(BaseCommand):
                 print(f"    {rationale}")
 
         if report.code_analysis:
-            print(f"\nCode Analysis:")
+            print("\nCode Analysis:")
             print(f"  Files analyzed: {len(report.code_analysis.files_analyzed)}")
             print(f"  Total lines: {report.code_analysis.total_lines_added}")
             if report.code_analysis.languages_detected:
@@ -138,12 +140,12 @@ class ScoreCommand(BaseCommand):
             from claude_evaluator.models.score_report import EfficiencyFlag
             redundant = sum(1 for s in report.step_analysis if s.efficiency_flag == EfficiencyFlag.redundant)
             if redundant > 0:
-                print(f"\nExecution Analysis:")
+                print("\nExecution Analysis:")
                 print(f"  Total steps: {len(report.step_analysis)}")
                 print(f"  Redundant steps: {redundant}")
 
         if verbose and report.rationale:
-            print(f"\nStrategy Commentary:")
+            print("\nStrategy Commentary:")
             # Truncate long rationale for display
             rationale = report.rationale
             if len(rationale) > 200:
