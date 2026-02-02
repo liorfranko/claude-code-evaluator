@@ -25,7 +25,7 @@ evaluations:
       Uses the official /feature-dev command to build a task management CLI.
       Tests the guided feature development workflow with architecture focus.
     task: >
-      Build a task management CLI application with the following capabilities:
+      With feature-dev command, build a task management CLI application with the following capabilities:
       1. Add, list, update, and delete tasks
       2. Mark tasks as complete/incomplete
       3. Assign priorities (low, medium, high)

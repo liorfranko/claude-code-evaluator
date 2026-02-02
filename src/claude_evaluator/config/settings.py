@@ -11,6 +11,10 @@ Environment Variables:
     CLAUDE_DEVELOPER_QA_MODEL: Developer Q&A model
     CLAUDE_DEVELOPER_CONTEXT_WINDOW_SIZE: Conversation context size
     CLAUDE_DEVELOPER_MAX_ANSWER_RETRIES: Maximum answer retry attempts
+    CLAUDE_EVALUATOR_MODEL: Gemini model for evaluation scoring
+    CLAUDE_EVALUATOR_TIMEOUT_SECONDS: Evaluation operation timeout
+    CLAUDE_EVALUATOR_TEMPERATURE: LLM temperature for scoring
+    CLAUDE_EVALUATOR_ENABLE_AST_PARSING: Enable tree-sitter AST parsing
 """
 
 from functools import lru_cache
@@ -38,6 +42,7 @@ from claude_evaluator.config.defaults import (
 __all__ = [
     "WorkerSettings",
     "DeveloperSettings",
+    "EvaluatorSettings",
     "Settings",
     "get_settings",
 ]
@@ -120,6 +125,44 @@ class DeveloperSettings(BaseSettings):
     )
 
 
+class EvaluatorSettings(BaseSettings):
+    """Settings for the EvaluatorAgent.
+
+    Attributes:
+        model: Gemini model identifier for evaluation scoring.
+        timeout_seconds: Timeout for evaluation operations.
+        temperature: LLM temperature for scoring (lower = more deterministic).
+        enable_ast_parsing: Whether to use tree-sitter AST parsing.
+
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="CLAUDE_EVALUATOR_",
+        extra="ignore",
+    )
+
+    model: str = Field(
+        default="gemini-2.0-flash",
+        description="Gemini model identifier for evaluation scoring",
+    )
+    timeout_seconds: int = Field(
+        default=120,
+        ge=10,
+        le=600,
+        description="Timeout for evaluation operations in seconds",
+    )
+    temperature: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="LLM temperature for scoring (lower = more deterministic)",
+    )
+    enable_ast_parsing: bool = Field(
+        default=True,
+        description="Whether to use tree-sitter AST parsing",
+    )
+
+
 class Settings(BaseSettings):
     """Root settings container.
 
@@ -129,6 +172,7 @@ class Settings(BaseSettings):
     Attributes:
         worker: WorkerAgent settings.
         developer: DeveloperAgent settings.
+        evaluator: EvaluatorAgent settings.
 
     """
 
@@ -139,6 +183,7 @@ class Settings(BaseSettings):
 
     worker: WorkerSettings = Field(default_factory=WorkerSettings)
     developer: DeveloperSettings = Field(default_factory=DeveloperSettings)
+    evaluator: EvaluatorSettings = Field(default_factory=EvaluatorSettings)
 
 
 @lru_cache(maxsize=1)

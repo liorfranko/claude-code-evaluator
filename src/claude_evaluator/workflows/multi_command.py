@@ -236,6 +236,7 @@ class MultiCommandWorkflow(BaseWorkflow):
                     conversation_history=query_metrics.messages,
                     session_id=str(evaluation.id),
                     attempt_number=1,
+                    phase_name=phase.name,
                 )
 
                 # Get developer's analysis and potential response

@@ -27,7 +27,7 @@ evaluations:
       The two-phase approach ensures Claude understands the codebase before
       making changes.
     task: >
-      Build a task management CLI application with the following capabilities:
+      With planning phase, build a task management CLI application with the following capabilities:
       1. Add, list, update, and delete tasks
       2. Mark tasks as complete/incomplete
       3. Assign priorities (low, medium, high)

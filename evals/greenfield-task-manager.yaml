@@ -19,13 +19,13 @@ defaults:
   model: claude-sonnet-4-5@20250929
 
 evaluations:
-  - id: task-manager-feature-dev
-    name: Task Management CLI (feature-dev)
+  - id: task-manager
+    name: Task Management CLI
     description: >
-      Uses the official /feature-dev command to build a task management CLI.
+      Uses the direct implementation workflow to build a task management CLI.
       Tests the guided feature development workflow with architecture focus.
     task: >
-      Build a task management CLI application with the following capabilities:
+      Without any planning, build a task management CLI application with the following capabilities:
       1. Add, list, update, and delete tasks
       2. Mark tasks as complete/incomplete
       3. Assign priorities (low, medium, high)
@@ -33,15 +33,15 @@ evaluations:
       5. Persist tasks to a JSON file
       6. Support for due dates
     tags:
-      - feature-dev
-      - complex
+      - simple
+      - direct
       - python
       - cli
     phases:
-      - name: feature-dev
+      - name: implement
         permission_mode: bypassPermissions
         prompt: >
-          /feature-dev:feature-dev Build a task management CLI application that allows users to:
+          Build a task management CLI application that allows users to:
           - Add, list, update, and delete tasks
           - Mark tasks as complete/incomplete
           - Assign priorities (low, medium, high)
