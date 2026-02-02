@@ -170,6 +170,7 @@ class TestFullWorkflowExecution:
     @pytest.mark.asyncio
     async def test_complete_multi_command_lifecycle(self) -> None:
         """Test complete multi-command workflow lifecycle."""
+        # Note: DeveloperAgent.answer_question is mocked by conftest.py fixture
         developer = DeveloperAgent()
         worker = self.create_mock_worker()
 

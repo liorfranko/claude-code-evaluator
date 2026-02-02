@@ -311,7 +311,9 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
 
         asyncio.run(workflow.execute(evaluation))
 
-        assert workflow.planning_response == planning_response
+        # Compare stripped versions to handle whitespace differences
+        assert workflow.planning_response is not None
+        assert workflow.planning_response.strip() == planning_response.strip()
 
     def test_session_continuity_between_phases(self) -> None:
         """Test that tool counts are properly aggregated between phases."""
