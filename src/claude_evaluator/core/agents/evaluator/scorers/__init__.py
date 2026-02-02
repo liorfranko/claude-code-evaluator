@@ -7,4 +7,14 @@ This package provides scorer implementations for different quality dimensions:
 - AggregateScorer: Combines dimension scores with weights
 """
 
-__all__: list[str] = []
+from claude_evaluator.core.agents.evaluator.scorers.efficiency import (
+    EfficiencyScorer,
+    calculate_efficiency_score,
+    classify_task_complexity,
+)
+
+__all__ = [
+    "EfficiencyScorer",
+    "calculate_efficiency_score",
+    "classify_task_complexity",
+]

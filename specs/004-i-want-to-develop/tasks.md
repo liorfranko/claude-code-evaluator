@@ -75,8 +75,8 @@ Core data models and settings that all other components depend on.
 Implement the individual dimension scorers.
 
 ### Efficiency Scorer (Pure Calculation)
-- [ ] T200 [US1] [US2] Implement TaskComplexityTier classification logic based on metrics (scorers/efficiency.py)
-- [ ] T201 [US1] [US2] Implement efficiency score calculation: 100 - (actual/baseline × 100) clamped to 0-100 (scorers/efficiency.py)
+- [x] T200 [US1] [US2] Implement TaskComplexityTier classification logic based on metrics (scorers/efficiency.py)
+- [x] T201 [US1] [US2] Implement efficiency score calculation: 100 - (actual/baseline × 100) clamped to 0-100 (scorers/efficiency.py)
 - [ ] T202 [US1] [US2] Add tier baseline constants: Simple (10K/5/$0.10), Medium (50K/15/$0.50), Complex (150K/30/$1.50) (scorers/efficiency.py)
 
 ### Aggregate Scorer (Pure Calculation)
