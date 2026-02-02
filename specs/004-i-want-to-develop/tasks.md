@@ -29,7 +29,7 @@ Project initialization and dependency configuration.
 - [x] T001 [P] Add `google-generativeai>=0.8.0` dependency to pyproject.toml
 - [x] T002 [P] Add tree-sitter dependencies to pyproject.toml: tree-sitter, tree-sitter-python, tree-sitter-javascript, tree-sitter-go, tree-sitter-rust, tree-sitter-java, tree-sitter-c
 - [x] T003 [P] Add GEMINI_API_KEY to .env.example template
-- [ ] T004 [P] Create evaluator directory structure: src/claude_evaluator/core/agents/evaluator/
+- [x] T004 [P] Create evaluator directory structure: src/claude_evaluator/core/agents/evaluator/
 
 ### Package Initialization
 - [ ] T005 Create src/claude_evaluator/core/agents/evaluator/__init__.py with exports
