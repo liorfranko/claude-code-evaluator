@@ -85,7 +85,7 @@ Implement the individual dimension scorers.
 
 ### Task Completion Scorer (LLM-Based)
 - [x] T205 [US1] [US2] Create Gemini client wrapper with retry logic (core/agents/evaluator/gemini_client.py)
-- [ ] T206 [US1] [US2] Define task completion scoring prompt template (prompts.py)
+- [x] T206 [US1] [US2] Define task completion scoring prompt template (prompts.py)
 - [ ] T207 [US1] [US2] Implement TaskCompletionScorer with structured output using Pydantic schema (scorers/task_completion.py)
 
 ### Code Quality Scorer (LLM-Based)
