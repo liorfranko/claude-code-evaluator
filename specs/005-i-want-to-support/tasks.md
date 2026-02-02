@@ -163,8 +163,8 @@ Source: plan.md, spec.md, data-model.md, research.md
 ### Tests
 
 - [X] T049 [US3] Write test: verify change summary accuracy vs git status (tests/integration/test_brownfield_clone.py)
-- [ ] T050 [US3] Verify: Report includes workspace path (tests/e2e/test_brownfield_evaluation.py)
-- [ ] T051 [US3] Verify: Report includes summary of modified/added/deleted files (tests/e2e/test_brownfield_evaluation.py)
+- [X] T050 [US3] Verify: Report includes workspace path (tests/e2e/test_brownfield_evaluation.py)
+- [X] T051 [US3] Verify: Report includes summary of modified/added/deleted files (tests/e2e/test_brownfield_evaluation.py)
 
 ### Checkpoint
 

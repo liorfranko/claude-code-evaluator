@@ -228,3 +228,142 @@ class TestBrownfieldChangeSummary:
             assert summary.files_modified == []
             assert summary.files_added == []
             assert summary.files_deleted == []
+
+
+class TestBrownfieldReportFields:
+    """Tests for brownfield-specific fields in EvaluationReport."""
+
+    def test_report_includes_workspace_path(self) -> None:
+        """T050: Report includes workspace path for brownfield evaluations."""
+        from claude_evaluator.report.models import EvaluationReport, ChangeSummary
+        from claude_evaluator.models.enums import Outcome, WorkflowType
+        from claude_evaluator.models.metrics import Metrics
+
+        # Create a report with brownfield fields
+        report = EvaluationReport(
+            evaluation_id="test-123",
+            task_description="Test task",
+            workflow_type=WorkflowType.direct,
+            outcome=Outcome.success,
+            metrics=Metrics(
+                total_runtime_ms=1000,
+                total_tokens=100,
+                input_tokens=50,
+                output_tokens=50,
+                total_cost_usd=0.01,
+                prompt_count=1,
+                turn_count=1,
+            ),
+            timeline=[],
+            decisions=[],
+            workspace_path="/tmp/brownfield/workspace",
+        )
+
+        assert report.workspace_path == "/tmp/brownfield/workspace"
+
+    def test_report_includes_change_summary(self) -> None:
+        """T051: Report includes summary of modified/added/deleted files."""
+        from claude_evaluator.report.models import EvaluationReport, ChangeSummary
+        from claude_evaluator.models.enums import Outcome, WorkflowType
+        from claude_evaluator.models.metrics import Metrics
+
+        change_summary = ChangeSummary(
+            files_modified=["src/main.py"],
+            files_added=["src/new_feature.py", "tests/test_feature.py"],
+            files_deleted=["old_file.py"],
+        )
+
+        report = EvaluationReport(
+            evaluation_id="test-456",
+            task_description="Add feature",
+            workflow_type=WorkflowType.direct,
+            outcome=Outcome.success,
+            metrics=Metrics(
+                total_runtime_ms=5000,
+                total_tokens=500,
+                input_tokens=200,
+                output_tokens=300,
+                total_cost_usd=0.05,
+                prompt_count=3,
+                turn_count=5,
+            ),
+            timeline=[],
+            decisions=[],
+            change_summary=change_summary,
+        )
+
+        assert report.change_summary is not None
+        assert report.change_summary.files_modified == ["src/main.py"]
+        assert report.change_summary.files_added == ["src/new_feature.py", "tests/test_feature.py"]
+        assert report.change_summary.files_deleted == ["old_file.py"]
+        assert report.change_summary.total_changes == 4
+
+    def test_report_includes_ref_used(self) -> None:
+        """Report includes the git ref that was used."""
+        from claude_evaluator.report.models import EvaluationReport
+        from claude_evaluator.models.enums import Outcome, WorkflowType
+        from claude_evaluator.models.metrics import Metrics
+
+        report = EvaluationReport(
+            evaluation_id="test-789",
+            task_description="Test task",
+            workflow_type=WorkflowType.direct,
+            outcome=Outcome.success,
+            metrics=Metrics(
+                total_runtime_ms=1000,
+                total_tokens=100,
+                input_tokens=50,
+                output_tokens=50,
+                total_cost_usd=0.01,
+                prompt_count=1,
+                turn_count=1,
+            ),
+            timeline=[],
+            decisions=[],
+            ref_used="main",
+        )
+
+        assert report.ref_used == "main"
+
+    def test_report_json_includes_brownfield_fields(self) -> None:
+        """JSON serialization includes brownfield fields."""
+        from claude_evaluator.report.models import EvaluationReport, ChangeSummary
+        from claude_evaluator.report.generator import ReportGenerator
+        from claude_evaluator.models.enums import Outcome, WorkflowType
+        from claude_evaluator.models.metrics import Metrics
+
+        change_summary = ChangeSummary(
+            files_modified=["main.py"],
+            files_added=["new.py"],
+            files_deleted=[],
+        )
+
+        report = EvaluationReport(
+            evaluation_id="test-json",
+            task_description="JSON test",
+            workflow_type=WorkflowType.direct,
+            outcome=Outcome.success,
+            metrics=Metrics(
+                total_runtime_ms=1000,
+                total_tokens=100,
+                input_tokens=50,
+                output_tokens=50,
+                total_cost_usd=0.01,
+                prompt_count=1,
+                turn_count=1,
+            ),
+            timeline=[],
+            decisions=[],
+            workspace_path="/tmp/test",
+            change_summary=change_summary,
+            ref_used="develop",
+        )
+
+        generator = ReportGenerator()
+        json_str = generator.to_json(report)
+
+        assert '"workspace_path": "/tmp/test"' in json_str
+        assert '"ref_used": "develop"' in json_str
+        assert '"change_summary"' in json_str
+        assert '"files_modified"' in json_str
+        assert '"main.py"' in json_str
