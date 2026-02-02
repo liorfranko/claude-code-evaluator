@@ -58,7 +58,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Checkpoint
 
-- [ ] T014 CHECKPOINT: Verify exception classes are importable and properly structured
+- [X] T014 CHECKPOINT: Verify exception classes are importable and properly structured
 
 ---
 
