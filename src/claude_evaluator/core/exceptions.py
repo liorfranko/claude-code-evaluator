@@ -58,3 +58,25 @@ class CloneError(EvaluationError):
             f"Failed to clone repository {url}: {error_message}"
             + (" (retry attempted)" if retry_attempted else "")
         )
+
+
+class InvalidRepositoryError(EvaluationError):
+    """Raised when a repository URL is invalid or inaccessible.
+
+    Attributes:
+        url: The invalid repository URL.
+        reason: The reason the URL is invalid.
+
+    """
+
+    def __init__(self, url: str, reason: str) -> None:
+        """Initialize InvalidRepositoryError.
+
+        Args:
+            url: The invalid repository URL.
+            reason: The reason the URL is invalid.
+
+        """
+        self.url = url
+        self.reason = reason
+        super().__init__(f"Invalid repository URL '{url}': {reason}")
