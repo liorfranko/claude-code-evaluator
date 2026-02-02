@@ -60,7 +60,7 @@ Core data models and settings that all other components depend on.
 ### Configuration
 - [x] T110 Add EvaluatorSettings class to config/settings.py with model, timeout, temperature settings
 - [x] T111 Add evaluator settings to root Settings class
-- [ ] T112 Define default constants for evaluator in config/defaults.py
+- [x] T112 Define default constants for evaluator in config/defaults.py
 
 ### Exceptions
 - [ ] T113 Create evaluator exceptions: EvaluatorError, ScoringError, ParsingError, GeminiAPIError, ASTParsingError (src/claude_evaluator/core/agents/evaluator/exceptions.py)
