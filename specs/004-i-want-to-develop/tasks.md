@@ -33,7 +33,7 @@ Project initialization and dependency configuration.
 
 ### Package Initialization
 - [x] T005 Create src/claude_evaluator/core/agents/evaluator/__init__.py with exports
-- [ ] T006 Create src/claude_evaluator/core/agents/evaluator/scorers/__init__.py
+- [x] T006 Create src/claude_evaluator/core/agents/evaluator/scorers/__init__.py
 - [ ] T007 Create src/claude_evaluator/core/agents/evaluator/analyzers/__init__.py
 - [ ] T008 Create src/claude_evaluator/core/agents/evaluator/ast/__init__.py
 
