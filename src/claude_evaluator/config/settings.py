@@ -11,6 +11,10 @@ Environment Variables:
     CLAUDE_DEVELOPER_QA_MODEL: Developer Q&A model
     CLAUDE_DEVELOPER_CONTEXT_WINDOW_SIZE: Conversation context size
     CLAUDE_DEVELOPER_MAX_ANSWER_RETRIES: Maximum answer retry attempts
+    CLAUDE_EVALUATOR_MODEL: Gemini model for evaluation scoring
+    CLAUDE_EVALUATOR_TIMEOUT_SECONDS: Evaluation operation timeout
+    CLAUDE_EVALUATOR_TEMPERATURE: LLM temperature for scoring
+    CLAUDE_EVALUATOR_ENABLE_AST_PARSING: Enable tree-sitter AST parsing
 """
 
 from functools import lru_cache
@@ -168,6 +172,7 @@ class Settings(BaseSettings):
     Attributes:
         worker: WorkerAgent settings.
         developer: DeveloperAgent settings.
+        evaluator: EvaluatorAgent settings.
 
     """
 
@@ -178,6 +183,7 @@ class Settings(BaseSettings):
 
     worker: WorkerSettings = Field(default_factory=WorkerSettings)
     developer: DeveloperSettings = Field(default_factory=DeveloperSettings)
+    evaluator: EvaluatorSettings = Field(default_factory=EvaluatorSettings)
 
 
 @lru_cache(maxsize=1)
