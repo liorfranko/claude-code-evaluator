@@ -12,7 +12,11 @@ from pathlib import Path
 import structlog
 
 from claude_evaluator.core.agents.evaluator.analyzers import CodeAnalyzer, StepAnalyzer
-from claude_evaluator.core.agents.evaluator.exceptions import EvaluatorError, ParsingError
+from claude_evaluator.core.agents.evaluator.exceptions import (
+    EvaluatorError,
+    GeminiAPIError,
+    ParsingError,
+)
 from claude_evaluator.core.agents.evaluator.gemini_client import GeminiClient
 from claude_evaluator.core.agents.evaluator.scorers import (
     AggregateScorer,
@@ -191,13 +195,17 @@ class EvaluatorAgent:
             Complete ScoreReport with all dimension scores.
 
         Raises:
-            EvaluatorError: If evaluation fails.
+            EvaluatorError: If evaluation fails critically.
 
         """
         logger.info("starting_evaluation", path=str(evaluation_path))
 
-        # Load evaluation
-        evaluation = self.load_evaluation(evaluation_path)
+        # T406: Graceful handling for malformed evaluation.json
+        try:
+            evaluation = self.load_evaluation(evaluation_path)
+        except ParsingError as e:
+            logger.error("evaluation_parsing_failed", error=str(e))
+            raise EvaluatorError(f"Failed to load evaluation: {e}") from e
 
         logger.debug(
             "evaluation_loaded",
@@ -208,36 +216,65 @@ class EvaluatorAgent:
         # Extract steps from evaluation
         steps = self._extract_steps(evaluation)
 
-        # Analyze steps
-        step_analyses = self.step_analyzer.analyze(steps)
-        strategy_commentary = self.step_analyzer.generate_strategy_commentary(
-            steps, step_analyses
-        )
+        # Analyze steps (T408: Continue even if analysis fails)
+        try:
+            step_analyses = self.step_analyzer.analyze(steps)
+            strategy_commentary = self.step_analyzer.generate_strategy_commentary(
+                steps, step_analyses
+            )
+        except Exception as e:
+            logger.warning("step_analysis_failed", error=str(e))
+            step_analyses = []
+            strategy_commentary = f"Step analysis failed: {e}"
 
-        # Analyze code
-        code_analysis = self.code_analyzer.analyze(steps=steps)
+        # T408: Analyze code with AST fallback
+        try:
+            code_analysis = self.code_analyzer.analyze(steps=steps)
+        except Exception as e:
+            logger.warning("code_analysis_failed", error=str(e))
+            code_analysis = CodeAnalysis(
+                files=[],
+                total_files=0,
+                total_lines=0,
+                languages={},
+            )
 
-        # Score task completion
-        task_completion_score = self.task_completion_scorer.score(
-            task_description=evaluation.task_description,
-            outcome=evaluation.outcome.value,
-            turn_count=evaluation.metrics.turn_count,
-            total_tokens=evaluation.metrics.total_tokens,
-            tool_count=sum(evaluation.metrics.tool_counts.values()),
-            context=context,
-        )
+        # T407: Score task completion with Gemini API error handling
+        try:
+            task_completion_score = self.task_completion_scorer.score(
+                task_description=evaluation.task_description,
+                outcome=evaluation.outcome.value,
+                turn_count=evaluation.metrics.turn_count,
+                total_tokens=evaluation.metrics.total_tokens,
+                tool_count=sum(evaluation.metrics.tool_counts.values()),
+                context=context,
+            )
+        except GeminiAPIError as e:
+            logger.warning("task_completion_scoring_failed", error=str(e))
+            # Fallback to neutral score
+            from claude_evaluator.models.score_report import DimensionType
+            task_completion_score = DimensionScore(
+                dimension_name=DimensionType.task_completion,
+                score=50,
+                weight=0.5,
+                rationale=f"Unable to score task completion due to API error: {e}",
+            )
 
-        # Score code quality (if there are code files)
+        # T407: Score code quality with error handling
         code_quality_score: DimensionScore | None = None
         if code_analysis.total_files > 0:
             code_files = self._prepare_code_files(code_analysis)
             if code_files:
-                code_quality_score = self.code_quality_scorer.score(
-                    files=code_files,
-                    context=context,
-                )
+                try:
+                    code_quality_score = self.code_quality_scorer.score(
+                        files=code_files,
+                        context=context,
+                    )
+                except GeminiAPIError as e:
+                    logger.warning("code_quality_scoring_failed", error=str(e))
+                    # Continue without code quality score
 
-        # Score efficiency
+        # Score efficiency (pure calculation, no external API)
         efficiency_score = self.efficiency_scorer.score(
             total_tokens=evaluation.metrics.total_tokens,
             turn_count=evaluation.metrics.turn_count,
