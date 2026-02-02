@@ -29,7 +29,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 - [X] T001 Add RepositorySource model with url, ref, depth fields (src/claude_evaluator/config/models.py)
 - [X] T002 Implement GitHub HTTPS URL validator for RepositorySource.url (src/claude_evaluator/config/models.py)
-- [ ] T003 Implement depth validator accepting int or "full" (src/claude_evaluator/config/models.py)
+- [X] T003 Implement depth validator accepting int or "full" (src/claude_evaluator/config/models.py)
 - [ ] T004 Add repository_source field to EvaluationConfig model (src/claude_evaluator/config/models.py)
 - [ ] T005 Add ChangeSummary model to report models (src/claude_evaluator/report/models.py)
 - [ ] T006 Add workspace_path and change_summary fields to EvaluationReport (src/claude_evaluator/report/models.py)

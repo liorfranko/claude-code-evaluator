@@ -193,6 +193,7 @@ class EvaluationConfig(BaseSchema):
         max_budget_usd: Override suite default.
         timeout_seconds: Override suite default.
         developer_qa_model: Override suite default for developer Q&A model.
+        repository_source: Optional repository source for brownfield evaluation.
 
     """
 
@@ -208,6 +209,7 @@ class EvaluationConfig(BaseSchema):
     timeout_seconds: int | None = None
     model: str | None = None
     developer_qa_model: str | None = None
+    repository_source: RepositorySource | None = None
 
 
 class EvaluationSuite(BaseSchema):
