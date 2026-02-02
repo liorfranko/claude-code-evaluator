@@ -146,7 +146,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Checkpoint
 
-- [ ] T045 [US2] CHECKPOINT: Verify US-002 Use Specific Branch is complete
+- [X] T045 [US2] CHECKPOINT: Verify US-002 Use Specific Branch is complete
 
 ---
 
