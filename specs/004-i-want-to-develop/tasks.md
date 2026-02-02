@@ -77,7 +77,7 @@ Implement the individual dimension scorers.
 ### Efficiency Scorer (Pure Calculation)
 - [x] T200 [US1] [US2] Implement TaskComplexityTier classification logic based on metrics (scorers/efficiency.py)
 - [x] T201 [US1] [US2] Implement efficiency score calculation: 100 - (actual/baseline × 100) clamped to 0-100 (scorers/efficiency.py)
-- [ ] T202 [US1] [US2] Add tier baseline constants: Simple (10K/5/$0.10), Medium (50K/15/$0.50), Complex (150K/30/$1.50) (scorers/efficiency.py)
+- [x] T202 [US1] [US2] Add tier baseline constants: Simple (10K/5/$0.10), Medium (50K/15/$0.50), Complex (150K/30/$1.50) (scorers/efficiency.py)
 
 ### Aggregate Scorer (Pure Calculation)
 - [ ] T203 [US1] [US2] Implement weighted aggregate calculation with default weights 50/30/20 (scorers/aggregate.py)
