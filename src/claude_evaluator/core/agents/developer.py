@@ -624,7 +624,16 @@ class DeveloperAgent(BaseSchema):
             context_strategy = f"last {self.context_window_size} messages"
 
         # Build the prompt
-        prompt = self._build_answer_prompt(context.questions, messages_to_use)
+        prompt = self._build_answer_prompt(
+            context.questions, messages_to_use, context.phase_name
+        )
+
+        # Log the full question being sent to the developer
+        question_text = self._format_questions(context.questions)
+        logger.info(
+            "developer_question_received",
+            question_text=question_text,
+        )
 
         # Log the decision to answer
         self.log_decision(
@@ -740,6 +749,7 @@ class DeveloperAgent(BaseSchema):
         self,
         questions: list[Any],
         messages: list[dict[str, Any]],
+        phase_name: str | None = None,
     ) -> str:
         """Build a prompt for answer generation.
 
@@ -749,6 +759,7 @@ class DeveloperAgent(BaseSchema):
         Args:
             questions: List of QuestionItem objects.
             messages: List of message dictionaries for context.
+            phase_name: The current phase name for phase-aware responses.
 
         Returns:
             The formatted prompt string.
@@ -760,8 +771,21 @@ class DeveloperAgent(BaseSchema):
         # Format the conversation context
         context_text = self._format_conversation_context(messages)
 
-        prompt = f"""You are a developer assistant in an automated evaluation workflow. Analyze the worker's response and decide how to proceed.
+        # Build phase-aware guidance if phase_name is provided
+        phase_guidance = ""
+        if phase_name:
+            phase_guidance = f"""
+## Current Phase: {phase_name}
 
+CRITICAL PHASE AWARENESS:
+- You are in the "{phase_name}" phase of a multi-phase workflow
+- When the worker suggests "next steps" like running other commands (e.g., /spectra:plan, /spectra:clarify), this means the CURRENT PHASE IS COMPLETE
+- Do NOT tell the worker to run those next commands - they will be handled by the next phase automatically
+- If you see "Recommended Next Steps" or "You can now run X", respond with "complete"
+"""
+
+        prompt = f"""You are a developer assistant in an automated evaluation workflow. Analyze the worker's response and decide how to proceed.
+{phase_guidance}
 ## Conversation Context
 {context_text}
 
@@ -774,19 +798,24 @@ Analyze the worker's response and determine what to do next:
 1. If the worker has COMPLETED the task (implemented code, finished work, no more action needed):
    - Respond with exactly: "complete"
 
-2. If the worker is ASKING for input, presenting options, or waiting for a decision:
+2. If the worker suggests "next steps" or commands to run next (like /spectra:plan, /spectra:clarify):
+   - This means the current phase is DONE - respond with exactly: "complete"
+   - The next phase will handle those commands automatically
+
+3. If the worker is ASKING for input, presenting options, or waiting for a decision WITHIN the current task:
    - Respond with a clear instruction to continue the work
    - ALWAYS choose to proceed, implement, or continue
-   - If there are numbered options, pick the one that does the most work (e.g., "implement all" over "implement phase 1 only")
-   - Example responses: "continue", "proceed with full implementation", "yes, implement all tasks", "4" (if option 4 is full implementation)
+   - If there are numbered options, pick the one that does the most work
+   - Example responses: "continue", "proceed with full implementation", "yes, implement all"
 
-3. If the worker seems stuck or needs guidance:
+4. If the worker seems stuck or needs guidance:
    - Provide a clear instruction to continue with the task
 
 IMPORTANT:
 - This is AUTOMATED - always push forward, never ask questions back
 - Prefer doing MORE work over less (all phases vs one phase)
 - Keep response SHORT - just the instruction or "complete"
+- "Recommended Next Steps" = phase complete, respond "complete"
 
 Your response:"""
 
@@ -1017,7 +1046,7 @@ Your response:"""
 4. If the assistant is NOT asking for input (just providing information or completing work): Respond with exactly "NO_QUESTION"
 
 ## Guidelines for answering (if needed):
-- Choose the most comprehensive/complete option (e.g., "Proceed with full implementation")
+- Choose the most comprehensive/complete option (e.g., "continue")
 - Prefer options that move the task forward without user interaction
 - Be direct and actionable
 
