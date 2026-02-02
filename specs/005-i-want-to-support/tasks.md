@@ -84,7 +84,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Checkpoint
 
-- [ ] T025 CHECKPOINT: Verify git operations module works with mocked and real git
+- [X] T025 CHECKPOINT: Verify git operations module works with mocked and real git
 
 ---
 
