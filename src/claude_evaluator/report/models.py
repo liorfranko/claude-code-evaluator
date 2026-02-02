@@ -6,7 +6,7 @@ a complete evaluation report with metrics, timeline, and decisions.
 
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.decision import Decision
@@ -14,7 +14,42 @@ from claude_evaluator.models.enums import Outcome, WorkflowType
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.timeline_event import TimelineEvent
 
-__all__ = ["EvaluationReport"]
+__all__ = ["ChangeSummary", "EvaluationReport"]
+
+
+class ChangeSummary(BaseSchema):
+    """Summary of repository changes made during evaluation.
+
+    Represents the modifications made to a brownfield repository during
+    evaluation, tracking which files were added, modified, or deleted.
+
+    Attributes:
+        files_modified: Paths of files that were changed.
+        files_added: Paths of new files created.
+        files_deleted: Paths of files that were removed.
+        total_changes: Total count of all changes (computed).
+
+    """
+
+    files_modified: list[str] = Field(default_factory=list)
+    files_added: list[str] = Field(default_factory=list)
+    files_deleted: list[str] = Field(default_factory=list)
+    total_changes: int = Field(default=0)
+
+    @model_validator(mode="after")
+    def compute_total(self) -> "ChangeSummary":
+        """Compute total_changes from list lengths.
+
+        Returns:
+            Self with total_changes computed.
+
+        """
+        self.total_changes = (
+            len(self.files_modified)
+            + len(self.files_added)
+            + len(self.files_deleted)
+        )
+        return self
 
 
 class EvaluationReport(BaseSchema):
