@@ -140,9 +140,9 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Tests
 
-- [ ] T042 [US2] Write test: clone specific branch (tests/integration/test_brownfield_clone.py)
-- [ ] T043 [US2] Write test: clone specific tag (tests/integration/test_brownfield_clone.py)
-- [ ] T044 [US2] Verify: Report indicates which ref was used (tests/integration/test_brownfield_clone.py)
+- [X] T042 [US2] Write test: clone specific branch (tests/integration/test_brownfield_clone.py)
+- [X] T043 [US2] Write test: clone specific tag (tests/integration/test_brownfield_clone.py)
+- [X] T044 [US2] Verify: Report indicates which ref was used (tests/integration/test_brownfield_clone.py)
 
 ### Checkpoint
 

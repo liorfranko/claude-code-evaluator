@@ -118,6 +118,94 @@ class TestCloneRepository:
             assert exc_info.value.url == TEST_REPO_URL
 
 
+class TestCloneSpecificRef:
+    """Integration tests for cloning specific branches and tags (T042-T044)."""
+
+    @pytest.mark.asyncio
+    async def test_clone_specific_branch(self) -> None:
+        """T042: Clone specific branch successfully."""
+        source = RepositorySource(
+            url=TEST_REPO_URL,
+            ref=TEST_REPO_BRANCH,
+            depth=1,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "repo"
+
+            ref_used = await clone_repository(source, target)
+
+            # Verify correct branch was cloned
+            assert ref_used == TEST_REPO_BRANCH
+            assert target.exists()
+
+            # Verify we're on the correct branch
+            process = await asyncio.create_subprocess_exec(
+                "git", "rev-parse", "--abbrev-ref", "HEAD",
+                cwd=target,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+            current_branch = stdout.decode("utf-8").strip()
+            assert current_branch == TEST_REPO_BRANCH
+
+    @pytest.mark.asyncio
+    async def test_clone_specific_tag(self) -> None:
+        """T043: Clone specific tag successfully.
+
+        Note: The Hello-World repo may not have tags, so we test that
+        the tag ref is properly passed to git clone.
+        """
+        # Use a known public repo with tags: the git repo itself
+        source = RepositorySource(
+            url="https://github.com/git/git",
+            ref="v2.40.0",
+            depth=1,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "repo"
+
+            ref_used = await clone_repository(source, target)
+
+            # Verify correct tag was cloned
+            assert ref_used == "v2.40.0"
+            assert target.exists()
+            assert (target / ".git").is_dir()
+
+    @pytest.mark.asyncio
+    async def test_report_indicates_ref_used(self) -> None:
+        """T044: Report indicates which ref was used.
+
+        Verifies that clone_repository returns the ref that was checked out,
+        which will be included in the evaluation report.
+        """
+        source_with_ref = RepositorySource(
+            url=TEST_REPO_URL,
+            ref=TEST_REPO_BRANCH,
+            depth=1,
+        )
+
+        source_without_ref = RepositorySource(
+            url=TEST_REPO_URL,
+            depth=1,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target1 = Path(tmpdir) / "repo1"
+            target2 = Path(tmpdir) / "repo2"
+
+            ref1 = await clone_repository(source_with_ref, target1)
+            ref2 = await clone_repository(source_without_ref, target2)
+
+            # With ref specified, should return the ref
+            assert ref1 == TEST_REPO_BRANCH
+
+            # Without ref, should return HEAD
+            assert ref2 == "HEAD"
+
+
 class TestGetChangeSummary:
     """Integration tests for get_change_summary function."""
 
