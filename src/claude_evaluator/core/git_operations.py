@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from claude_evaluator.core.exceptions import CloneError
+from claude_evaluator.report.models import ChangeSummary
 
 if TYPE_CHECKING:
     from claude_evaluator.config.models import RepositorySource
@@ -154,3 +155,89 @@ async def clone_repository(
         error_message="Clone failed after retry",
         retry_attempted=True,
     )
+
+
+def parse_git_status(output: str) -> ChangeSummary:
+    """Parse git status --porcelain output into ChangeSummary.
+
+    Parses the machine-readable porcelain format output from git status
+    and categorizes files into modified, added, and deleted.
+
+    Status codes handled:
+        - ?? = untracked (added)
+        - A  = staged added
+        - M  = modified (index or worktree)
+        - D  = deleted (index or worktree)
+        - AM = added and modified
+        - MM = modified in both index and worktree
+        - R  = renamed (treated as added)
+
+    Args:
+        output: The output from 'git status --porcelain'.
+
+    Returns:
+        A ChangeSummary with categorized file lists.
+
+    """
+    modified: list[str] = []
+    added: list[str] = []
+    deleted: list[str] = []
+
+    for line in output.strip().split("\n"):
+        if not line:
+            continue
+
+        # Porcelain format: XY FILENAME
+        # X = index status, Y = worktree status
+        status = line[:2]
+        filepath = line[3:]
+
+        # Handle renamed files (R* format includes "old -> new")
+        if status.startswith("R"):
+            # Extract the new filename from "old -> new"
+            if " -> " in filepath:
+                filepath = filepath.split(" -> ")[1]
+            added.append(filepath)
+        elif status in ("??", "A ", "AM"):
+            added.append(filepath)
+        elif status in ("M ", " M", "MM"):
+            modified.append(filepath)
+        elif status in ("D ", " D"):
+            deleted.append(filepath)
+        elif status == "AD":
+            # Added then deleted = effectively deleted
+            deleted.append(filepath)
+        elif status == "MD":
+            # Modified then deleted = deleted
+            deleted.append(filepath)
+
+    return ChangeSummary(
+        files_modified=modified,
+        files_added=added,
+        files_deleted=deleted,
+    )
+
+
+async def get_change_summary(workspace_path: Path) -> ChangeSummary:
+    """Get summary of changes made in a workspace.
+
+    Runs 'git status --porcelain' to detect all changes made to the
+    repository since the last commit.
+
+    Args:
+        workspace_path: Path to the git workspace.
+
+    Returns:
+        A ChangeSummary of all modifications.
+
+    """
+    process = await asyncio.create_subprocess_exec(
+        "git", "status", "--porcelain",
+        cwd=workspace_path,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await process.communicate()
+
+    output = stdout.decode("utf-8", errors="replace")
+    return parse_git_status(output)
