@@ -13,8 +13,9 @@ from pathlib import Path
 import pytest
 
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.exceptions import CloneError
+from claude_evaluator.core.exceptions import BranchNotFoundError, CloneError
 from claude_evaluator.core.git_operations import (
+    GitStatusError,
     clone_repository,
     get_change_summary,
 )
@@ -102,7 +103,7 @@ class TestCloneRepository:
 
     @pytest.mark.asyncio
     async def test_clone_invalid_branch_fails(self) -> None:
-        """Clone with invalid branch should raise CloneError."""
+        """Clone with invalid branch should raise BranchNotFoundError."""
         source = RepositorySource(
             url=TEST_REPO_URL,
             ref="nonexistent-branch-xyz",
@@ -112,10 +113,11 @@ class TestCloneRepository:
         with tempfile.TemporaryDirectory() as tmpdir:
             target = Path(tmpdir) / "repo"
 
-            with pytest.raises(CloneError) as exc_info:
+            with pytest.raises(BranchNotFoundError) as exc_info:
                 await clone_repository(source, target)
 
             assert exc_info.value.url == TEST_REPO_URL
+            assert exc_info.value.ref == "nonexistent-branch-xyz"
 
 
 class TestCloneSpecificRef:
@@ -375,3 +377,15 @@ class TestGetChangeSummary:
             assert "README" in summary.files_modified
             # Note: git status may show "subdir/" for new directories
             assert any("subdir" in f for f in summary.files_added)
+
+    @pytest.mark.asyncio
+    async def test_git_status_error_on_non_git_directory(self) -> None:
+        """get_change_summary should raise GitStatusError for non-git directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            non_git_dir = Path(tmpdir)
+
+            with pytest.raises(GitStatusError) as exc_info:
+                await get_change_summary(non_git_dir)
+
+            assert exc_info.value.workspace_path == non_git_dir
+            assert "not a git repository" in exc_info.value.error_message.lower()

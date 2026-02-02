@@ -10,10 +10,10 @@ import pytest
 from claude_evaluator.config.models import RepositorySource
 from claude_evaluator.core.git_operations import (
     build_clone_command,
+    is_branch_not_found_error,
     is_network_error,
     parse_git_status,
 )
-from claude_evaluator.report.models import ChangeSummary
 
 
 class TestBuildCloneCommand:
@@ -267,3 +267,65 @@ class TestIsNetworkError:
         """Network error detection should be case-insensitive."""
         assert is_network_error("COULD NOT RESOLVE HOST")
         assert is_network_error("connection REFUSED")
+
+
+class TestIsBranchNotFoundError:
+    """Tests for is_branch_not_found_error function."""
+
+    def test_remote_branch_not_found(self) -> None:
+        """'Remote branch not found' should be detected."""
+        assert is_branch_not_found_error("fatal: Remote branch 'nonexistent' not found in upstream origin")
+
+    def test_did_not_match_any(self) -> None:
+        """'did not match any' should be detected."""
+        assert is_branch_not_found_error("error: pathspec 'feature' did not match any file(s) known to git")
+
+    def test_couldnt_find_remote_ref(self) -> None:
+        """'couldn't find remote ref' should be detected."""
+        assert is_branch_not_found_error("fatal: couldn't find remote ref nonexistent")
+
+    def test_could_not_find_remote_branch(self) -> None:
+        """'Could not find remote branch' should be detected."""
+        assert is_branch_not_found_error("fatal: Could not find remote branch feature-x to clone")
+
+    def test_network_error_not_branch_error(self) -> None:
+        """Network errors should NOT be branch errors."""
+        assert not is_branch_not_found_error("fatal: Could not resolve host: github.com")
+
+    def test_permission_denied_not_branch_error(self) -> None:
+        """Permission errors should NOT be branch errors."""
+        assert not is_branch_not_found_error("fatal: Authentication failed")
+
+    def test_empty_string(self) -> None:
+        """Empty string should NOT be branch error."""
+        assert not is_branch_not_found_error("")
+
+    def test_case_insensitive(self) -> None:
+        """Branch error detection should be case-insensitive."""
+        assert is_branch_not_found_error("REMOTE BRANCH 'test' NOT FOUND")
+
+
+class TestParseGitStatusCopiedFiles:
+    """Tests for copy (C) status handling in parse_git_status."""
+
+    def test_copied_files(self) -> None:
+        """Copied files (C ) should be treated as added."""
+        output = "C  original.py -> copied.py"
+        summary = parse_git_status(output)
+
+        assert "copied.py" in summary.files_added
+        assert "original.py" not in summary.files_added
+
+    def test_copied_and_modified(self) -> None:
+        """Copied and modified (CM) should be treated as added."""
+        output = "CM original.py -> copied_modified.py"
+        summary = parse_git_status(output)
+
+        assert "copied_modified.py" in summary.files_added
+
+    def test_renamed_and_modified(self) -> None:
+        """Renamed and modified (RM) should be treated as added."""
+        output = "RM old.py -> new_modified.py"
+        summary = parse_git_status(output)
+
+        assert "new_modified.py" in summary.files_added
