@@ -123,4 +123,33 @@ For more information, see the documentation.
         help="Validate suite configuration without running evaluations",
     )
 
+    # Score command
+    parser.add_argument(
+        "--score",
+        type=str,
+        metavar="FILE",
+        help="Path to evaluation.json file to score",
+    )
+
+    parser.add_argument(
+        "--workspace",
+        "-w",
+        type=str,
+        metavar="DIR",
+        help="Workspace directory for resolving file paths (default: evaluation file directory)",
+    )
+
+    parser.add_argument(
+        "--no-ast",
+        action="store_true",
+        help="Disable AST-based metrics extraction",
+    )
+
+    parser.add_argument(
+        "--model",
+        type=str,
+        metavar="MODEL",
+        help="Gemini model to use for scoring (default: gemini-2.0-flash)",
+    )
+
     return parser
