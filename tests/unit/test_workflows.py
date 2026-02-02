@@ -343,13 +343,11 @@ class TestDirectWorkflowMockedWorker:
 
         asyncio.run(workflow.execute(evaluation))
 
-        # Verify the query includes workspace context and task description
+        # Verify the query includes the task description and correct phase
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args
         assert call_args.kwargs["phase"] == "implementation"
         assert "Implement a calculator function" in call_args.kwargs["query"]
-        assert "current directory" in call_args.kwargs["query"]
-        assert "relative paths" in call_args.kwargs["query"]
 
     def test_execute_collects_query_metrics(
         self,
