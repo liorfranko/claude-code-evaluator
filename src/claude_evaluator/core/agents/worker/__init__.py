@@ -4,7 +4,7 @@ This module exports the components used by WorkerAgent for
 message processing, permission management, question handling,
 tool tracking, and SDK configuration.
 
-Note: DEFAULT_MODEL, SDK_AVAILABLE, and WorkerAgent should be imported from
+Note: DEFAULT_MODEL and WorkerAgent should be imported from
 claude_evaluator.core.agents.worker_agent directly (not from this package)
 to avoid circular imports.
 """

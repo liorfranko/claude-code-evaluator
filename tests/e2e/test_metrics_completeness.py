@@ -22,9 +22,10 @@ from claude_evaluator.models.query_metrics import QueryMetrics
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows import DirectWorkflow, MultiCommandWorkflow
 
-# Required fields in the metrics schema
+# Required fields in the metrics schema (as output in report JSON)
+# Note: Internal models use _ms suffix, but reports convert to _seconds for readability
 REQUIRED_METRICS_FIELDS = [
-    "total_runtime_ms",
+    "total_runtime_seconds",  # Converted from total_runtime_ms
     "total_tokens",
     "input_tokens",
     "output_tokens",
@@ -51,7 +52,7 @@ REQUIRED_REPORT_FIELDS = [
 REQUIRED_QUERY_FIELDS = [
     "query_index",
     "prompt",
-    "duration_ms",
+    "duration_seconds",  # Converted from duration_ms
     "input_tokens",
     "output_tokens",
     "cost_usd",
@@ -269,7 +270,8 @@ class TestMetricsSchemaValidation:
         metrics_dict = report_dict["metrics"]
 
         # Check numeric types
-        assert isinstance(metrics_dict["total_runtime_ms"], int)
+        # Note: total_runtime_seconds is a float (converted from total_runtime_ms)
+        assert isinstance(metrics_dict["total_runtime_seconds"], (int, float))
         assert isinstance(metrics_dict["total_tokens"], int)
         assert isinstance(metrics_dict["input_tokens"], int)
         assert isinstance(metrics_dict["output_tokens"], int)
