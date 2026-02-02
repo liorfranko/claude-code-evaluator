@@ -86,6 +86,7 @@ class QuestionContext(BaseSchema):
         conversation_history: Full conversation history as message dicts (required).
         session_id: The session identifier (required).
         attempt_number: The attempt number, must be 1 or 2 (required).
+        phase_name: The current phase name for phase-aware responses (optional).
 
     """
 
@@ -93,6 +94,7 @@ class QuestionContext(BaseSchema):
     conversation_history: list[dict[str, Any]]
     session_id: str
     attempt_number: int
+    phase_name: str | None = None
 
     @model_validator(mode="after")
     def validate_model(self) -> "QuestionContext":

@@ -15,7 +15,7 @@ from claude_evaluator.models.enums import EvaluationStatus, Outcome
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.timeline_event import TimelineEvent
 from claude_evaluator.report.exceptions import ReportGenerationError
-from claude_evaluator.report.models import EvaluationReport
+from claude_evaluator.report.models import ChangeSummary, EvaluationReport
 
 if TYPE_CHECKING:
     from claude_evaluator.core import Evaluation
@@ -42,7 +42,13 @@ class ReportGenerator:
         """Initialize the report generator."""
         pass
 
-    def generate(self, evaluation: "Evaluation") -> EvaluationReport:
+    def generate(
+        self,
+        evaluation: "Evaluation",
+        workspace_path: str | None = None,
+        change_summary: ChangeSummary | None = None,
+        ref_used: str | None = None,
+    ) -> EvaluationReport:
         """Generate a report from a completed evaluation.
 
         Creates an EvaluationReport from the evaluation's collected data,
@@ -50,6 +56,9 @@ class ReportGenerator:
 
         Args:
             evaluation: The completed Evaluation instance.
+            workspace_path: Path to preserved workspace (brownfield only).
+            change_summary: Summary of changes made (brownfield only).
+            ref_used: Git ref that was checked out (brownfield only).
 
         Returns:
             An EvaluationReport containing all evaluation data.
@@ -91,6 +100,9 @@ class ReportGenerator:
             decisions=decisions,
             errors=errors,
             generated_at=datetime.now(),
+            workspace_path=workspace_path,
+            change_summary=change_summary,
+            ref_used=ref_used,
         )
 
     def to_json(self, report: EvaluationReport, indent: int = 2) -> str:
@@ -305,7 +317,7 @@ class ReportGenerator:
             A dictionary representation of the report.
 
         """
-        return {
+        result = {
             "evaluation_id": report.evaluation_id,
             "task_description": report.task_description,
             "workflow_type": report.workflow_type.value,
@@ -316,6 +328,21 @@ class ReportGenerator:
             "errors": report.errors,
             "generated_at": report.generated_at.isoformat(),
         }
+
+        # Include brownfield-specific fields if present
+        if report.workspace_path is not None:
+            result["workspace_path"] = report.workspace_path
+        if report.change_summary is not None:
+            result["change_summary"] = {
+                "files_modified": report.change_summary.files_modified,
+                "files_added": report.change_summary.files_added,
+                "files_deleted": report.change_summary.files_deleted,
+                "total_changes": report.change_summary.total_changes,
+            }
+        if report.ref_used is not None:
+            result["ref_used"] = report.ref_used
+
+        return result
 
     def _metrics_to_dict(self, metrics: Metrics) -> dict[str, Any]:
         """Convert Metrics to a dictionary.

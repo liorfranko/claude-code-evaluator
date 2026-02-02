@@ -27,7 +27,7 @@ evaluations:
       Tests multi-command sequential workflows for complex project development.
       Direct implementation, no agent.
     task: >
-      Build a task management CLI application with the following capabilities:
+      With direct implementation, spectra command, build a task management CLI application with the following capabilities:
       1. Add, list, update, and delete tasks
       2. Mark tasks as complete/incomplete
       3. Assign priorities (low, medium, high)
@@ -50,6 +50,9 @@ evaluations:
       - name: plan
         permission_mode: bypassPermissions
         prompt: "/spectra:plan"
+      - name: clarify
+        permission_mode: acceptEdits
+        prompt: "/spectra:clarify"        
       - name: tasks
         permission_mode: bypassPermissions
         prompt: "/spectra:tasks"
@@ -66,39 +69,3 @@ evaluations:
           5. Keep going until every single task is marked [x] complete
           6. If you encounter any issues, work around them and continue
           7. This is an automated evaluation - there is NO user to respond to questions
-  - id: spectra-full-workflow-agent
-    name: Spectra Full Workflow Simulation (Agent)
-    description: >
-      Simulates the complete spectra workflow: specify, plan, tasks, implement.
-      Tests multi-command sequential workflows for complex project development.
-      Agent implementation, no direct implementation.
-    task: >
-      Build a task management CLI application with the following capabilities:
-      1. Add, list, update, and delete tasks
-      2. Mark tasks as complete/incomplete
-      3. Assign priorities (low, medium, high)
-      4. Filter and search tasks
-      5. Persist tasks to a JSON file
-      6. Support for due dates
-    tags:
-      - spectra
-      - complex
-      - multi-phase
-      - python
-      - cli
-    phases:
-      - name: specify
-        permission_mode: acceptEdits
-        prompt: >
-          /spectra:specify Build a task management CLI application that allows users to:
-          - Add, list, update, and delete tasks
-          - Mark tasks as complete/incomplete
-      - name: plan
-        permission_mode: acceptEdits
-        prompt: "/spectra:plan"
-      - name: tasks
-        permission_mode: acceptEdits
-        prompt: "/spectra:tasks"
-      - name: implement
-        permission_mode: bypassPermissions
-        prompt: "/spectra:implement, don't ask for user input, just implement the whole plan"

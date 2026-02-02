@@ -1,0 +1,52 @@
+# =============================================================================
+# Brownfield Evaluation: Spoon-Knife Repository
+# =============================================================================
+# This evaluation tests Claude's ability to add a simple feature to an existing
+# HTML/CSS project - the classic GitHub Spoon-Knife demo repository.
+# =============================================================================
+
+name: brownfield-spoon-knife
+description: |
+  Brownfield evaluation using the Spoon-Knife repository.
+  Tests adding a simple feature (footer) to an existing HTML/CSS project.
+version: "1.0.0"
+
+defaults:
+  max_turns: 10
+  max_budget_usd: 1.0
+  timeout_seconds: 180
+  model: haiku
+
+evaluations:
+  - id: add-footer
+    name: Add Footer to HTML Page
+    description: |
+      Tests brownfield mode by cloning Spoon-Knife repo and adding a footer
+      element with appropriate styling.
+
+    task: |
+      Add a footer to the index.html page with the following requirements:
+      1. Create a <footer> element at the bottom of the <body>
+      2. The footer should contain the text "Made with 🍴 by the open source community"
+      3. Add appropriate CSS styling in styles.css for the footer:
+         - Center the text
+         - Add some padding
+         - Use a subtle background color
+
+    tags:
+      - brownfield
+      - html
+      - css
+      - feature
+
+    enabled: true
+
+    repository_source:
+      url: https://github.com/octocat/Spoon-Knife
+      ref: main
+      depth: 1
+
+    phases:
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt_template: "{task}"

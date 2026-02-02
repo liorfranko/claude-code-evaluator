@@ -10,9 +10,11 @@ from pathlib import Path
 
 from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
 from claude_evaluator.cli.formatters import create_progress_callback
-from claude_evaluator.config.models import Phase
+from claude_evaluator.config.models import Phase, RepositorySource
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
+from claude_evaluator.core.exceptions import CloneError
+from claude_evaluator.core.git_operations import clone_repository, get_change_summary
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode, WorkflowType
@@ -72,6 +74,7 @@ class RunEvaluationCommand(BaseCommand):
         phases: list[Phase] | None = None,
         model: str | None = None,
         max_turns: int | None = None,
+        repository_source: RepositorySource | None = None,
     ) -> EvaluationReport:
         """Run a single evaluation.
 
@@ -84,13 +87,17 @@ class RunEvaluationCommand(BaseCommand):
             phases: Phases for multi-command workflow (optional).
             model: Model identifier to use (optional).
             max_turns: Maximum turns per query for the SDK (optional).
+            repository_source: Source repository for brownfield mode (optional).
 
         Returns:
             The generated EvaluationReport.
 
         """
+        is_brownfield = repository_source is not None
+
         if verbose:
-            print(f"Starting evaluation with {workflow_type.value} workflow...")
+            mode_str = "brownfield" if is_brownfield else "greenfield"
+            print(f"Starting {mode_str} evaluation with {workflow_type.value} workflow...")
 
         # Create timestamped folder for this evaluation
         timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -98,11 +105,21 @@ class RunEvaluationCommand(BaseCommand):
         eval_folder.mkdir(parents=True, exist_ok=True)
 
         # Create workspace subfolder inside the evaluation folder
-        workspace_path = eval_folder / "workspace"
+        # Use "brownfield" subdirectory for cloned repositories
+        workspace_subdir = "brownfield" if is_brownfield else "workspace"
+        workspace_path = eval_folder / workspace_subdir
         workspace_path.mkdir(parents=True, exist_ok=True)
 
-        # Initialize git repository
-        self._init_git_repo(workspace_path, eval_folder, verbose)
+        # Initialize workspace: clone for brownfield, init for greenfield
+        ref_used: str | None = None
+        if is_brownfield:
+            # Clone external repository
+            ref_used = await self._clone_repository(
+                repository_source, workspace_path, verbose
+            )
+        else:
+            # Initialize empty git repository
+            self._init_git_repo(workspace_path, eval_folder, verbose)
 
         # Get current branch name
         current_branch = self._get_current_branch(workspace_path)
@@ -160,9 +177,20 @@ class RunEvaluationCommand(BaseCommand):
         except Exception as e:
             self._handle_error(evaluation, e, verbose)
 
-        # Generate report
+        # Generate report with brownfield metadata if applicable
         generator = ReportGenerator()
-        report = generator.generate(evaluation)
+        change_summary = None
+        if is_brownfield:
+            change_summary = await get_change_summary(workspace_path)
+            if verbose:
+                print(f"Changes: {change_summary.total_changes} files")
+
+        report = generator.generate(
+            evaluation,
+            workspace_path=str(workspace_path) if is_brownfield else None,
+            change_summary=change_summary,
+            ref_used=ref_used,
+        )
 
         # Save report
         report_path = eval_folder / "evaluation.json"
@@ -242,6 +270,40 @@ class RunEvaluationCommand(BaseCommand):
             raise RuntimeError(
                 f"Git push failed for branch '{current_branch}': {push_result.stderr}"
             )
+
+    async def _clone_repository(
+        self,
+        source: RepositorySource,
+        target_path: Path,
+        verbose: bool,
+    ) -> str:
+        """Clone a repository for brownfield evaluation.
+
+        Args:
+            source: The repository source configuration.
+            target_path: The target directory for the clone.
+            verbose: Whether to print progress messages.
+
+        Returns:
+            The ref that was checked out.
+
+        Raises:
+            CloneError: If the clone fails after retry.
+
+        """
+        if verbose:
+            print(f"Cloning repository: {source.url}")
+            if source.ref:
+                print(f"  Branch/ref: {source.ref}")
+            if source.depth != "full":
+                print(f"  Depth: {source.depth}")
+
+        ref_used = await clone_repository(source, target_path)
+
+        if verbose:
+            print(f"Clone complete. Ref: {ref_used}")
+
+        return ref_used
 
     def _get_current_branch(self, workspace_path: Path) -> str:
         """Get the current git branch name."""

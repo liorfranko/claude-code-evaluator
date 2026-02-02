@@ -1,0 +1,53 @@
+# =============================================================================
+# Brownfield Evaluation Example: Hello World Repository
+# =============================================================================
+# This evaluation demonstrates the brownfield mode - cloning an existing
+# GitHub repository and running an evaluation against it.
+#
+# Brownfield mode is useful for:
+# - Testing Claude's ability to work with existing codebases
+# - Evaluating refactoring and enhancement tasks
+# - Testing bug fixes on real-world code
+# =============================================================================
+
+name: brownfield-hello-world
+description: |
+  Simple brownfield evaluation demonstrating repository cloning.
+  Uses the GitHub Hello-World example repository.
+version: "1.0.0"
+
+defaults:
+  max_turns: 5
+  max_budget_usd: 1.0
+  timeout_seconds: 120
+  model: haiku
+
+evaluations:
+  # Simple task: Add a file to the cloned Hello-World repository
+  - id: add-readme-section
+    name: Add Section to README
+    description: |
+      Tests brownfield mode by cloning Hello-World repo and adding content.
+
+    task: |
+      Add a new section called "## About This Fork" to the README file.
+      The section should contain a brief description saying this is a
+      fork created for testing purposes.
+
+    tags:
+      - brownfield
+      - simple
+      - readme
+
+    enabled: true
+
+    # Brownfield configuration - clone from external repository
+    repository_source:
+      url: https://github.com/octocat/Hello-World
+      ref: master
+      depth: 1
+
+    phases:
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt_template: "{task}"
