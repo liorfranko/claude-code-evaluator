@@ -34,6 +34,7 @@ from claude_evaluator.models.question import (
 from claude_evaluator.models.timeline_event import TimelineEvent
 from claude_evaluator.models.score_report import (
     AnalysisStatus,
+    ASTMetrics,
     CodeAnalysis,
     CodeIssue,
     DimensionScore,
@@ -73,6 +74,7 @@ __all__ = [
     "ModelValidationError",
     # Score Report Models
     "AnalysisStatus",
+    "ASTMetrics",
     "CodeAnalysis",
     "CodeIssue",
     "DimensionScore",

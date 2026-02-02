@@ -38,6 +38,7 @@ from claude_evaluator.config.defaults import (
 __all__ = [
     "WorkerSettings",
     "DeveloperSettings",
+    "EvaluatorSettings",
     "Settings",
     "get_settings",
 ]
@@ -117,6 +118,44 @@ class DeveloperSettings(BaseSettings):
         default=DEFAULT_MAX_ITERATIONS,
         ge=1,
         description="Maximum loop iterations before forced termination",
+    )
+
+
+class EvaluatorSettings(BaseSettings):
+    """Settings for the EvaluatorAgent.
+
+    Attributes:
+        model: Gemini model identifier for evaluation scoring.
+        timeout_seconds: Timeout for evaluation operations.
+        temperature: LLM temperature for scoring (lower = more deterministic).
+        enable_ast_parsing: Whether to use tree-sitter AST parsing.
+
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="CLAUDE_EVALUATOR_",
+        extra="ignore",
+    )
+
+    model: str = Field(
+        default="gemini-2.0-flash",
+        description="Gemini model identifier for evaluation scoring",
+    )
+    timeout_seconds: int = Field(
+        default=120,
+        ge=10,
+        le=600,
+        description="Timeout for evaluation operations in seconds",
+    )
+    temperature: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="LLM temperature for scoring (lower = more deterministic)",
+    )
+    enable_ast_parsing: bool = Field(
+        default=True,
+        description="Whether to use tree-sitter AST parsing",
     )
 
 

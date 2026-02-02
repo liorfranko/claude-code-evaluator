@@ -55,7 +55,7 @@ Core data models and settings that all other components depend on.
 
 ### AST Metrics Models
 - [x] T108 Define ASTMetrics model: function_count, class_count, cyclomatic_complexity, max_nesting_depth, import_count, loc_breakdown (src/claude_evaluator/models/score_report.py)
-- [ ] T109 Update FileAnalysis model to include optional ASTMetrics field
+- [x] T109 Update FileAnalysis model to include optional ASTMetrics field
 
 ### Configuration
 - [ ] T110 Add EvaluatorSettings class to config/settings.py with model, timeout, temperature settings
