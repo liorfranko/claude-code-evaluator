@@ -102,7 +102,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Checkpoint
 
-- [ ] T031 [US1] CHECKPOINT: Verify brownfield clone works and git init is skipped
+- [X] T031 [US1] CHECKPOINT: Verify brownfield clone works and git init is skipped
 
 ---
 
