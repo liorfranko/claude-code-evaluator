@@ -238,6 +238,7 @@ class FileAnalysis(BaseSchema):
         lines_of_code: Total lines in the file.
         analysis_status: Whether file was analyzed, skipped, or missing.
         quality_notes: Specific observations about this file's quality.
+        ast_metrics: Structural metrics from AST parsing (if parsing succeeded).
 
     """
 
@@ -263,6 +264,10 @@ class FileAnalysis(BaseSchema):
     quality_notes: str | None = Field(
         default=None,
         description="Specific observations about this file's quality",
+    )
+    ast_metrics: ASTMetrics | None = Field(
+        default=None,
+        description="Structural metrics from AST parsing (if parsing succeeded)",
     )
 
 
