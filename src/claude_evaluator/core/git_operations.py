@@ -183,8 +183,9 @@ def parse_git_status(output: str) -> ChangeSummary:
     added: list[str] = []
     deleted: list[str] = []
 
-    for line in output.strip().split("\n"):
-        if not line:
+    for line in output.split("\n"):
+        # Skip empty lines (strip only for checking emptiness)
+        if not line.strip():
             continue
 
         # Porcelain format: XY FILENAME

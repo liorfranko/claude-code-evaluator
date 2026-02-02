@@ -73,7 +73,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 - [X] T017 Implement clone_repository() async function with retry logic (src/claude_evaluator/core/git_operations.py)
 - [X] T018 Implement is_network_error() helper function (src/claude_evaluator/core/git_operations.py)
 - [X] T019 Implement get_change_summary() async function (src/claude_evaluator/core/git_operations.py)
-- [ ] T020 Implement parse_git_status() function for --porcelain output (src/claude_evaluator/core/git_operations.py)
+- [X] T020 Implement parse_git_status() function for --porcelain output (src/claude_evaluator/core/git_operations.py)
 
 ### Git Operations Tests
 
