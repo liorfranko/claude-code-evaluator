@@ -18,6 +18,7 @@ __all__ = [
     "IssueSeverity",
     "TaskComplexityTier",
     "DimensionScore",
+    "StepAnalysis",
 ]
 
 
@@ -97,4 +98,47 @@ class DimensionScore(BaseSchema):
     sub_scores: dict[str, int] | None = Field(
         default=None,
         description="Breakdown of score components (for code_quality)",
+    )
+
+
+class StepAnalysis(BaseSchema):
+    """Analysis of an individual execution step from the evaluation.
+
+    Attributes:
+        step_index: Position in execution sequence (0-indexed).
+        tool_name: Name of the tool invoked in this step.
+        action_summary: Brief description of what the step accomplished.
+        efficiency_flag: Whether step was efficient, neutral, or redundant.
+        commentary: Additional notes or observations about this step.
+        duration_ms: Time taken for this step if available.
+
+    """
+
+    step_index: int = Field(
+        ...,
+        ge=0,
+        description="Position in execution sequence (0-indexed)",
+    )
+    tool_name: str = Field(
+        ...,
+        min_length=1,
+        description="Name of the tool invoked in this step",
+    )
+    action_summary: str = Field(
+        ...,
+        min_length=10,
+        description="Brief description of what the step accomplished",
+    )
+    efficiency_flag: EfficiencyFlag = Field(
+        ...,
+        description="Whether step was efficient, neutral, or redundant",
+    )
+    commentary: str | None = Field(
+        default=None,
+        description="Additional notes or observations about this step",
+    )
+    duration_ms: int | None = Field(
+        default=None,
+        ge=0,
+        description="Time taken for this step if available",
     )
