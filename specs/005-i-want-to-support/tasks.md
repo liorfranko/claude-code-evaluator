@@ -77,10 +77,10 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Git Operations Tests
 
-- [ ] T021 [P] Write unit tests for build_clone_command() (tests/unit/test_git_operations.py)
-- [ ] T022 [P] Write unit tests for parse_git_status() (tests/unit/test_git_operations.py)
-- [ ] T023 [P] Write unit tests for is_network_error() (tests/unit/test_git_operations.py)
-- [ ] T024 Write integration test for clone_repository() with real repo (tests/integration/test_brownfield_clone.py)
+- [X] T021 [P] Write unit tests for build_clone_command() (tests/unit/test_git_operations.py)
+- [X] T022 [P] Write unit tests for parse_git_status() (tests/unit/test_git_operations.py)
+- [X] T023 [P] Write unit tests for is_network_error() (tests/unit/test_git_operations.py)
+- [X] T024 Write integration test for clone_repository() with real repo (tests/integration/test_brownfield_clone.py)
 
 ### Checkpoint
 
