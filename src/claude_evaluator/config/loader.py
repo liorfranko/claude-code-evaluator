@@ -18,6 +18,7 @@ from claude_evaluator.config.models import (
     EvaluationConfig,
     EvaluationSuite,
     Phase,
+    RepositorySource,
 )
 from claude_evaluator.models.enums import PermissionMode
 
@@ -428,6 +429,9 @@ def _parse_evaluation(
         for phase_index, phase_data in enumerate(phases_data)
     ]
 
+    # Parse optional repository_source for brownfield mode
+    repository_source = _parse_repository_source(data, context)
+
     return EvaluationConfig(
         id=eval_id,
         name=name,
@@ -441,7 +445,50 @@ def _parse_evaluation(
         timeout_seconds=_optional_int(data, "timeout_seconds", context),
         model=_optional_string(data, "model", context),
         developer_qa_model=_optional_string(data, "developer_qa_model", context),
+        repository_source=repository_source,
     )
+
+
+def _parse_repository_source(
+    data: dict[str, Any], context: str
+) -> RepositorySource | None:
+    """Parse repository_source configuration for brownfield evaluations.
+
+    Args:
+        data: The raw dictionary from YAML parsing.
+        context: Context string for error messages.
+
+    Returns:
+        RepositorySource if present, None otherwise.
+
+    Raises:
+        ConfigurationError: If repository_source fields are invalid.
+
+    """
+    repo_data = data.get("repository_source")
+    if repo_data is None:
+        return None
+
+    if not isinstance(repo_data, dict):
+        raise ConfigurationError(
+            f"Invalid 'repository_source': expected mapping in {context}"
+        )
+
+    url = _require_string(repo_data, "url", f"repository_source in {context}")
+    ref = _optional_string(repo_data, "ref", f"repository_source in {context}")
+
+    # Parse depth - can be int or "full"
+    depth = repo_data.get("depth", 1)
+    if not isinstance(depth, (int, str)):
+        raise ConfigurationError(
+            f"Invalid 'depth': expected integer or 'full' in repository_source in {context}"
+        )
+    if isinstance(depth, str) and depth != "full":
+        raise ConfigurationError(
+            f"Invalid 'depth': string value must be 'full' in repository_source in {context}"
+        )
+
+    return RepositorySource(url=url, ref=ref, depth=depth)
 
 
 def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase:
