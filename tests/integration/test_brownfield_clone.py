@@ -324,3 +324,54 @@ class TestGetChangeSummary:
             assert "new_file.py" in summary.files_added
             assert "README" in summary.files_modified
             assert summary.total_changes == 2
+
+    @pytest.mark.asyncio
+    async def test_change_summary_accuracy_vs_git_status(self) -> None:
+        """T049: Verify change summary accuracy vs git status.
+
+        Compares get_change_summary() output with raw git status --porcelain
+        to ensure they produce consistent results.
+        """
+        source = RepositorySource(
+            url=TEST_REPO_URL,
+            ref=TEST_REPO_BRANCH,
+            depth=1,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "repo"
+            await clone_repository(source, target)
+
+            # Make various changes
+            (target / "new_file.txt").write_text("new content")
+            (target / "README").write_text("modified")
+            (target / "subdir").mkdir()
+            (target / "subdir" / "nested.py").write_text("nested file")
+
+            # Get change summary
+            summary = await get_change_summary(target)
+
+            # Get raw git status
+            process = await asyncio.create_subprocess_exec(
+                "git", "status", "--porcelain",
+                cwd=target,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+            git_status_output = stdout.decode("utf-8").strip()
+
+            # Count lines in git status (non-empty)
+            git_status_lines = [
+                line for line in git_status_output.split("\n") if line.strip()
+            ]
+            total_from_git = len(git_status_lines)
+
+            # Verify totals match
+            assert summary.total_changes == total_from_git
+
+            # Verify specific files are tracked
+            assert "new_file.txt" in summary.files_added
+            assert "README" in summary.files_modified
+            # Note: git status may show "subdir/" for new directories
+            assert any("subdir" in f for f in summary.files_added)
