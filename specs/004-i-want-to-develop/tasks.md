@@ -63,7 +63,7 @@ Core data models and settings that all other components depend on.
 - [x] T112 Define default constants for evaluator in config/defaults.py
 
 ### Exceptions
-- [ ] T113 Create evaluator exceptions: EvaluatorError, ScoringError, ParsingError, GeminiAPIError, ASTParsingError (src/claude_evaluator/core/agents/evaluator/exceptions.py)
+- [x] T113 Create evaluator exceptions: EvaluatorError, ScoringError, ParsingError, GeminiAPIError, ASTParsingError (src/claude_evaluator/core/agents/evaluator/exceptions.py)
 
 ### Checkpoint
 - [ ] T114 CHECKPOINT: Verify all models pass validation tests and settings load correctly
