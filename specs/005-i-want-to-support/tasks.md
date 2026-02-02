@@ -194,7 +194,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Checkpoint
 
-- [ ] T063 CHECKPOINT: Verify all error scenarios handled with clear messages
+- [X] T063 CHECKPOINT: Verify all error scenarios handled with clear messages
 
 ---
 
