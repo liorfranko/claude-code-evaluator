@@ -80,8 +80,8 @@ Implement the individual dimension scorers.
 - [x] T202 [US1] [US2] Add tier baseline constants: Simple (10K/5/$0.10), Medium (50K/15/$0.50), Complex (150K/30/$1.50) (scorers/efficiency.py)
 
 ### Aggregate Scorer (Pure Calculation)
-- [ ] T203 [US1] [US2] Implement weighted aggregate calculation with default weights 50/30/20 (scorers/aggregate.py)
-- [ ] T204 [US1] [US2] Implement weight redistribution when code_quality is N/A (70/30) (scorers/aggregate.py)
+- [x] T203 [US1] [US2] Implement weighted aggregate calculation with default weights 50/30/20 (scorers/aggregate.py)
+- [x] T204 [US1] [US2] Implement weight redistribution when code_quality is N/A (70/30) (scorers/aggregate.py)
 
 ### Task Completion Scorer (LLM-Based)
 - [ ] T205 [US1] [US2] Create Gemini client wrapper with retry logic (core/agents/evaluator/gemini_client.py)
