@@ -189,8 +189,8 @@ Source: plan.md, spec.md, data-model.md, research.md
 - [X] T058 [P] Write test: SSH URL rejected with helpful message (tests/unit/test_repository_source.py)
 - [X] T059 [P] Write test: invalid URL format error (tests/unit/test_repository_source.py)
 - [X] T060 [P] Write test: network retry after 5 seconds (tests/unit/test_git_operations.py)
-- [ ] T061 Write test: branch not found error (tests/integration/test_brownfield_clone.py)
-- [ ] T062 Write test: empty repository clones successfully (tests/integration/test_brownfield_clone.py)
+- [X] T061 Write test: branch not found error (tests/integration/test_brownfield_clone.py)
+- [X] T062 Write test: empty repository clones successfully (tests/integration/test_brownfield_clone.py)
 
 ### Checkpoint
 
