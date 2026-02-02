@@ -162,7 +162,7 @@ class CodeAnalyzer:
                 file_path=str(file_path),
                 language=Language.unknown.value,
                 lines_of_code=0,
-                status=AnalysisStatus.file_missing,
+                analysis_status=AnalysisStatus.file_missing,
                 ast_metrics=None,
             )
 
@@ -174,7 +174,7 @@ class CodeAnalyzer:
                 file_path=str(file_path),
                 language=Language.unknown.value,
                 lines_of_code=0,
-                status=AnalysisStatus.skipped,
+                analysis_status=AnalysisStatus.skipped,
                 ast_metrics=None,
             )
 
@@ -226,7 +226,7 @@ class CodeAnalyzer:
             file_path=str(file_path),
             language=language.value,
             lines_of_code=lines,
-            status=status,
+            analysis_status=status,
             ast_metrics=ast_metrics,
         )
 

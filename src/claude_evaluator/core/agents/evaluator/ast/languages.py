@@ -120,16 +120,20 @@ def get_grammar(language: Language):  # noqa: ANN201
         return None
 
     try:
+        import tree_sitter
+
+        capsule = None
+
         # Import the appropriate tree-sitter language module
         if language == Language.python:
             import tree_sitter_python as ts_python
 
-            return ts_python.language()
+            capsule = ts_python.language()
 
         elif language == Language.javascript:
             import tree_sitter_javascript as ts_javascript
 
-            return ts_javascript.language()
+            capsule = ts_javascript.language()
 
         elif language == Language.typescript:
             # TypeScript uses JavaScript grammar for basic parsing
@@ -137,32 +141,36 @@ def get_grammar(language: Language):  # noqa: ANN201
             try:
                 import tree_sitter_typescript as ts_typescript
 
-                return ts_typescript.language_typescript()
+                capsule = ts_typescript.language_typescript()
             except ImportError:
                 # Fall back to JavaScript grammar
                 import tree_sitter_javascript as ts_javascript
 
-                return ts_javascript.language()
+                capsule = ts_javascript.language()
 
         elif language == Language.go:
             import tree_sitter_go as ts_go
 
-            return ts_go.language()
+            capsule = ts_go.language()
 
         elif language == Language.rust:
             import tree_sitter_rust as ts_rust
 
-            return ts_rust.language()
+            capsule = ts_rust.language()
 
         elif language == Language.java:
             import tree_sitter_java as ts_java
 
-            return ts_java.language()
+            capsule = ts_java.language()
 
         elif language in (Language.c, Language.cpp):
             import tree_sitter_c as ts_c
 
-            return ts_c.language()
+            capsule = ts_c.language()
+
+        # Wrap capsule in tree_sitter.Language
+        if capsule is not None:
+            return tree_sitter.Language(capsule)
 
     except ImportError as e:
         logger.warning(

@@ -8,7 +8,7 @@ import re
 
 import structlog
 
-from claude_evaluator.models.score_report import StepAnalysis
+from claude_evaluator.models.score_report import EfficiencyFlag, StepAnalysis
 
 __all__ = [
     "StepAnalyzer",
@@ -258,24 +258,54 @@ class StepAnalyzer:
                 issues.append("Tool call appears unnecessary")
                 recommendations.append("Consider if this operation is needed")
 
-            # Only create analysis if there are issues
+            # Determine efficiency flag
+            is_redundant = any(
+                "repeated" in issue.lower() or "redundant" in issue.lower()
+                for issue in issues
+            )
+            if is_redundant:
+                efficiency_flag = EfficiencyFlag.redundant
+            elif issues:
+                efficiency_flag = EfficiencyFlag.neutral
+            else:
+                efficiency_flag = EfficiencyFlag.efficient
+
+            # Build action summary
+            tool_name = step.get("tool_name", "unknown")
+            tool_input = step.get("tool_input", {})
+            action_summary = f"Invoked {tool_name}"
+            if "file_path" in tool_input:
+                action_summary += f" on {tool_input['file_path']}"
+            elif "command" in tool_input:
+                cmd = tool_input["command"][:50]
+                action_summary += f": {cmd}"
+            elif "pattern" in tool_input:
+                action_summary += f" with pattern '{tool_input['pattern'][:30]}'"
+
+            # Ensure minimum length
+            if len(action_summary) < 10:
+                action_summary = f"Executed {tool_name} tool call"
+
+            # Build commentary from issues and recommendations
+            commentary = None
             if issues:
-                analysis = StepAnalysis(
-                    step_number=i + 1,
-                    tool_name=step.get("tool_name", "unknown"),
-                    issues=issues,
-                    recommendations=recommendations,
-                    is_redundant=any(
-                        "repeated" in issue.lower() or "redundant" in issue.lower()
-                        for issue in issues
-                    ),
-                )
-                results.append(analysis)
+                commentary = "; ".join(issues)
+                if recommendations:
+                    commentary += ". Recommendations: " + "; ".join(recommendations)
+
+            analysis = StepAnalysis(
+                step_index=i,
+                tool_name=tool_name,
+                action_summary=action_summary,
+                efficiency_flag=efficiency_flag,
+                commentary=commentary,
+            )
+            results.append(analysis)
 
         logger.debug(
             "steps_analyzed",
             total_steps=len(steps),
-            steps_with_issues=len(results),
+            steps_with_issues=sum(1 for r in results if r.efficiency_flag != EfficiencyFlag.efficient),
         )
 
         return results
@@ -296,8 +326,8 @@ class StepAnalyzer:
 
         """
         total_steps = len(steps)
-        issues_count = len(analyses)
-        redundant_count = sum(1 for a in analyses if a.is_redundant)
+        issues_count = sum(1 for a in analyses if a.efficiency_flag != EfficiencyFlag.efficient)
+        redundant_count = sum(1 for a in analyses if a.efficiency_flag == EfficiencyFlag.redundant)
 
         # Calculate tool usage distribution
         tool_counts: dict[str, int] = {}
