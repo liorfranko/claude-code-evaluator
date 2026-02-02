@@ -36,7 +36,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Model Tests
 
-- [ ] T007 [P] Write unit tests for RepositorySource URL validation (tests/unit/test_repository_source.py)
+- [X] T007 [P] Write unit tests for RepositorySource URL validation (tests/unit/test_repository_source.py)
 - [ ] T008 [P] Write unit tests for RepositorySource depth validation (tests/unit/test_repository_source.py)
 - [ ] T009 [P] Write unit tests for ChangeSummary model (tests/unit/test_change_summary.py)
 
