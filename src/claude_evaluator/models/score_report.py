@@ -22,6 +22,7 @@ __all__ = [
     "FileAnalysis",
     "CodeIssue",
     "CodeAnalysis",
+    "ScoreReport",
 ]
 
 
@@ -267,4 +268,68 @@ class CodeAnalysis(BaseSchema):
     issues_found: list[CodeIssue] = Field(
         default_factory=list,
         description="List of potential issues or anti-patterns detected",
+    )
+
+
+class ScoreReport(BaseSchema):
+    """The output document produced by the evaluator agent.
+
+    Contains all scores and analysis for a single evaluation.
+
+    Attributes:
+        evaluation_id: Reference to the evaluated execution's ID.
+        aggregate_score: Combined weighted score (0-100).
+        dimension_scores: Individual scores for each quality dimension.
+        rationale: Overall textual explanation for the scores.
+        step_analysis: Analysis of each execution step.
+        code_analysis: Analysis of generated code (optional).
+        generated_at: ISO 8601 timestamp of score generation.
+        evaluator_model: Gemini model used for evaluation.
+        evaluation_duration_ms: Time taken to generate the score report.
+
+    """
+
+    evaluation_id: str = Field(
+        ...,
+        min_length=1,
+        description="Reference to the evaluated execution's ID",
+    )
+    aggregate_score: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Combined weighted score (0-100)",
+    )
+    dimension_scores: list[DimensionScore] = Field(
+        ...,
+        min_length=2,
+        max_length=3,
+        description="Individual scores for each quality dimension",
+    )
+    rationale: str = Field(
+        ...,
+        min_length=50,
+        description="Overall textual explanation for the scores",
+    )
+    step_analysis: list[StepAnalysis] = Field(
+        default_factory=list,
+        description="Analysis of each execution step",
+    )
+    code_analysis: CodeAnalysis | None = Field(
+        default=None,
+        description="Analysis of generated code (optional)",
+    )
+    generated_at: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp of score generation",
+    )
+    evaluator_model: str = Field(
+        ...,
+        min_length=1,
+        description="Gemini model used for evaluation",
+    )
+    evaluation_duration_ms: int = Field(
+        ...,
+        ge=0,
+        description="Time taken to generate the score report in milliseconds",
     )

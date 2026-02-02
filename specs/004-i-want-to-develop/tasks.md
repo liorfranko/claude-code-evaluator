@@ -49,7 +49,7 @@ Core data models and settings that all other components depend on.
 - [x] T102 Define StepAnalysis model with validation (src/claude_evaluator/models/score_report.py)
 - [x] T103 Define FileAnalysis model (src/claude_evaluator/models/score_report.py)
 - [x] T104 Define CodeIssue model (src/claude_evaluator/models/score_report.py)
-- [ ] T105 Define CodeAnalysis model with FileAnalysis list (src/claude_evaluator/models/score_report.py)
+- [x] T105 Define CodeAnalysis model with FileAnalysis list (src/claude_evaluator/models/score_report.py)
 - [ ] T106 Define ScoreReport model with all relationships (src/claude_evaluator/models/score_report.py)
 - [ ] T107 Add ScoreReport exports to src/claude_evaluator/models/__init__.py
 
