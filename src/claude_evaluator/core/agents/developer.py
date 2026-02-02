@@ -650,6 +650,7 @@ class DeveloperAgent(BaseSchema):
                 model=model,
                 cwd=working_dir,
                 prompt_length=len(prompt),
+                prompt=prompt,
             )
 
             result_message = None
@@ -775,18 +776,17 @@ Analyze the worker's response and determine what to do next:
    - Respond with exactly: "complete"
 
 2. If the worker is ASKING for input, presenting options, or waiting for a decision:
-   - Respond with a clear instruction to continue the work
-   - ALWAYS choose to proceed, implement, or continue
-   - If there are numbered options, pick the one that does the most work (e.g., "implement all" over "implement phase 1 only")
-   - Example responses: "continue", "proceed with full implementation", "yes, implement all tasks", "4" (if option 4 is full implementation)
+   - Respond with exactly: "continue" to proceed with the current phase
+   - This tells the worker to continue what it was already doing
+   - Do NOT say things like "proceed with implementation" or "implement all" as this may cause the worker to skip phases
 
 3. If the worker seems stuck or needs guidance:
    - Provide a clear instruction to continue with the task
 
 IMPORTANT:
 - This is AUTOMATED - always push forward, never ask questions back
-- Prefer doing MORE work over less (all phases vs one phase)
-- Keep response SHORT - just the instruction or "complete"
+- Respond with "continue" to let the worker proceed with its current phase
+- Keep response SHORT - just "continue" or "complete"
 
 Your response:"""
 
