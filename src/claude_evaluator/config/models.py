@@ -8,8 +8,9 @@ workflows with configurable permissions, tool access, and resource limits.
 from __future__ import annotations
 
 from datetime import datetime
+from urllib.parse import urlparse
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import PermissionMode
@@ -39,6 +40,58 @@ class RepositorySource(BaseSchema):
     url: str = Field(..., description="GitHub HTTPS URL to clone")
     ref: str | None = Field(default=None, description="Branch, tag, or commit to checkout")
     depth: int | str = Field(default=1, description="Clone depth (positive int or 'full')")
+
+    @field_validator("url")
+    @classmethod
+    def validate_github_https_url(cls, v: str) -> str:
+        """Validate URL is a GitHub HTTPS URL.
+
+        Args:
+            v: The URL string to validate.
+
+        Returns:
+            The validated URL string.
+
+        Raises:
+            ValueError: If URL is not a valid GitHub HTTPS URL.
+
+        """
+        # Check for SSH format which is not allowed
+        if v.startswith("git@"):
+            raise ValueError(
+                f"SSH URLs are not supported. Use HTTPS format: "
+                f"https://github.com/owner/repo instead of {v}"
+            )
+
+        # Parse the URL
+        parsed = urlparse(v)
+
+        # Validate scheme is https
+        if parsed.scheme != "https":
+            raise ValueError(
+                f"URL must use HTTPS scheme. Got '{parsed.scheme}' in {v}"
+            )
+
+        # Validate host is github.com
+        if parsed.netloc != "github.com":
+            raise ValueError(
+                f"URL must be a GitHub URL (github.com). Got '{parsed.netloc}' in {v}"
+            )
+
+        # Validate path has owner/repo structure
+        # Path should be like /owner/repo or /owner/repo.git
+        path = parsed.path.strip("/")
+        if path.endswith(".git"):
+            path = path[:-4]
+
+        path_parts = path.split("/")
+        if len(path_parts) < 2 or not path_parts[0] or not path_parts[1]:
+            raise ValueError(
+                f"URL must include owner and repository: "
+                f"https://github.com/owner/repo. Got {v}"
+            )
+
+        return v
 
 
 class Phase(BaseSchema):
