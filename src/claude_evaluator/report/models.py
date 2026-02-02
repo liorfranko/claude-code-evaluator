@@ -71,6 +71,7 @@ class EvaluationReport(BaseSchema):
         generated_at: When report was generated.
         workspace_path: Path to preserved workspace (brownfield only).
         change_summary: Summary of changes made (brownfield only).
+        ref_used: Git ref (branch/tag) that was checked out (brownfield only).
 
     """
 
@@ -85,6 +86,7 @@ class EvaluationReport(BaseSchema):
     errors: list[str] = Field(default_factory=list)
     workspace_path: str | None = None
     change_summary: ChangeSummary | None = None
+    ref_used: str | None = None
 
     def has_errors(self) -> bool:
         """Check if the evaluation encountered any errors.

@@ -14,7 +14,7 @@ from claude_evaluator.config.models import Phase, RepositorySource
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.core.exceptions import CloneError
-from claude_evaluator.core.git_operations import clone_repository
+from claude_evaluator.core.git_operations import clone_repository, get_change_summary
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode, WorkflowType
@@ -177,9 +177,20 @@ class RunEvaluationCommand(BaseCommand):
         except Exception as e:
             self._handle_error(evaluation, e, verbose)
 
-        # Generate report
+        # Generate report with brownfield metadata if applicable
         generator = ReportGenerator()
-        report = generator.generate(evaluation)
+        change_summary = None
+        if is_brownfield:
+            change_summary = await get_change_summary(workspace_path)
+            if verbose:
+                print(f"Changes: {change_summary.total_changes} files")
+
+        report = generator.generate(
+            evaluation,
+            workspace_path=str(workspace_path) if is_brownfield else None,
+            change_summary=change_summary,
+            ref_used=ref_used,
+        )
 
         # Save report
         report_path = eval_folder / "evaluation.json"

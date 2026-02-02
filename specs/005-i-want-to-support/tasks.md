@@ -136,7 +136,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 ### Implementation
 
 - [X] T040 [US2] Ensure --branch flag is passed to git clone when ref specified (src/claude_evaluator/cli/commands/evaluation.py)
-- [ ] T041 [US2] Store ref_used in evaluation metadata for report (src/claude_evaluator/cli/commands/evaluation.py)
+- [X] T041 [US2] Store ref_used in evaluation metadata for report (src/claude_evaluator/cli/commands/evaluation.py)
 
 ### Tests
 
