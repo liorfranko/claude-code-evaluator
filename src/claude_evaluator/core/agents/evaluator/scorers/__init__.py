@@ -11,16 +11,32 @@ from claude_evaluator.core.agents.evaluator.scorers.aggregate import (
     AggregateScorer,
     calculate_aggregate_score,
 )
+from claude_evaluator.core.agents.evaluator.scorers.code_quality import (
+    CodeQualityResult,
+    CodeQualityScorer,
+    read_file_content,
+    truncate_content,
+)
 from claude_evaluator.core.agents.evaluator.scorers.efficiency import (
     EfficiencyScorer,
     calculate_efficiency_score,
     classify_task_complexity,
 )
+from claude_evaluator.core.agents.evaluator.scorers.task_completion import (
+    TaskCompletionResult,
+    TaskCompletionScorer,
+)
 
 __all__ = [
     "AggregateScorer",
     "calculate_aggregate_score",
+    "CodeQualityResult",
+    "CodeQualityScorer",
+    "read_file_content",
+    "truncate_content",
     "EfficiencyScorer",
     "calculate_efficiency_score",
     "classify_task_complexity",
+    "TaskCompletionResult",
+    "TaskCompletionScorer",
 ]

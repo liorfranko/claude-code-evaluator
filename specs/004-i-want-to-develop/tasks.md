@@ -90,8 +90,8 @@ Implement the individual dimension scorers.
 
 ### Code Quality Scorer (LLM-Based)
 - [x] T208 [US1] [US2] Define code quality scoring prompt template with criteria weights (prompts.py)
-- [ ] T209 [US1] [US2] Implement CodeQualityScorer with sub-scores: correctness 40%, structure 25%, error_handling 20%, naming 15% (scorers/code_quality.py)
-- [ ] T210 [US1] [US2] Add file content reading and truncation for large files (scorers/code_quality.py)
+- [x] T209 [US1] [US2] Implement CodeQualityScorer with sub-scores: correctness 40%, structure 25%, error_handling 20%, naming 15% (scorers/code_quality.py)
+- [x] T210 [US1] [US2] Add file content reading and truncation for large files (scorers/code_quality.py)
 
 ### Checkpoint
 - [ ] T211 [US1] [US2] CHECKPOINT: Verify all scorers produce valid DimensionScore objects
