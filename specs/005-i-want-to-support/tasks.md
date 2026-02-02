@@ -125,7 +125,7 @@ Source: plan.md, spec.md, data-model.md, research.md
 
 ### Checkpoint
 
-- [ ] T039 [US1] CHECKPOINT: Verify US-001 Clone and Modify External Repository is complete
+- [X] T039 [US1] CHECKPOINT: Verify US-001 Clone and Modify External Repository is complete
 
 ---
 
