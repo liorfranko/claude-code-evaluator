@@ -278,8 +278,9 @@ class BaseWorkflow(ABC):
             return await self.execute(evaluation)
 
         try:
-            async with asyncio.timeout(timeout_seconds):
-                return await self.execute(evaluation)
+            return await asyncio.wait_for(
+                self.execute(evaluation), timeout=timeout_seconds
+            )
         except asyncio.TimeoutError:
             logger.warning(
                 "workflow_timeout",

@@ -8,7 +8,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from claude_agent_sdk import (
+from claude_agent_sdk import (  # pyright: ignore[reportMissingImports]
     ClaudeAgentOptions,
     PermissionResultAllow,
     PermissionResultDeny,

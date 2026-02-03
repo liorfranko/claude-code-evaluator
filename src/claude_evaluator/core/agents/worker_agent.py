@@ -17,7 +17,7 @@ import contextlib
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from claude_agent_sdk import ClaudeSDKClient
+from claude_agent_sdk import ClaudeSDKClient  # pyright: ignore[reportMissingImports]
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from claude_evaluator.config.defaults import (
