@@ -93,7 +93,7 @@ class TestMetricsSchemaValidation:
         ]
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=0,
@@ -130,7 +130,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         # Generate report
@@ -164,7 +164,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -193,7 +193,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -259,7 +259,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -302,7 +302,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -333,7 +333,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -366,7 +366,7 @@ class TestMultiPhaseMetricsCompleteness:
         self.call_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             self.call_count += 1
             return QueryMetrics(
@@ -409,7 +409,7 @@ class TestMultiPhaseMetricsCompleteness:
         evaluation.start()
 
         workflow = MultiCommandWorkflow(collector, phases)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -456,7 +456,7 @@ class TestMultiPhaseMetricsCompleteness:
         evaluation.start()
 
         workflow = MultiCommandWorkflow(collector, phases)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()

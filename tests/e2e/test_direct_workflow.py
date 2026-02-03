@@ -244,7 +244,7 @@ class TestDirectWorkflowE2EExecution:
         received_queries: list[str] = []
 
         async def capture_query(
-            query: str, phase: str = None, resume_session: bool = False
+            query: str, phase: str = None, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             received_queries.append(query)
             return realistic_query_metrics
@@ -514,7 +514,7 @@ class TestDirectWorkflowSinglePhaseVerification:
 
         # Verify no planning phase exists
         assert "planning" not in metrics.tokens_by_phase
-        assert "plan" not in metrics.tokens_by_phase.keys()
+        assert "plan" not in metrics.tokens_by_phase
 
     def test_only_implementation_phase_tokens(
         self,
@@ -556,7 +556,7 @@ class TestDirectWorkflowSinglePhaseVerification:
         permission_mode_at_execution = None
 
         async def capture_permission_mode(
-            query: str, phase: str = None
+            query: str, phase: str = None  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal permission_mode_at_execution
             permission_mode_at_execution = evaluation.worker_agent.permission_mode

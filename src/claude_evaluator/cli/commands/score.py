@@ -43,7 +43,9 @@ class ScoreCommand(BaseCommand):
 
         """
         evaluation_path = Path(args.evaluation_path)
-        workspace_path = Path(args.workspace) if args.workspace else evaluation_path.parent
+        workspace_path = (
+            Path(args.workspace) if args.workspace else evaluation_path.parent
+        )
 
         # For score command, default output is same directory as evaluation file
         # Don't use args.output if it's the suite default directory
@@ -116,7 +118,9 @@ class ScoreCommand(BaseCommand):
         print("Dimension Scores:")
         for dim in report.dimension_scores:
             weight_pct = int(dim.weight * 100)
-            print(f"  - {dim.dimension_name.value}: {dim.score}/100 ({weight_pct}% weight)")
+            print(
+                f"  - {dim.dimension_name.value}: {dim.score}/100 ({weight_pct}% weight)"
+            )
 
         if verbose and report.dimension_scores:
             print("\nRationales:")
@@ -138,7 +142,12 @@ class ScoreCommand(BaseCommand):
 
         if report.step_analysis:
             from claude_evaluator.models.score_report import EfficiencyFlag
-            redundant = sum(1 for s in report.step_analysis if s.efficiency_flag == EfficiencyFlag.redundant)
+
+            redundant = sum(
+                1
+                for s in report.step_analysis
+                if s.efficiency_flag == EfficiencyFlag.redundant
+            )
             if redundant > 0:
                 print("\nExecution Analysis:")
                 print(f"  Total steps: {len(report.step_analysis)}")

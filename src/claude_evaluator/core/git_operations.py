@@ -146,7 +146,9 @@ def is_branch_not_found_error(error_output: str) -> bool:
         "Could not find remote branch",
     ]
     error_lower = error_output.lower()
-    return any(indicator.lower() in error_lower for indicator in branch_not_found_indicators)
+    return any(
+        indicator.lower() in error_lower for indicator in branch_not_found_indicators
+    )
 
 
 async def clone_repository(
@@ -393,7 +395,9 @@ async def get_change_summary(workspace_path: Path) -> ChangeSummary:
 
     """
     process = await asyncio.create_subprocess_exec(
-        "git", "status", "--porcelain",
+        "git",
+        "status",
+        "--porcelain",
         cwd=workspace_path,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

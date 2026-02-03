@@ -42,8 +42,8 @@ ReceiveResponseCallback: TypeAlias = Callable[[], dict[str, Any]]
 logger = get_logger(__name__)
 
 # SDK imports for LLM-powered answer generation
-from claude_agent_sdk import ClaudeAgentOptions
-from claude_agent_sdk import query as sdk_query
+from claude_agent_sdk import ClaudeAgentOptions  # noqa: E402
+from claude_agent_sdk import query as sdk_query  # noqa: E402
 
 __all__ = ["DeveloperAgent"]
 

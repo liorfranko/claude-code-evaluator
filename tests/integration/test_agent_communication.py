@@ -42,7 +42,7 @@ class TestDeveloperWorkerCommunication:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -90,7 +90,7 @@ class TestDeveloperWorkerCommunication:
         developer = DeveloperAgent()
         worker = self.create_mock_worker()
 
-        evaluation = Evaluation(
+        Evaluation(
             task_description="Test decision logging",
             workflow_type=WorkflowType.direct,
             developer_agent=developer,
@@ -117,7 +117,7 @@ class TestDeveloperWorkerCommunication:
         developer = DeveloperAgent()
         worker = self.create_mock_worker()
 
-        evaluation = Evaluation(
+        Evaluation(
             task_description="Test state transitions",
             workflow_type=WorkflowType.direct,
             developer_agent=developer,
@@ -171,7 +171,7 @@ class TestDeveloperWorkerCommunication:
     @pytest.mark.asyncio
     async def test_worker_tracks_tool_invocations(self) -> None:
         """Test that Worker tracks tool invocations during execution."""
-        developer = DeveloperAgent()
+        DeveloperAgent()
         worker = WorkerAgent(
             execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
@@ -222,7 +222,7 @@ class TestAgentCoordinationInWorkflows:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(
@@ -331,7 +331,7 @@ class TestAgentCoordinationInWorkflows:
         )
 
         async def capture_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             received_queries.append(query)
             return QueryMetrics(
@@ -382,7 +382,7 @@ class TestAgentErrorHandling:
             permission_mode=PermissionMode.plan,
         )
 
-        async def failing_query(query: str, phase: str) -> QueryMetrics:
+        async def failing_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
             raise RuntimeError("Worker execution failed")
 
         worker.execute_query = failing_query  # type: ignore
@@ -419,7 +419,7 @@ class TestAgentErrorHandling:
             permission_mode=PermissionMode.plan,
         )
 
-        async def failing_query(query: str, phase: str) -> QueryMetrics:
+        async def failing_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Invalid query")
 
         worker.execute_query = failing_query  # type: ignore

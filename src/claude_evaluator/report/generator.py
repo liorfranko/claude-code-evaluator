@@ -82,8 +82,8 @@ class ReportGenerator:
         # Build timeline from evaluation events
         timeline = self.build_timeline(evaluation)
 
-        # Get developer decisions
-        decisions = evaluation.developer_agent.decisions_log
+        # Get developer decisions (stored in evaluation by workflow)
+        decisions = evaluation.decisions_log
 
         # Collect errors
         errors: list[str] = []
@@ -215,7 +215,7 @@ class ReportGenerator:
         )
 
         # Add developer decisions as timeline events
-        for decision in evaluation.developer_agent.decisions_log:
+        for decision in evaluation.decisions_log:
             timeline.append(
                 TimelineEvent(
                     timestamp=decision.timestamp,

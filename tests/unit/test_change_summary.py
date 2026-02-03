@@ -4,7 +4,6 @@ Tests the ChangeSummary model used to track repository changes
 during brownfield evaluations.
 """
 
-import pytest
 
 from claude_evaluator.report.models import ChangeSummary
 

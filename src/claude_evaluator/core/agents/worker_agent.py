@@ -17,10 +17,10 @@ import contextlib
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from claude_agent_sdk import ClaudeSDKClient
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from claude_evaluator.config.defaults import (
-    DEFAULT_MAX_TURNS,
     DEFAULT_QUESTION_TIMEOUT_SECONDS,
     DEFAULT_WORKER_MODEL,
     QUESTION_TIMEOUT_MAX,
@@ -44,7 +44,6 @@ from claude_evaluator.models.tool_invocation import ToolInvocation
 
 logger = get_logger(__name__)
 
-from claude_agent_sdk import ClaudeSDKClient
 
 __all__ = ["WorkerAgent", "DEFAULT_MODEL"]
 
@@ -71,7 +70,6 @@ class WorkerAgent(BaseSchema):
         permission_mode: Current permission mode for tool execution.
         allowed_tools: List of tools that are auto-approved for execution.
         additional_dirs: Additional directories Claude can access.
-        max_turns: Maximum number of conversation turns per query.
         max_budget_usd: Maximum spend limit per query in USD (optional).
         model: Model identifier to use for SDK execution.
         on_question_callback: Async callback invoked when Claude asks a question.
@@ -92,7 +90,6 @@ class WorkerAgent(BaseSchema):
     permission_mode: PermissionMode
     allowed_tools: list[str] = Field(default_factory=list)
     additional_dirs: list[str] = Field(default_factory=list)
-    max_turns: int = DEFAULT_MAX_TURNS
     session_id: str | None = None
     max_budget_usd: float | None = None
     model: str | None = None
@@ -132,9 +129,8 @@ class WorkerAgent(BaseSchema):
             )
 
         # Validate on_question_callback is async if provided
-        if (
-            self.on_question_callback is not None
-            and not asyncio.iscoroutinefunction(self.on_question_callback)
+        if self.on_question_callback is not None and not asyncio.iscoroutinefunction(
+            self.on_question_callback
         ):
             raise TypeError(
                 "on_question_callback must be an async function (coroutine function)"
@@ -233,7 +229,6 @@ class WorkerAgent(BaseSchema):
                 permission_mode=self.permission_mode,
                 additional_dirs=self.additional_dirs,
                 allowed_tools=self.allowed_tools,
-                max_turns=self.max_turns,
                 max_budget_usd=self.max_budget_usd,
                 model=self.model,
                 use_user_plugins=self.use_user_plugins,
@@ -318,8 +313,10 @@ class WorkerAgent(BaseSchema):
                 message_type = type(message).__name__
 
                 if message_type == "AssistantMessage" and hasattr(message, "content"):
-                    response_content = self._message_processor.process_assistant_message(
-                        message, pending_tool_uses, all_messages
+                    response_content = (
+                        self._message_processor.process_assistant_message(
+                            message, pending_tool_uses, all_messages
+                        )
                     )
                     question_block = self._question_handler.find_question_block(message)
                 elif message_type == "UserMessage" and hasattr(message, "content"):
@@ -327,7 +324,9 @@ class WorkerAgent(BaseSchema):
                         message, pending_tool_uses, all_messages
                     )
                 elif message_type == "SystemMessage":
-                    self._message_processor.process_system_message(message, all_messages)
+                    self._message_processor.process_system_message(
+                        message, all_messages
+                    )
                 elif message_type == "ResultMessage":
                     result_message = message
 

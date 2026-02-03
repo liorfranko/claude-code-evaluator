@@ -38,8 +38,12 @@ class RepositorySource(BaseSchema):
     """
 
     url: str = Field(..., description="GitHub HTTPS URL to clone")
-    ref: str | None = Field(default=None, description="Branch, tag, or commit to checkout")
-    depth: int | str = Field(default=1, description="Clone depth (positive int or 'full')")
+    ref: str | None = Field(
+        default=None, description="Branch, tag, or commit to checkout"
+    )
+    depth: int | str = Field(
+        default=1, description="Clone depth (positive int or 'full')"
+    )
 
     @field_validator("url")
     @classmethod
@@ -68,9 +72,7 @@ class RepositorySource(BaseSchema):
 
         # Validate scheme is https
         if parsed.scheme != "https":
-            raise ValueError(
-                f"URL must use HTTPS scheme. Got '{parsed.scheme}' in {v}"
-            )
+            raise ValueError(f"URL must use HTTPS scheme. Got '{parsed.scheme}' in {v}")
 
         # Validate host is github.com
         if parsed.netloc != "github.com":
@@ -117,9 +119,7 @@ class RepositorySource(BaseSchema):
 
         # v must be int at this point (since str case is handled above)
         if v < 1:
-            raise ValueError(
-                f"depth must be a positive integer (>= 1). Got {v}"
-            )
+            raise ValueError(f"depth must be a positive integer (>= 1). Got {v}")
         return v
 
 

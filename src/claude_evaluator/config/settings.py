@@ -11,10 +11,14 @@ Environment Variables:
     CLAUDE_DEVELOPER_QA_MODEL: Developer Q&A model
     CLAUDE_DEVELOPER_CONTEXT_WINDOW_SIZE: Conversation context size
     CLAUDE_DEVELOPER_MAX_ANSWER_RETRIES: Maximum answer retry attempts
+    CLAUDE_DEVELOPER_MAX_ITERATIONS: Maximum loop iterations
     CLAUDE_EVALUATOR_MODEL: Gemini model for evaluation scoring
     CLAUDE_EVALUATOR_TIMEOUT_SECONDS: Evaluation operation timeout
     CLAUDE_EVALUATOR_TEMPERATURE: LLM temperature for scoring
     CLAUDE_EVALUATOR_ENABLE_AST_PARSING: Enable tree-sitter AST parsing
+    CLAUDE_EVALUATOR_TASK_COMPLETION_WEIGHT: Weight for task completion score
+    CLAUDE_EVALUATOR_CODE_QUALITY_WEIGHT: Weight for code quality score
+    CLAUDE_EVALUATOR_EFFICIENCY_WEIGHT: Weight for efficiency score
 """
 
 from functools import lru_cache
@@ -25,13 +29,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from claude_evaluator.config.defaults import (
     CONTEXT_WINDOW_MAX,
     CONTEXT_WINDOW_MIN,
+    DEFAULT_CODE_QUALITY_WEIGHT,
     DEFAULT_CONTEXT_WINDOW_SIZE,
+    DEFAULT_EFFICIENCY_WEIGHT,
+    DEFAULT_EVALUATOR_ENABLE_AST,
+    DEFAULT_EVALUATOR_MODEL,
+    DEFAULT_EVALUATOR_TEMPERATURE,
+    DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
     DEFAULT_MAX_ANSWER_RETRIES,
     DEFAULT_MAX_ITERATIONS,
     DEFAULT_MAX_TURNS,
     DEFAULT_QA_MODEL,
     DEFAULT_QUESTION_TIMEOUT_SECONDS,
-    DEFAULT_SDK_MAX_TURNS,
+    DEFAULT_TASK_COMPLETION_WEIGHT,
     DEFAULT_WORKER_MODEL,
     MAX_ANSWER_RETRIES_MAX,
     MAX_ANSWER_RETRIES_MIN,
@@ -78,11 +88,6 @@ class WorkerSettings(BaseSettings):
         ge=QUESTION_TIMEOUT_MIN,
         le=QUESTION_TIMEOUT_MAX,
         description="Timeout in seconds for question callbacks",
-    )
-    sdk_max_turns: int = Field(
-        default=DEFAULT_SDK_MAX_TURNS,
-        ge=1,
-        description="Default max turns for SDK execution",
     )
 
 
@@ -133,6 +138,9 @@ class EvaluatorSettings(BaseSettings):
         timeout_seconds: Timeout for evaluation operations.
         temperature: LLM temperature for scoring (lower = more deterministic).
         enable_ast_parsing: Whether to use tree-sitter AST parsing.
+        task_completion_weight: Weight for task completion score.
+        code_quality_weight: Weight for code quality score.
+        efficiency_weight: Weight for efficiency score.
 
     """
 
@@ -142,24 +150,42 @@ class EvaluatorSettings(BaseSettings):
     )
 
     model: str = Field(
-        default="gemini-3-flash-preview",
+        default=DEFAULT_EVALUATOR_MODEL,
         description="Gemini model identifier for evaluation scoring",
     )
     timeout_seconds: int = Field(
-        default=120,
+        default=DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
         ge=10,
         le=600,
         description="Timeout for evaluation operations in seconds",
     )
     temperature: float = Field(
-        default=0.1,
+        default=DEFAULT_EVALUATOR_TEMPERATURE,
         ge=0.0,
         le=1.0,
         description="LLM temperature for scoring (lower = more deterministic)",
     )
     enable_ast_parsing: bool = Field(
-        default=True,
+        default=DEFAULT_EVALUATOR_ENABLE_AST,
         description="Whether to use tree-sitter AST parsing",
+    )
+    task_completion_weight: float = Field(
+        default=DEFAULT_TASK_COMPLETION_WEIGHT,
+        ge=0.0,
+        le=1.0,
+        description="Weight for task completion score",
+    )
+    code_quality_weight: float = Field(
+        default=DEFAULT_CODE_QUALITY_WEIGHT,
+        ge=0.0,
+        le=1.0,
+        description="Weight for code quality score",
+    )
+    efficiency_weight: float = Field(
+        default=DEFAULT_EFFICIENCY_WEIGHT,
+        ge=0.0,
+        le=1.0,
+        description="Weight for efficiency score",
     )
 
 

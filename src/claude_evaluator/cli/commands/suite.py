@@ -105,7 +105,6 @@ class RunSuiteCommand(BaseCommand):
                     verbose=verbose,
                     phases=config.phases,
                     model=config.model,
-                    max_turns=config.max_turns,
                     repository_source=config.repository_source,
                 )
                 reports.append(report)

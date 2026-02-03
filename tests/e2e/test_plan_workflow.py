@@ -89,7 +89,7 @@ class TestPlanWorkflowE2EPlanModeExecution:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             if phase == "planning":
                 return planning_metrics
@@ -113,7 +113,7 @@ class TestPlanWorkflowE2EPlanModeExecution:
         received_queries: list[tuple[str, str]] = []
 
         async def capture_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             received_queries.append((query, phase))
             return QueryMetrics(
@@ -149,7 +149,7 @@ class TestPlanWorkflowE2EPlanModeExecution:
         permission_during_planning: PermissionMode | None = None
 
         async def capture_permission_and_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal permission_during_planning
             if phase == "planning":
@@ -224,7 +224,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
@@ -247,7 +247,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         received_queries: list[tuple[str, str]] = []
 
         async def capture_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             received_queries.append((query, phase))
             return QueryMetrics(
@@ -290,7 +290,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         """
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             response = planning_response if phase == "planning" else "Done"
             return QueryMetrics(
@@ -345,7 +345,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         call_count = [0]
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             nonlocal call_count
             call_count[0] += 1
@@ -428,7 +428,7 @@ class TestPlanWorkflowE2EMetricsCapture:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
@@ -476,7 +476,7 @@ class TestPlanWorkflowE2EMetricsCapture:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
@@ -530,7 +530,7 @@ class TestPlanWorkflowE2EMetricsCapture:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
@@ -582,7 +582,7 @@ class TestPlanWorkflowE2EMetricsCapture:
         call_count = [0]
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             nonlocal call_count
             call_count[0] += 1
@@ -663,7 +663,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
@@ -698,7 +698,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
@@ -741,7 +741,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 return planning_metrics
@@ -768,7 +768,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         evaluation = self.create_evaluation()
 
         async def mock_query_error(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             if phase == "planning":
                 raise RuntimeError("Planning failed: Cannot access repository")
@@ -801,7 +801,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         evaluation = self.create_evaluation()
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             if phase == "implementation":
                 raise RuntimeError("Implementation failed: Syntax error")

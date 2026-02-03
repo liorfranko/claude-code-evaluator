@@ -52,7 +52,9 @@ def _require_string(data: dict[str, Any], field: str, context: str) -> str:
         raise ConfigurationError(f"Missing required field '{field}' in {context}")
     value = data[field]
     if not isinstance(value, str) or not value.strip():
-        raise ConfigurationError(f"Invalid '{field}': must be a non-empty string in {context}")
+        raise ConfigurationError(
+            f"Invalid '{field}': must be a non-empty string in {context}"
+        )
     return value.strip()
 
 
@@ -166,7 +168,9 @@ def _optional_string_list(
     if not isinstance(value, list):
         raise ConfigurationError(f"Invalid '{field}': expected list in {context}")
     if not all(isinstance(item, str) for item in value):
-        raise ConfigurationError(f"Invalid '{field}': all items must be strings in {context}")
+        raise ConfigurationError(
+            f"Invalid '{field}': all items must be strings in {context}"
+        )
     return value
 
 
@@ -430,7 +434,7 @@ def _parse_evaluation(
             workflow_type = WorkflowType(workflow_type_str)
         except ValueError:
             valid_types = [wt.value for wt in WorkflowType]
-            raise ConfigurationError(
+            raise ConfigurationError(  # noqa: B904
                 f"Invalid workflow_type '{workflow_type_str}' in {context}. "
                 f"Valid values: {valid_types}"
             )
@@ -440,8 +444,11 @@ def _parse_evaluation(
     phases_data = data.get("phases")
     if phases_data is not None:
         if not isinstance(phases_data, list):
+            raise ConfigurationError(f"Field 'phases' must be a list in {context}")
+        if len(phases_data) == 0 and workflow_type != WorkflowType.direct:
             raise ConfigurationError(
-                f"Field 'phases' must be a list in {context}"
+                f"Empty 'phases' list in {context}. "
+                f"Either add phases or set workflow_type: direct"
             )
         phases = [
             _parse_phase(phase_data, phase_index, context)

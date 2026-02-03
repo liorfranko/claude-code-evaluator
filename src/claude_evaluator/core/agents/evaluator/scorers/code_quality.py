@@ -315,27 +315,29 @@ class CodeQualityScorer:
         if total_loc == 0:
             avg_score = sum(r.score for r in results) // len(results)
         else:
-            weighted_sum = sum(
-                r.score * files[i][3] for i, r in enumerate(results)
-            )
+            weighted_sum = sum(r.score * files[i][3] for i, r in enumerate(results))
             avg_score = int(round(weighted_sum / total_loc))
 
         # Aggregate sub-scores (all 8 dimensions)
         avg_sub_scores = {
-            "correctness": sum(r.sub_scores.correctness for r in results) // len(results),
+            "correctness": sum(r.sub_scores.correctness for r in results)
+            // len(results),
             "structure": sum(r.sub_scores.structure for r in results) // len(results),
-            "error_handling": sum(r.sub_scores.error_handling for r in results) // len(results),
+            "error_handling": sum(r.sub_scores.error_handling for r in results)
+            // len(results),
             "naming": sum(r.sub_scores.naming for r in results) // len(results),
             "security": sum(r.sub_scores.security for r in results) // len(results),
-            "performance": sum(r.sub_scores.performance for r in results) // len(results),
-            "best_practices": sum(r.sub_scores.best_practices for r in results) // len(results),
-            "code_smells": sum(r.sub_scores.code_smells for r in results) // len(results),
+            "performance": sum(r.sub_scores.performance for r in results)
+            // len(results),
+            "best_practices": sum(r.sub_scores.best_practices for r in results)
+            // len(results),
+            "code_smells": sum(r.sub_scores.code_smells for r in results)
+            // len(results),
         }
 
         # Build rationale
         file_summaries = [
-            f"{files[i][0]}: {r.score}/100"
-            for i, r in enumerate(results)
+            f"{files[i][0]}: {r.score}/100" for i, r in enumerate(results)
         ]
         rationale = (
             f"Analyzed {len(files)} file(s). "

@@ -180,14 +180,18 @@ class CodeAnalyzer:
 
         # Detect language
         language = detect_language(file_path)
-        lines = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
+        lines = content.count("\n") + (
+            1 if content and not content.endswith("\n") else 0
+        )
 
         # Parse and extract metrics if AST enabled
         ast_metrics: ASTMetrics | None = None
         status = AnalysisStatus.analyzed
 
         if self.enable_ast and self.parser and self.metrics_extractor:
-            parse_result = self.parser.parse(content, language=language, file_path=file_path)
+            parse_result = self.parser.parse(
+                content, language=language, file_path=file_path
+            )
 
             if parse_result.success:
                 ast_metrics = self.metrics_extractor.extract(parse_result)

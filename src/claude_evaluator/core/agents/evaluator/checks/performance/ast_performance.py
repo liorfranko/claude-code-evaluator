@@ -77,7 +77,7 @@ class NestedLoopsCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,
+        source_code: str,  # noqa: ARG002
     ) -> list[CheckResult]:
         """Scan for deeply nested loops.
 
@@ -110,7 +110,9 @@ class NestedLoopsCheck(ASTCheck):
                     CheckResult(
                         check_id=self.check_id,
                         category=self.category,
-                        severity=CheckSeverity.high if depth >= 4 else CheckSeverity.medium,
+                        severity=CheckSeverity.high
+                        if depth >= 4
+                        else CheckSeverity.medium,
                         file_path=file_path,
                         line_number=line_num,
                         message=f"Deeply nested loops detected: {depth} levels of nesting (O(n^{depth}) complexity)",
@@ -181,7 +183,7 @@ class LargeFileReadCheck(ASTCheck):
 
     def run(
         self,
-        parse_result: ParseResult,
+        parse_result: ParseResult,  # noqa: ARG002
         file_path: str,
         source_code: str,
     ) -> list[CheckResult]:
@@ -245,13 +247,9 @@ class IneffectiveLoopCheck(ASTCheck):
     description = "Detects loop patterns that could be more efficient"
 
     # Ineffective patterns in loop context
-    APPEND_IN_LOOP_PATTERN: ClassVar[re.Pattern] = re.compile(
-        r"(\w+)\.append\("
-    )
+    APPEND_IN_LOOP_PATTERN: ClassVar[re.Pattern] = re.compile(r"(\w+)\.append\(")
 
-    STRING_CONCAT_PATTERN: ClassVar[re.Pattern] = re.compile(
-        r"(\w+)\s*\+?=\s*.*\+"
-    )
+    STRING_CONCAT_PATTERN: ClassVar[re.Pattern] = re.compile(r"(\w+)\s*\+?=\s*.*\+")
 
     def run(
         self,
@@ -351,7 +349,7 @@ class IneffectiveLoopCheck(ASTCheck):
 
                 if self.APPEND_IN_LOOP_PATTERN.search(text):
                     findings.append(("append", line_num))
-                elif self.STRING_CONCAT_PATTERN.search(text):
+                elif self.STRING_CONCAT_PATTERN.search(text):  # noqa: SIM102
                     # Only flag if it looks like string concatenation
                     if "+" in text and ("'" in text or '"' in text):
                         findings.append(("string_concat", line_num))

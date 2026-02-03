@@ -118,7 +118,7 @@ class HardcodedSecretsCheck(ASTCheck):
             source_code,
         )
 
-        for var_name, value, line_num in findings:
+        for var_name, _value, line_num in findings:
             results.append(
                 CheckResult(
                     check_id=self.check_id,
@@ -438,7 +438,9 @@ class EvalExecCheck(ASTCheck):
                         attr_func_name: str | None = None
                         for attr_child in child.children:
                             if attr_child.type == "identifier":
-                                attr_func_name = self._get_node_text(attr_child, source_code)
+                                attr_func_name = self._get_node_text(
+                                    attr_child, source_code
+                                )
                         if attr_func_name:
                             line_num = self._get_line_number(n)
                             calls.append((attr_func_name, line_num))
@@ -517,7 +519,7 @@ class InsecureRandomCheck(ASTCheck):
             return results
 
         # Also check for random module import
-        if lang == Language.python:
+        if lang == Language.python:  # noqa: SIM102
             if "import random" in source_code or "from random import" in source_code:
                 # Find random function calls
                 lines = source_code.split("\n")

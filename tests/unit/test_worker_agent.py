@@ -514,7 +514,7 @@ class TestAllowedToolsHandling:
     def test_allowed_tools_independent_of_input(self) -> None:
         """Test that allowed_tools is independent of input list after init."""
         original_tools = ["Read", "Bash"]
-        agent = WorkerAgent(
+        WorkerAgent(
             execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,

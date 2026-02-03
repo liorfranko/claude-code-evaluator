@@ -48,7 +48,7 @@ class TestFullWorkflowExecution:
         self.query_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             self.query_count += 1
             return QueryMetrics(
@@ -233,7 +233,7 @@ class TestFullWorkflowWithYAMLConfig:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -330,7 +330,7 @@ class TestFullWorkflowReportPersistence:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -452,7 +452,7 @@ class TestFullWorkflowErrorScenarios:
             permission_mode=PermissionMode.plan,
         )
 
-        async def failing_query(query: str, phase: str) -> QueryMetrics:
+        async def failing_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
             raise RuntimeError("Simulated failure")
 
         worker.execute_query = failing_query  # type: ignore
@@ -501,7 +501,7 @@ class TestFullWorkflowErrorScenarios:
         call_count = [0]
 
         async def sometimes_failing_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             call_count[0] += 1
             if call_count[0] == 2:  # Fail on second call

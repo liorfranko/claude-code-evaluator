@@ -15,7 +15,6 @@ import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
-from claude_evaluator.core.agents.worker.question_handler import QuestionHandler
 from claude_evaluator.models.enums import ExecutionMode, PermissionMode
 from claude_evaluator.models.question import (
     QuestionContext,
@@ -162,7 +161,7 @@ def base_agent() -> WorkerAgent:
 def agent_with_callback() -> WorkerAgent:
     """Create a WorkerAgent with a configured question callback."""
 
-    async def mock_callback(context: QuestionContext) -> str:
+    async def mock_callback(context: QuestionContext) -> str:  # noqa: ARG001
         return "test answer"
 
     return WorkerAgent(
@@ -488,7 +487,7 @@ class TestCallbackInvocation:
     async def test_handle_question_block_increments_attempt_counter(self) -> None:
         """Test that _handle_question_block increments the attempt counter."""
 
-        async def mock_callback(context: QuestionContext) -> str:
+        async def mock_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "answer"
 
         agent = WorkerAgent(
@@ -522,9 +521,8 @@ class TestAnswerInjection:
     @pytest.mark.asyncio
     async def test_answer_sent_via_client_query(self) -> None:
         """Test that the answer from callback is sent via client.query()."""
-        captured_answer: list[str] = []
 
-        async def capture_callback(context: QuestionContext) -> str:
+        async def capture_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "The answer is 42"
 
         agent = WorkerAgent(
@@ -572,7 +570,7 @@ class TestAnswerInjection:
     async def test_conversation_continues_after_answer(self) -> None:
         """Test that conversation continues properly after answer is sent."""
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Continue with option A"
 
         agent = WorkerAgent(
@@ -621,7 +619,7 @@ class TestAnswerInjection:
         """Test handling multiple questions in sequence."""
         answer_count = 0
 
-        async def sequential_callback(context: QuestionContext) -> str:
+        async def sequential_callback(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal answer_count
             answer_count += 1
             return f"Answer {answer_count}"
@@ -744,7 +742,7 @@ class TestTimeoutHandling:
     async def test_callback_timeout_raises_timeout_error(self) -> None:
         """Test that slow callback causes TimeoutError with descriptive message."""
 
-        async def slow_callback(context: QuestionContext) -> str:
+        async def slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(10)  # Very slow
             return "late answer"
 
@@ -771,7 +769,7 @@ class TestTimeoutHandling:
     async def test_timeout_error_includes_question_summary(self) -> None:
         """Test that timeout error message includes question text."""
 
-        async def never_returns(context: QuestionContext) -> str:
+        async def never_returns(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(100)
             return "never"
 
@@ -802,7 +800,7 @@ class TestTimeoutHandling:
     async def test_fast_callback_does_not_timeout(self) -> None:
         """Test that fast callback completes without timeout."""
 
-        async def fast_callback(context: QuestionContext) -> str:
+        async def fast_callback(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(0.01)  # Very fast
             return "quick answer"
 
@@ -834,7 +832,7 @@ class TestQuestionHandlingIntegration:
     def test_callback_must_be_async(self) -> None:
         """Test that non-async callback raises TypeError."""
 
-        def sync_callback(context: QuestionContext) -> str:
+        def sync_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "sync answer"
 
         with pytest.raises(TypeError) as exc_info:
@@ -922,7 +920,7 @@ class TestQuestionHandlingIntegration:
     def test_question_attempt_counter_resets_on_new_query(self) -> None:
         """Test that question attempt counter resets at start of new query."""
 
-        async def mock_callback(context: QuestionContext) -> str:
+        async def mock_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "answer"
 
         agent = WorkerAgent(
@@ -1128,7 +1126,7 @@ class TestQuestionHandlingEdgeCases:
     async def test_callback_exception_propagates(self) -> None:
         """Test that exceptions from callback propagate correctly."""
 
-        async def failing_callback(context: QuestionContext) -> str:
+        async def failing_callback(context: QuestionContext) -> str:  # noqa: ARG001
             raise ValueError("Callback failed intentionally")
 
         agent = WorkerAgent(

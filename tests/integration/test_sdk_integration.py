@@ -24,7 +24,7 @@ from claude_evaluator.models.query_metrics import QueryMetrics
 
 # Check if SDK is available for conditional test skipping
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient  # noqa: F401
 
     HAS_SDK = True
 except ImportError:
@@ -645,7 +645,7 @@ class TestClientSessionManagement:
         mock_client = create_mock_client(mock_result)
         client_created_count = 0
 
-        def track_client_creation(options):
+        def track_client_creation(options):  # noqa: ARG001
             nonlocal client_created_count
             client_created_count += 1
             return mock_client
@@ -694,7 +694,7 @@ class TestClaudeSDKClientCreation:
         mock_client = create_mock_client(mock_result)
         client_class_called = False
 
-        def track_client_creation(options):
+        def track_client_creation(options):  # noqa: ARG001
             nonlocal client_class_called
             client_class_called = True
             return mock_client
@@ -926,7 +926,7 @@ class TestClientCleanupNormalCompletion:
         clients = [mock_client1, mock_client2]
         client_index = 0
 
-        def create_client(options):
+        def create_client(options):  # noqa: ARG001
             nonlocal client_index
             client = clients[client_index]
             client_index += 1
@@ -1031,7 +1031,7 @@ class TestClientCleanupOnException:
         # receive_response should not be called if query fails
         mock_client.receive_response = MagicMock()
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             with pytest.raises(RuntimeError, match="Query failed"):
@@ -1064,7 +1064,7 @@ class TestClientCleanupOnException:
 
         mock_client.receive_response = failing_receive
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             with pytest.raises(RuntimeError, match="Streaming failed"):
@@ -1241,7 +1241,7 @@ class TestIntegrationWorkflow:
         client_count = 0
         clients = []
 
-        def create_fresh_client(options):
+        def create_fresh_client(options):  # noqa: ARG001
             nonlocal client_count
             client_count += 1
             client = create_mock_client(mock_result)
@@ -1296,7 +1296,7 @@ class TestIntegrationWorkflow:
         clients = [failing_client, success_client]
         client_index = 0
 
-        def create_client(options):
+        def create_client(options):  # noqa: ARG001
             nonlocal client_index
             client = clients[client_index]
             client_index += 1

@@ -138,16 +138,14 @@ class BestPracticesCheck(LLMCheck):
         if not source_code.strip():
             return results
 
-        language = (
-            parse_result.language.value
-            if parse_result.language
-            else "unknown"
-        )
+        language = parse_result.language.value if parse_result.language else "unknown"
 
         # Truncate code if too long
         truncated_code = source_code
         if len(source_code) > self.MAX_CODE_LENGTH:
-            truncated_code = source_code[: self.MAX_CODE_LENGTH] + "\n\n[... truncated ...]"
+            truncated_code = (
+                source_code[: self.MAX_CODE_LENGTH] + "\n\n[... truncated ...]"
+            )
 
         prompt = BEST_PRACTICES_PROMPT_TEMPLATE.format(
             language=language,

@@ -70,7 +70,7 @@ class LongFunctionCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,
+        source_code: str,  # noqa: ARG002
     ) -> list[CheckResult]:
         """Scan for long functions.
 
@@ -227,7 +227,7 @@ class LongParameterListCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,
+        source_code: str,  # noqa: ARG002
     ) -> list[CheckResult]:
         """Scan for functions with too many parameters.
 
@@ -411,7 +411,7 @@ class DeadCodeCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,
+        source_code: str,  # noqa: ARG002
     ) -> list[CheckResult]:
         """Scan for dead code.
 
@@ -518,8 +518,6 @@ class MagicNumberCheck(ASTCheck):
         2,
         10,
         100,
-        0.0,
-        1.0,
         0.5,
     }
 

@@ -183,9 +183,15 @@ def _is_unnecessary_tool_call(step: dict) -> bool:
     # Check for common unnecessary patterns
     unnecessary_patterns = [
         # Empty or trivial commands
-        (tool_name == "Bash", lambda s: not s.get("tool_input", {}).get("command", "").strip()),
+        (
+            tool_name == "Bash",
+            lambda s: not s.get("tool_input", {}).get("command", "").strip(),
+        ),
         # Read of current directory
-        (tool_name == "Read", lambda s: s.get("tool_input", {}).get("file_path", "") in (".", "./")),
+        (
+            tool_name == "Read",
+            lambda s: s.get("tool_input", {}).get("file_path", "") in (".", "./"),
+        ),
     ]
 
     for matches_tool, check_input in unnecessary_patterns:
@@ -305,7 +311,9 @@ class StepAnalyzer:
         logger.debug(
             "steps_analyzed",
             total_steps=len(steps),
-            steps_with_issues=sum(1 for r in results if r.efficiency_flag != EfficiencyFlag.efficient),
+            steps_with_issues=sum(
+                1 for r in results if r.efficiency_flag != EfficiencyFlag.efficient
+            ),
         )
 
         return results
@@ -326,8 +334,12 @@ class StepAnalyzer:
 
         """
         total_steps = len(steps)
-        issues_count = sum(1 for a in analyses if a.efficiency_flag != EfficiencyFlag.efficient)
-        redundant_count = sum(1 for a in analyses if a.efficiency_flag == EfficiencyFlag.redundant)
+        issues_count = sum(
+            1 for a in analyses if a.efficiency_flag != EfficiencyFlag.efficient
+        )
+        redundant_count = sum(
+            1 for a in analyses if a.efficiency_flag == EfficiencyFlag.redundant
+        )
 
         # Calculate tool usage distribution
         tool_counts: dict[str, int] = {}
@@ -357,6 +369,8 @@ class StepAnalyzer:
             )
 
         if issues_count == 0:
-            commentary_parts.append("Execution strategy appears efficient with no detected issues.")
+            commentary_parts.append(
+                "Execution strategy appears efficient with no detected issues."
+            )
 
         return " ".join(commentary_parts)
