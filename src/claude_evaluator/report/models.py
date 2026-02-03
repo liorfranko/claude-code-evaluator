@@ -45,9 +45,7 @@ class ChangeSummary(BaseSchema):
 
         """
         self.total_changes = (
-            len(self.files_modified)
-            + len(self.files_added)
-            + len(self.files_deleted)
+            len(self.files_modified) + len(self.files_added) + len(self.files_deleted)
         )
         return self
 

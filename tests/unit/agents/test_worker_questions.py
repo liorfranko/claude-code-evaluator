@@ -15,8 +15,7 @@ import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
-from claude_evaluator.core.agents.worker.question_handler import QuestionHandler
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode
+from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.question import (
     QuestionContext,
 )
@@ -151,7 +150,6 @@ class MockClaudeSDKClient:
 def base_agent() -> WorkerAgent:
     """Create a base WorkerAgent for testing without question callback."""
     return WorkerAgent(
-        execution_mode=ExecutionMode.sdk,
         project_directory="/tmp/test_project",
         active_session=False,
         permission_mode=PermissionMode.plan,
@@ -162,11 +160,10 @@ def base_agent() -> WorkerAgent:
 def agent_with_callback() -> WorkerAgent:
     """Create a WorkerAgent with a configured question callback."""
 
-    async def mock_callback(context: QuestionContext) -> str:
+    async def mock_callback(context: QuestionContext) -> str:  # noqa: ARG001
         return "test answer"
 
     return WorkerAgent(
-        execution_mode=ExecutionMode.sdk,
         project_directory="/tmp/test_project",
         active_session=False,
         permission_mode=PermissionMode.plan,
@@ -453,7 +450,6 @@ class TestCallbackInvocation:
             return "user's answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -488,11 +484,10 @@ class TestCallbackInvocation:
     async def test_handle_question_block_increments_attempt_counter(self) -> None:
         """Test that _handle_question_block increments the attempt counter."""
 
-        async def mock_callback(context: QuestionContext) -> str:
+        async def mock_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -522,13 +517,11 @@ class TestAnswerInjection:
     @pytest.mark.asyncio
     async def test_answer_sent_via_client_query(self) -> None:
         """Test that the answer from callback is sent via client.query()."""
-        captured_answer: list[str] = []
 
-        async def capture_callback(context: QuestionContext) -> str:
+        async def capture_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "The answer is 42"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -572,11 +565,10 @@ class TestAnswerInjection:
     async def test_conversation_continues_after_answer(self) -> None:
         """Test that conversation continues properly after answer is sent."""
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Continue with option A"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -621,13 +613,12 @@ class TestAnswerInjection:
         """Test handling multiple questions in sequence."""
         answer_count = 0
 
-        async def sequential_callback(context: QuestionContext) -> str:
+        async def sequential_callback(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal answer_count
             answer_count += 1
             return f"Answer {answer_count}"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -670,7 +661,6 @@ class TestTimeoutHandling:
         """Test that valid timeout values are accepted."""
         # Minimum valid
         agent_min = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -680,7 +670,6 @@ class TestTimeoutHandling:
 
         # Maximum valid
         agent_max = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -691,7 +680,6 @@ class TestTimeoutHandling:
     def test_question_timeout_validation_default(self) -> None:
         """Test that default timeout is 60 seconds."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -702,54 +690,50 @@ class TestTimeoutHandling:
         """Test that timeout of 0 is rejected."""
         with pytest.raises(ValueError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=0,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(
-            exc_info.value
-        )
+        error_str = str(exc_info.value)
+        assert "question_timeout_seconds" in error_str
+        assert "greater than or equal to 1" in error_str
 
     def test_question_timeout_validation_rejects_negative(self) -> None:
         """Test that negative timeout is rejected."""
         with pytest.raises(ValueError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=-5,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(
-            exc_info.value
-        )
+        error_str = str(exc_info.value)
+        assert "question_timeout_seconds" in error_str
+        assert "greater than or equal to 1" in error_str
 
     def test_question_timeout_validation_rejects_over_max(self) -> None:
         """Test that timeout over 300 is rejected."""
         with pytest.raises(ValueError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=301,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(
-            exc_info.value
-        )
+        error_str = str(exc_info.value)
+        assert "question_timeout_seconds" in error_str
+        assert "less than or equal to 300" in error_str
 
     @pytest.mark.asyncio
     async def test_callback_timeout_raises_timeout_error(self) -> None:
         """Test that slow callback causes TimeoutError with descriptive message."""
 
-        async def slow_callback(context: QuestionContext) -> str:
+        async def slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(10)  # Very slow
             return "late answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -771,12 +755,11 @@ class TestTimeoutHandling:
     async def test_timeout_error_includes_question_summary(self) -> None:
         """Test that timeout error message includes question text."""
 
-        async def never_returns(context: QuestionContext) -> str:
+        async def never_returns(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(100)
             return "never"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -802,12 +785,11 @@ class TestTimeoutHandling:
     async def test_fast_callback_does_not_timeout(self) -> None:
         """Test that fast callback completes without timeout."""
 
-        async def fast_callback(context: QuestionContext) -> str:
+        async def fast_callback(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(0.01)  # Very fast
             return "quick answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -834,12 +816,11 @@ class TestQuestionHandlingIntegration:
     def test_callback_must_be_async(self) -> None:
         """Test that non-async callback raises TypeError."""
 
-        def sync_callback(context: QuestionContext) -> str:
+        def sync_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "sync answer"
 
         with pytest.raises(TypeError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
@@ -922,11 +903,10 @@ class TestQuestionHandlingIntegration:
     def test_question_attempt_counter_resets_on_new_query(self) -> None:
         """Test that question attempt counter resets at start of new query."""
 
-        async def mock_callback(context: QuestionContext) -> str:
+        async def mock_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -994,7 +974,6 @@ class TestQuestionHandlingIntegration:
             return "Confirmed"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1128,11 +1107,10 @@ class TestQuestionHandlingEdgeCases:
     async def test_callback_exception_propagates(self) -> None:
         """Test that exceptions from callback propagate correctly."""
 
-        async def failing_callback(context: QuestionContext) -> str:
+        async def failing_callback(context: QuestionContext) -> str:  # noqa: ARG001
             raise ValueError("Callback failed intentionally")
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,

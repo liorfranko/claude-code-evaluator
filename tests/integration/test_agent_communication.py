@@ -16,7 +16,6 @@ from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -35,14 +34,13 @@ class TestDeveloperWorkerCommunication:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker that simulates responses."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -90,7 +88,7 @@ class TestDeveloperWorkerCommunication:
         developer = DeveloperAgent()
         worker = self.create_mock_worker()
 
-        evaluation = Evaluation(
+        Evaluation(
             task_description="Test decision logging",
             workflow_type=WorkflowType.direct,
             developer_agent=developer,
@@ -117,7 +115,7 @@ class TestDeveloperWorkerCommunication:
         developer = DeveloperAgent()
         worker = self.create_mock_worker()
 
-        evaluation = Evaluation(
+        Evaluation(
             task_description="Test state transitions",
             workflow_type=WorkflowType.direct,
             developer_agent=developer,
@@ -171,9 +169,8 @@ class TestDeveloperWorkerCommunication:
     @pytest.mark.asyncio
     async def test_worker_tracks_tool_invocations(self) -> None:
         """Test that Worker tracks tool invocations during execution."""
-        developer = DeveloperAgent()
+        DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -215,14 +212,13 @@ class TestAgentCoordinationInWorkflows:
     def create_mock_worker(self, call_counter: list[int]) -> WorkerAgent:
         """Create a mock worker that counts calls."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(
@@ -324,14 +320,13 @@ class TestAgentCoordinationInWorkflows:
         received_queries: list[str] = []
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def capture_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             received_queries.append(query)
             return QueryMetrics(
@@ -376,13 +371,12 @@ class TestAgentErrorHandling:
         """Test that worker errors are captured in evaluation."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        async def failing_query(query: str, phase: str) -> QueryMetrics:
+        async def failing_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
             raise RuntimeError("Worker execution failed")
 
         worker.execute_query = failing_query  # type: ignore
@@ -413,13 +407,12 @@ class TestAgentErrorHandling:
         """Test that developer transitions to failed state on error."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        async def failing_query(query: str, phase: str) -> QueryMetrics:
+        async def failing_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Invalid query")
 
         worker.execute_query = failing_query  # type: ignore

@@ -5,9 +5,11 @@ direct implementation without planning phases. It executes a task in a single
 shot with acceptEdits permission mode.
 """
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from claude_evaluator.models.enums import PermissionMode
+from claude_evaluator.models.progress import ProgressEvent
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
@@ -51,6 +53,9 @@ class DirectWorkflow(BaseWorkflow):
         metrics_collector: "MetricsCollector",
         defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
+        model: str | None = None,
+        max_turns: int | None = None,
+        on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the DirectWorkflow.
 
@@ -62,9 +67,18 @@ class DirectWorkflow(BaseWorkflow):
             enable_question_handling: Whether to configure the WorkerAgent
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
+            model: Model identifier for the WorkerAgent (optional).
+            max_turns: Maximum conversation turns per query. Overrides defaults.
+            on_progress_callback: Optional callback for progress events (verbose output).
 
         """
-        super().__init__(metrics_collector, defaults)
+        super().__init__(
+            metrics_collector,
+            defaults,
+            model=model,
+            max_turns=max_turns,
+            on_progress_callback=on_progress_callback,
+        )
         self._enable_question_handling = enable_question_handling
 
     @property
@@ -84,7 +98,7 @@ class DirectWorkflow(BaseWorkflow):
         6. Returns aggregated Metrics
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
+            evaluation: The Evaluation instance containing the task description and state.
 
         Returns:
             A Metrics object containing all collected metrics from the execution.
@@ -96,16 +110,18 @@ class DirectWorkflow(BaseWorkflow):
         """
         self.on_execution_start(evaluation)
 
+        # Create agents for this execution
+        _, worker = self._create_agents(evaluation)
+
         try:
             # Configure question handling if enabled
             if self._enable_question_handling:
-                self.configure_worker_for_questions(evaluation)
+                self.configure_worker_for_questions()
 
             # Set the phase for metrics tracking
             self.set_phase("implementation")
 
             # Configure Worker with acceptEdits permission for direct execution
-            worker = evaluation.worker_agent
             worker.set_permission_mode(PermissionMode.acceptEdits)
 
             # Emit phase start event for verbose output

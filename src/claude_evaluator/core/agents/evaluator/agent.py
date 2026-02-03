@@ -96,7 +96,9 @@ class EvaluatorAgent:
             self.check_registry.register_all(get_all_security_checks())
             self.check_registry.register_all(get_all_performance_checks())
             self.check_registry.register_all(get_all_smell_checks())
-            self.check_registry.register_all(get_all_best_practices_checks(self.gemini_client))
+            self.check_registry.register_all(
+                get_all_best_practices_checks(self.gemini_client)
+            )
 
         # Initialize scorers with shared Gemini client
         self.task_completion_scorer = TaskCompletionScorer(client=self.gemini_client)
@@ -156,10 +158,12 @@ class EvaluatorAgent:
         # Extract from timeline if tool_name is present
         for event in evaluation.timeline:
             if hasattr(event, "tool_name") and event.tool_name:
-                steps.append({
-                    "tool_name": event.tool_name,
-                    "tool_input": getattr(event, "tool_input", {}),
-                })
+                steps.append(
+                    {
+                        "tool_name": event.tool_name,
+                        "tool_input": getattr(event, "tool_input", {}),
+                    }
+                )
 
         # Extract from queries.messages if available
         # Messages contain ToolUseBlock items in their content
@@ -172,26 +176,43 @@ class EvaluatorAgent:
                         content = msg.get("content", [])
                         if isinstance(content, list):
                             for item in content:
-                                if isinstance(item, dict) and item.get("type") == "ToolUseBlock":
-                                    steps.append({
-                                        "tool_name": item.get("name", "unknown"),
-                                        "tool_input": item.get("input", {}),
-                                    })
+                                if (
+                                    isinstance(item, dict)
+                                    and item.get("type") == "ToolUseBlock"
+                                ):
+                                    steps.append(
+                                        {
+                                            "tool_name": item.get("name", "unknown"),
+                                            "tool_input": item.get("input", {}),
+                                        }
+                                    )
                     # Handle object format
                     elif hasattr(msg, "content"):
                         content = msg.content
                         if isinstance(content, list):
                             for item in content:
-                                if isinstance(item, dict) and item.get("type") == "ToolUseBlock":
-                                    steps.append({
-                                        "tool_name": item.get("name", "unknown"),
-                                        "tool_input": item.get("input", {}),
-                                    })
-                                elif hasattr(item, "type") and item.type == "ToolUseBlock":
-                                    steps.append({
-                                        "tool_name": getattr(item, "name", "unknown"),
-                                        "tool_input": getattr(item, "input", {}),
-                                    })
+                                if (
+                                    isinstance(item, dict)
+                                    and item.get("type") == "ToolUseBlock"
+                                ):
+                                    steps.append(
+                                        {
+                                            "tool_name": item.get("name", "unknown"),
+                                            "tool_input": item.get("input", {}),
+                                        }
+                                    )
+                                elif (
+                                    hasattr(item, "type")
+                                    and item.type == "ToolUseBlock"
+                                ):
+                                    steps.append(
+                                        {
+                                            "tool_name": getattr(
+                                                item, "name", "unknown"
+                                            ),
+                                            "tool_input": getattr(item, "input", {}),
+                                        }
+                                    )
 
         return steps
 
@@ -221,13 +242,15 @@ class EvaluatorAgent:
             except Exception:
                 continue
 
-            files.append((
-                file_analysis.file_path,
-                file_analysis.language,
-                content,
-                file_analysis.lines_of_code,
-                file_analysis.ast_metrics,
-            ))
+            files.append(
+                (
+                    file_analysis.file_path,
+                    file_analysis.language,
+                    content,
+                    file_analysis.lines_of_code,
+                    file_analysis.ast_metrics,
+                )
+            )
 
         return files
 
@@ -250,6 +273,7 @@ class EvaluatorAgent:
 
         """
         import time
+
         self._evaluation_start = time.time()
 
         logger.info("starting_evaluation", path=str(evaluation_path))
@@ -302,6 +326,7 @@ class EvaluatorAgent:
             logger.warning("task_completion_scoring_failed", error=str(e))
             # Fallback to neutral score
             from claude_evaluator.models.score_report import DimensionType
+
             task_completion_score = DimensionScore(
                 dimension_name=DimensionType.task_completion,
                 score=50,
@@ -331,16 +356,23 @@ class EvaluatorAgent:
         )
 
         # Calculate aggregate score
-        aggregate_score, aggregate_rationale = self.aggregate_scorer.calculate([
-            task_completion_score,
-            efficiency_score,
-            *([code_quality_score] if code_quality_score else []),
-        ])
+        aggregate_score, aggregate_rationale = self.aggregate_scorer.calculate(
+            [
+                task_completion_score,
+                efficiency_score,
+                *([code_quality_score] if code_quality_score else []),
+            ]
+        )
 
         # Calculate evaluation duration
         import time
+
         evaluation_end = time.time()
-        evaluation_duration_ms = int((evaluation_end - self._evaluation_start) * 1000) if hasattr(self, "_evaluation_start") else 0
+        evaluation_duration_ms = (
+            int((evaluation_end - self._evaluation_start) * 1000)
+            if hasattr(self, "_evaluation_start")
+            else 0
+        )
 
         # Assemble score report
         score_report = ScoreReport(

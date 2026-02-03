@@ -61,7 +61,9 @@ class GeminiClient:
         """
         settings = get_settings().evaluator
         self.model = model or settings.model
-        self.temperature = temperature if temperature is not None else settings.temperature
+        self.temperature = (
+            temperature if temperature is not None else settings.temperature
+        )
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 

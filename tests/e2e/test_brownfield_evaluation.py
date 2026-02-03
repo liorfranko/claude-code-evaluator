@@ -236,7 +236,7 @@ class TestBrownfieldReportFields:
         """T050: Report includes workspace path for brownfield evaluations."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
         from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.report.models import ChangeSummary, EvaluationReport
+        from claude_evaluator.report.models import EvaluationReport
 
         # Create a report with brownfield fields
         report = EvaluationReport(

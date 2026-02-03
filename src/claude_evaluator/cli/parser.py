@@ -6,7 +6,7 @@ This module provides the argument parser for the claude-evaluator CLI.
 import argparse
 
 from claude_evaluator import __version__
-from claude_evaluator.config.defaults import DEFAULT_OUTPUT_DIR
+from claude_evaluator.config.defaults import DEFAULT_EVALUATOR_MODEL, DEFAULT_OUTPUT_DIR
 
 __all__ = ["create_parser"]
 
@@ -145,7 +145,7 @@ For more information, see the documentation.
         "--model",
         type=str,
         metavar="MODEL",
-        help="Gemini model to use for scoring (default: gemini-2.0-flash)",
+        help=f"Gemini model to use for scoring (default: {DEFAULT_EVALUATOR_MODEL})",
     )
 
     return parser

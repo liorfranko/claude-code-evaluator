@@ -8,7 +8,14 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from claude_agent_sdk import (  # pyright: ignore[reportMissingImports]
+    ClaudeAgentOptions,
+    PermissionResultAllow,
+    PermissionResultDeny,
+)
+
 from claude_evaluator.config.defaults import DEFAULT_WORKER_MODEL
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.question import (
@@ -21,11 +28,7 @@ __all__ = ["SDKConfigBuilder"]
 
 logger = get_logger(__name__)
 
-from claude_agent_sdk import (
-    ClaudeAgentOptions,
-    PermissionResultAllow,
-    PermissionResultDeny,
-)
+
 
 
 class SDKConfigBuilder:
@@ -41,10 +44,10 @@ class SDKConfigBuilder:
         permission_mode: PermissionMode,
         additional_dirs: list[str] | None = None,
         allowed_tools: list[str] | None = None,
-        max_turns: int = 10,
         max_budget_usd: float | None = None,
         model: str | None = None,
         use_user_plugins: bool = False,
+        max_turns: int | None = None,
     ) -> None:
         """Initialize the SDK config builder.
 
@@ -53,20 +56,21 @@ class SDKConfigBuilder:
             permission_mode: Permission mode for tool execution.
             additional_dirs: Additional allowed directories.
             allowed_tools: List of auto-approved tools.
-            max_turns: Maximum conversation turns.
             max_budget_usd: Maximum spend limit.
             model: Model identifier (optional).
             use_user_plugins: Whether to enable user plugins.
+            max_turns: Maximum conversation turns. If None, uses settings default.
+                Pass 0 or negative to use SDK default (unlimited).
 
         """
         self._project_directory = project_directory
         self._permission_mode = permission_mode
         self._additional_dirs = additional_dirs or []
         self._allowed_tools = allowed_tools or []
-        self._max_turns = max_turns
         self._max_budget_usd = max_budget_usd
         self._model = model
         self._use_user_plugins = use_user_plugins
+        self._max_turns = max_turns
         self._can_use_tool_handler: (
             Callable[[str, dict[str, Any], Any], Awaitable[Any]] | None
         ) = None
@@ -96,12 +100,27 @@ class SDKConfigBuilder:
             PermissionMode.bypassPermissions: "bypassPermissions",
         }
 
+        # Determine max_turns: use provided value, or fall back to settings default
+        # If max_turns is 0 or negative, pass None to use SDK default (unlimited)
+        if self._max_turns is not None:
+            max_turns = self._max_turns if self._max_turns > 0 else None
+            source = "config" if self._max_turns > 0 else "unlimited (config=0)"
+        else:
+            max_turns = get_settings().worker.max_turns
+            source = "settings default"
+
+        logger.info(
+            "sdk_max_turns_configured",
+            max_turns=max_turns,
+            source=source,
+        )
+
         return ClaudeAgentOptions(
             cwd=self._project_directory,
             add_dirs=self._additional_dirs if self._additional_dirs else [],
             permission_mode=permission_map.get(self._permission_mode, "plan"),
             allowed_tools=self._allowed_tools if self._allowed_tools else [],
-            max_turns=self._max_turns,
+            max_turns=max_turns,
             max_budget_usd=self._max_budget_usd,
             model=self._model or DEFAULT_WORKER_MODEL,
             setting_sources=["user"] if self._use_user_plugins else None,
@@ -126,9 +145,7 @@ class SDKConfigBuilder:
                 logger.info("Interrupting client after ExitPlanMode")
                 await client.interrupt()
         except Exception as e:
-            logger.debug(
-                f"Interrupt after ExitPlanMode failed (may be expected): {e}"
-            )
+            logger.debug(f"Interrupt after ExitPlanMode failed (may be expected): {e}")
 
 
 class ToolPermissionHandler:
@@ -172,9 +189,7 @@ class ToolPermissionHandler:
         """Set the SDK client reference for interruption."""
         self._client = client
 
-    def set_exit_plan_mode_callback(
-        self, callback: Callable[[], None] | None
-    ) -> None:
+    def set_exit_plan_mode_callback(self, callback: Callable[[], None] | None) -> None:
         """Set callback to invoke when ExitPlanMode is triggered."""
         self._on_exit_plan_mode = callback
 
@@ -182,7 +197,7 @@ class ToolPermissionHandler:
         self,
         tool_name: str,
         input_data: dict[str, Any],
-        context: Any,
+        context: Any,  # noqa: ARG002
     ) -> Any:
         """Handle tool permission requests.
 
@@ -226,18 +241,14 @@ class ToolPermissionHandler:
 
         # Schedule interrupt if client is available
         if self._client is not None:
-            asyncio.create_task(
-                SDKConfigBuilder.interrupt_after_delay(self._client)
-            )
+            asyncio.create_task(SDKConfigBuilder.interrupt_after_delay(self._client))
 
         if self._on_exit_plan_mode:
             self._on_exit_plan_mode()
 
         return PermissionResultAllow()
 
-    async def _handle_ask_user_question(
-        self, input_data: dict[str, Any]
-    ) -> Any:
+    async def _handle_ask_user_question(self, input_data: dict[str, Any]) -> Any:
         """Handle AskUserQuestion tool permission.
 
         Args:
@@ -288,9 +299,7 @@ class ToolPermissionHandler:
                 for q in questions:
                     options = q.get("options", [])
                     if options:
-                        answers[q.get("question", "")] = options[0].get(
-                            "label", "Yes"
-                        )
+                        answers[q.get("question", "")] = options[0].get("label", "Yes")
         else:
             # No callback - default to first option
             for q in questions:

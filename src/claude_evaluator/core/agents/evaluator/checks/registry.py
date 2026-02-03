@@ -292,9 +292,7 @@ class CheckRegistry:
             "info": 1,
         }
 
-        scores: dict[CheckCategory, int] = {
-            category: max_score for category in CheckCategory
-        }
+        scores: dict[CheckCategory, int] = dict.fromkeys(CheckCategory, max_score)
 
         aggregated = self.aggregate_by_category(results)
 

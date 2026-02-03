@@ -42,8 +42,8 @@ ReceiveResponseCallback: TypeAlias = Callable[[], dict[str, Any]]
 logger = get_logger(__name__)
 
 # SDK imports for LLM-powered answer generation
-from claude_agent_sdk import ClaudeAgentOptions
-from claude_agent_sdk import query as sdk_query
+from claude_agent_sdk import ClaudeAgentOptions  # noqa: E402
+from claude_agent_sdk import query as sdk_query  # noqa: E402
 
 __all__ = ["DeveloperAgent"]
 
@@ -777,29 +777,36 @@ CRITICAL PHASE AWARENESS:
 {question_text}
 
 ## Your Task
-Analyze the worker's response and determine what to do next:
+Analyze the worker's response and determine what to do next.
 
-1. If the worker has COMPLETED the task (implemented code, finished work, no more action needed):
-   - Respond with exactly: "complete"
+**FIRST, check if the worker is asking for input:**
 
-2. If the worker suggests "next steps" or commands to run next (like /spectra:plan, /spectra:clarify):
-   - This means the current phase is DONE - respond with exactly: "complete"
-   - The next phase will handle those commands automatically
+If the worker is ASKING for input, presenting questions, or waiting for your decision:
+- Look for explicit questions like "Q1:", "Question 1:", numbered questions, or "Please provide your answers"
+- Look for instructions like "Accept all", "Choose option", "Reply with", "Provide a custom answer"
+- If you see these patterns, YOU MUST ANSWER THE QUESTIONS
+- For multiple choice questions with suggested answers: respond with "Accept all" or answer each question
+- For yes/no questions: respond with "yes" or "no"
+- For options: pick the option that does the most work
+- Example responses: "Accept all", "Q1: yes, Q2: proceed with option A", "continue", "proceed with full implementation"
 
-3. If the worker is ASKING for input, presenting options, or waiting for a decision WITHIN the current task:
-   - Respond with a clear instruction to continue the work
-   - ALWAYS choose to proceed, implement, or continue
-   - If there are numbered options, pick the one that does the most work
-   - Example responses: "continue", "proceed with full implementation", "yes, implement all"
+**ONLY if there are NO questions waiting for your answer:**
 
-4. If the worker seems stuck or needs guidance:
-   - Provide a clear instruction to continue with the task
+If the worker has COMPLETED the task (implemented code, finished work, no questions pending):
+- Respond with exactly: "complete"
+
+If the worker suggests "Recommended Next Steps" or commands to run next (like /spectra:plan):
+- This means the current phase is DONE - respond with exactly: "complete"
+- The next phase will handle those commands automatically
+
+If the worker seems stuck or needs guidance:
+- Provide a clear instruction to continue with the task
 
 IMPORTANT:
 - This is AUTOMATED - always push forward, never ask questions back
-- Prefer doing MORE work over less (all phases vs one phase)
-- Keep response SHORT - just the instruction or "complete"
-- "Recommended Next Steps" = phase complete, respond "complete"
+- If there are questions with suggested answers and an "Accept all" option, respond "Accept all"
+- Keep response SHORT - just the answer/instruction or "complete"
+- Do NOT respond "complete" if there are unanswered questions
 
 Your response:"""
 

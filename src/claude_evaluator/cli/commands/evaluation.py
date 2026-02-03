@@ -10,8 +10,8 @@ from pathlib import Path
 from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
 from claude_evaluator.cli.formatters import create_progress_callback
 from claude_evaluator.config.models import Phase, RepositorySource
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core import Evaluation
-from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.core.git_operations import (
     clone_repository,
     get_change_summary,
@@ -20,7 +20,7 @@ from claude_evaluator.core.git_operations import (
 )
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode, WorkflowType
+from claude_evaluator.models.enums import PermissionMode, WorkflowType
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.report.models import EvaluationReport
 from claude_evaluator.workflows import (
@@ -76,8 +76,8 @@ class RunEvaluationCommand(BaseCommand):
         verbose: bool = False,
         phases: list[Phase] | None = None,
         model: str | None = None,
-        max_turns: int | None = None,
         repository_source: RepositorySource | None = None,
+        max_turns: int | None = None,
     ) -> EvaluationReport:
         """Run a single evaluation.
 
@@ -89,8 +89,8 @@ class RunEvaluationCommand(BaseCommand):
             verbose: Whether to print progress.
             phases: Phases for multi-command workflow (optional).
             model: Model identifier to use (optional).
-            max_turns: Maximum turns per query for the SDK (optional).
             repository_source: Source repository for brownfield mode (optional).
+            max_turns: Maximum conversation turns per query.
 
         Returns:
             The generated EvaluationReport.
@@ -100,7 +100,9 @@ class RunEvaluationCommand(BaseCommand):
 
         if verbose:
             mode_str = "brownfield" if is_brownfield else "greenfield"
-            print(f"Starting {mode_str} evaluation with {workflow_type.value} workflow...")
+            print(
+                f"Starting {mode_str} evaluation with {workflow_type.value} workflow..."
+            )
 
         # Create timestamped folder for this evaluation
         timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -122,6 +124,8 @@ class RunEvaluationCommand(BaseCommand):
             )
         else:
             # Initialize empty git repository
+            if verbose:
+                print("Initializing empty git repository")
             init_greenfield_workspace(workspace_path, eval_folder / "remote.git")
 
         # Get current branch name
@@ -129,45 +133,35 @@ class RunEvaluationCommand(BaseCommand):
         if verbose:
             print(f"Git branch: {current_branch}")
 
-        # Create agents
-        developer = DeveloperAgent()
-        claude_plans_dir = str(Path.home() / ".claude" / "plans")
-        progress_callback = create_progress_callback() if verbose else None
-
-        worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
-            project_directory=str(workspace_path),
-            active_session=False,
-            permission_mode=PermissionMode.acceptEdits,
-            additional_dirs=[claude_plans_dir, "/tmp"],
-            use_user_plugins=True,
-            model=model,
-            max_turns=max_turns if max_turns is not None else 200,
-            on_progress_callback=progress_callback,
-        )
-
-        # Create evaluation
+        # Create evaluation (pure state container)
         evaluation = Evaluation(
             task_description=task,
             workflow_type=workflow_type,
-            developer_agent=developer,
-            worker_agent=worker,
+            workspace_path=str(workspace_path),
+        )
+
+        # Apply default timeout from settings if not specified
+        effective_timeout: int = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else get_settings().workflow.timeout_seconds
         )
 
         # Create metrics collector
         collector = MetricsCollector()
 
         # Start evaluation
-        evaluation.start(workspace_path=str(workspace_path))
+        evaluation.start()
 
         if verbose:
             print(f"Workspace: {evaluation.workspace_path}")
             print(f"Evaluation ID: {evaluation.id}")
-
+            print(f"workflow type: {workflow_type}")
+            print(f"model: {model}")
         try:
             # Execute workflow
-            workflow = self._create_workflow(workflow_type, collector, phases)
-            await workflow.execute_with_timeout(evaluation, timeout_seconds)
+            workflow = self._create_workflow(workflow_type, collector, phases, model, verbose, max_turns)
+            await workflow.execute_with_timeout(evaluation, effective_timeout)
 
             if verbose:
                 print(f"Evaluation completed in {evaluation.get_duration_ms()}ms")
@@ -241,12 +235,18 @@ class RunEvaluationCommand(BaseCommand):
         workflow_type: WorkflowType,
         collector: MetricsCollector,
         phases: list[Phase] | None,
+        model: str | None = None,
+        verbose: bool = False,
+        max_turns: int | None = None,
     ) -> DirectWorkflow | PlanThenImplementWorkflow | MultiCommandWorkflow:
         """Create the appropriate workflow instance."""
+        # Create progress callback for verbose output
+        progress_callback = create_progress_callback() if verbose else None
+
         if workflow_type == WorkflowType.direct:
-            return DirectWorkflow(collector)
+            return DirectWorkflow(collector, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
         elif workflow_type == WorkflowType.plan_then_implement:
-            return PlanThenImplementWorkflow(collector)
+            return PlanThenImplementWorkflow(collector, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
         elif workflow_type == WorkflowType.multi_command:
             if phases is None:
                 phases = [
@@ -256,7 +256,7 @@ class RunEvaluationCommand(BaseCommand):
                         prompt_template="{task}",
                     ),
                 ]
-            return MultiCommandWorkflow(collector, phases)
+            return MultiCommandWorkflow(collector, phases, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
         else:
             raise ValueError(f"Unknown workflow type: {workflow_type}")
 

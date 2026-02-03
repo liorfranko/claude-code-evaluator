@@ -15,7 +15,6 @@ import pytest
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.models.enums import (
     DeveloperState,
-    ExecutionMode,
     PermissionMode,
 )
 from claude_evaluator.models.question import (
@@ -148,7 +147,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
 
         # Create WorkerAgent with the callback
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -235,7 +233,7 @@ class TestT700WorkerToDeveloperQuestionFlow:
         async def developer_callback(context: QuestionContext) -> str:
             # Mock the SDK query function since we don't have actual SDK
             # Use AsyncMock to return an awaitable
-            async def mock_sdk_query(*args, **kwargs):
+            async def mock_sdk_query(*args, **kwargs):  # noqa: ARG001
                 return "Use pytest for its simplicity and powerful fixtures"
 
             with patch(
@@ -246,7 +244,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
 
         # Create Worker with Developer callback
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -299,7 +296,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -339,13 +335,12 @@ class TestT700WorkerToDeveloperQuestionFlow:
         """Test that multiple sequential questions all reach the Developer."""
         question_count = 0
 
-        async def count_questions(context: QuestionContext) -> str:
+        async def count_questions(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal question_count
             question_count += 1
             return f"Answer to question {question_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -390,7 +385,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
             return "Option A"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -442,7 +436,6 @@ class TestT700QuestionContextIntegrity:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -473,7 +466,6 @@ class TestT700QuestionContextIntegrity:
             return "retry answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -504,7 +496,6 @@ class TestT700ErrorHandling:
     async def test_no_callback_raises_runtime_error(self) -> None:
         """Test that missing callback raises clear RuntimeError."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -527,12 +518,11 @@ class TestT700ErrorHandling:
     async def test_timeout_produces_descriptive_error(self) -> None:
         """Test that callback timeout produces descriptive error message."""
 
-        async def slow_developer(context: QuestionContext) -> str:
+        async def slow_developer(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(10)  # Very slow
             return "late answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -600,7 +590,6 @@ class TestT700AcceptanceCriteriaVerification:
             return "Developer approves using pytest"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -695,7 +684,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         # Track which model was used
         used_model: list[str] = []
 
-        async def capture_model_call(prompt: str, model: str) -> str:
+        async def capture_model_call(prompt: str, model: str) -> str:  # noqa: ARG001
             used_model.append(model)
             return "LLM-generated contextual answer"
 
@@ -711,17 +700,16 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", capture_model_call
-        ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
-                developer.transition_to(DeveloperState.prompting)
-                developer.transition_to(DeveloperState.awaiting_response)
+        ), patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
+            developer.transition_to(DeveloperState.prompting)
+            developer.transition_to(DeveloperState.awaiting_response)
 
-                result = await developer.answer_question(question_context)
+            result = await developer.answer_question(question_context)
 
-                # VERIFY: Specified model was used
-                assert len(used_model) == 1
-                assert used_model[0] == "claude-sonnet-4-5@20251001"
-                assert result.model_used == "claude-sonnet-4-5@20251001"
+            # VERIFY: Specified model was used
+            assert len(used_model) == 1
+            assert used_model[0] == "claude-sonnet-4-5@20251001"
+            assert result.model_used == "claude-sonnet-4-5@20251001"
 
     @pytest.mark.asyncio
     async def test_developer_builds_prompt_with_context(self) -> None:
@@ -734,7 +722,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         """
         captured_prompts: list[str] = []
 
-        async def capture_prompt(prompt: str, model: str) -> str:
+        async def capture_prompt(prompt: str, model: str) -> str:  # noqa: ARG001
             captured_prompts.append(prompt)
             return "Answer based on full context"
 
@@ -769,7 +757,7 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):  # noqa: SIM117
             with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 developer.transition_to(DeveloperState.prompting)
                 developer.transition_to(DeveloperState.awaiting_response)
@@ -825,26 +813,25 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", track_query_call
-        ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
-                developer.transition_to(DeveloperState.prompting)
-                developer.transition_to(DeveloperState.awaiting_response)
+        ), patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
+            developer.transition_to(DeveloperState.prompting)
+            developer.transition_to(DeveloperState.awaiting_response)
 
-                await developer.answer_question(question_context)
+            await developer.answer_question(question_context)
 
-                # VERIFY: query was called
-                assert query_called is True
+            # VERIFY: query was called
+            assert query_called is True
 
-                # VERIFY: query received a prompt string
-                assert "prompt" in query_kwargs
-                assert isinstance(query_kwargs["prompt"], str)
-                assert len(query_kwargs["prompt"]) > 0
+            # VERIFY: query received a prompt string
+            assert "prompt" in query_kwargs
+            assert isinstance(query_kwargs["prompt"], str)
+            assert len(query_kwargs["prompt"]) > 0
 
-                # VERIFY: query received a model
-                assert "model" in query_kwargs
-                assert (
-                    query_kwargs["model"] == "claude-haiku-4-5@20251001"
-                )  # DEFAULT_QA_MODEL
+            # VERIFY: query received a model
+            assert "model" in query_kwargs
+            assert (
+                query_kwargs["model"] == "claude-haiku-4-5@20251001"
+            )  # DEFAULT_QA_MODEL
 
     @pytest.mark.asyncio
     async def test_developer_returns_answer_result_with_answer(self) -> None:
@@ -861,7 +848,7 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         llm_answer = "Based on the context, I recommend using FastAPI for its async support and automatic API documentation."
 
-        async def return_answer(prompt: str, model: str) -> str:
+        async def return_answer(prompt: str, model: str) -> str:  # noqa: ARG001
             return llm_answer
 
         developer = DeveloperAgent(
@@ -880,7 +867,7 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", return_answer):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", return_answer):  # noqa: SIM117
             with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 developer.transition_to(DeveloperState.prompting)
                 developer.transition_to(DeveloperState.awaiting_response)
@@ -921,7 +908,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         """
         prompts_by_context: dict[str, str] = {}
 
-        async def capture_contextual_prompt(prompt: str, model: str) -> str:
+        async def capture_contextual_prompt(prompt: str, model: str) -> str:  # noqa: ARG001
             # Determine context from prompt content
             if "machine learning" in prompt.lower():
                 prompts_by_context["ml"] = prompt
@@ -963,33 +950,32 @@ class TestT701DeveloperLLMAnswerGeneration:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query",
             capture_contextual_prompt,
-        ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
-                # Test ML context
-                developer.reset()
-                developer.transition_to(DeveloperState.prompting)
-                developer.transition_to(DeveloperState.awaiting_response)
-                ml_result = await developer.answer_question(ml_context)
+        ), patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
+            # Test ML context
+            developer.reset()
+            developer.transition_to(DeveloperState.prompting)
+            developer.transition_to(DeveloperState.awaiting_response)
+            ml_result = await developer.answer_question(ml_context)
 
-                # Test scraping context
-                developer.reset()
-                developer.transition_to(DeveloperState.prompting)
-                developer.transition_to(DeveloperState.awaiting_response)
-                scraping_result = await developer.answer_question(scraping_context)
+            # Test scraping context
+            developer.reset()
+            developer.transition_to(DeveloperState.prompting)
+            developer.transition_to(DeveloperState.awaiting_response)
+            scraping_result = await developer.answer_question(scraping_context)
 
-                # VERIFY: Different contexts produced different prompts
-                assert "ml" in prompts_by_context
-                assert "scraping" in prompts_by_context
+            # VERIFY: Different contexts produced different prompts
+            assert "ml" in prompts_by_context
+            assert "scraping" in prompts_by_context
 
-                # VERIFY: ML context included ML conversation
-                assert "machine learning" in prompts_by_context["ml"].lower()
+            # VERIFY: ML context included ML conversation
+            assert "machine learning" in prompts_by_context["ml"].lower()
 
-                # VERIFY: Scraping context included scraping conversation
-                assert "web scraping" in prompts_by_context["scraping"].lower()
+            # VERIFY: Scraping context included scraping conversation
+            assert "web scraping" in prompts_by_context["scraping"].lower()
 
-                # VERIFY: Answers reflect the context
-                assert "scikit-learn" in ml_result.answer
-                assert "BeautifulSoup" in scraping_result.answer
+            # VERIFY: Answers reflect the context
+            assert "scikit-learn" in ml_result.answer
+            assert "BeautifulSoup" in scraping_result.answer
 
     @pytest.mark.asyncio
     async def test_developer_llm_answer_e2e_integration(self) -> None:
@@ -1021,23 +1007,21 @@ class TestT701DeveloperLLMAnswerGeneration:
             flow_events.append("Developer callback invoked")
             with patch(
                 "claude_evaluator.core.agents.developer.sdk_query", mock_llm_call
+            ), patch(
+                "claude_evaluator.core.agents.developer.SDK_AVAILABLE", True
             ):
-                with patch(
-                    "claude_evaluator.core.agents.developer.SDK_AVAILABLE", True
-                ):
-                    # Need to transition Developer to the right state
-                    if developer.current_state == DeveloperState.initializing:
-                        developer.transition_to(DeveloperState.prompting)
-                        developer.transition_to(DeveloperState.awaiting_response)
-                    result = await developer.answer_question(context)
-                    flow_events.append(
-                        f"Developer generated answer: {result.answer[:50]}..."
-                    )
-                    return result.answer
+                # Need to transition Developer to the right state
+                if developer.current_state == DeveloperState.initializing:
+                    developer.transition_to(DeveloperState.prompting)
+                    developer.transition_to(DeveloperState.awaiting_response)
+                result = await developer.answer_question(context)
+                flow_events.append(
+                    f"Developer generated answer: {result.answer[:50]}..."
+                )
+                return result.answer
 
         # Create Worker with Developer callback
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t701_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1156,11 +1140,10 @@ class TestT702SessionContinuity:
                 self._responses = responses
                 self._response_index = 0
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Answer from developer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1200,7 +1183,6 @@ class TestT702SessionContinuity:
             return "Answer for session"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1246,11 +1228,10 @@ class TestT702SessionContinuity:
             client_creations += 1
             original_init(self, options)
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Answer without new client"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1322,11 +1303,10 @@ class TestT702SessionContinuity:
                 self._responses = responses
                 self._response_index = 0
 
-        async def stateful_callback(context: QuestionContext) -> str:
+        async def stateful_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Answer from callback"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1365,7 +1345,6 @@ class TestT702SessionContinuity:
             return f"Answer {len(history_lengths)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1411,14 +1390,13 @@ class TestT702SessionContinuity:
         """
         execution_sequence: list[str] = []
 
-        async def tracking_callback(context: QuestionContext) -> str:
+        async def tracking_callback(context: QuestionContext) -> str:  # noqa: ARG001
             execution_sequence.append("callback_start")
             await asyncio.sleep(0.01)  # Simulate some async work
             execution_sequence.append("callback_end")
             return "Async answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1471,7 +1449,7 @@ class TestT702SessionContinuity:
         assert "callback_start" in execution_sequence
         assert "callback_end" in execution_sequence
 
-        callback_start_idx = execution_sequence.index("callback_start")
+        execution_sequence.index("callback_start")
         callback_end_idx = execution_sequence.index("callback_end")
 
         # Callback should complete before the answer is sent
@@ -1539,7 +1517,6 @@ class TestT702SessionContinuity:
             return "Verified answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1658,13 +1635,11 @@ class TestT703WorkerContinuesAfterAnswer:
         - Worker processes all messages until ResultMessage
         - Worker does not exit early after answer
         """
-        messages_processed_after_answer: list[str] = []
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Use pytest"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1733,11 +1708,10 @@ class TestT703WorkerContinuesAfterAnswer:
         the Developer provides an answer, demonstrating actual work is happening.
         """
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Yes, create the file"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1805,13 +1779,11 @@ class TestT703WorkerContinuesAfterAnswer:
         4. Worker performs multiple steps based on the answer
         5. Worker completes the task successfully
         """
-        steps_completed: list[str] = []
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Use the REST API approach"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1898,13 +1870,12 @@ class TestT703WorkerContinuesAfterAnswer:
         """
         answers_given: list[str] = []
 
-        async def multi_answer_callback(context: QuestionContext) -> str:
+        async def multi_answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             answer = f"Answer to question {len(answers_given) + 1}"
             answers_given.append(answer)
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2014,11 +1985,10 @@ class TestT703WorkerContinuesAfterAnswer:
                 self._responses = responses
                 self._response_index = 0
 
-        async def simple_callback(context: QuestionContext) -> str:
+        async def simple_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Continue"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2058,13 +2028,11 @@ class TestT703WorkerContinuesAfterAnswer:
 
         This is a negative test to ensure the Worker doesn't have early exit behavior.
         """
-        work_done_after_answer = False
 
-        async def answer_callback(context: QuestionContext) -> str:
+        async def answer_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Proceed"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2189,11 +2157,10 @@ class TestT703WorkerContinuesAfterAnswer:
                 self._responses = responses
                 self._response_index = 0
 
-        async def verification_callback(context: QuestionContext) -> str:
+        async def verification_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Verification answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2295,7 +2262,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"Answer {len(session_ids_received)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2381,7 +2347,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"Answer to question {len(history_lengths)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2484,11 +2449,10 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
                 self._responses = responses
                 self._response_index = 0
 
-        async def simple_callback(context: QuestionContext) -> str:
+        async def simple_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2534,7 +2498,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2591,7 +2554,7 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
                     all_text.append(content)
                 elif isinstance(content, list):
                     for block in content:
-                        if isinstance(block, dict):
+                        if isinstance(block, dict):  # noqa: SIM102
                             if "text" in block:
                                 all_text.append(block["text"])
             all_queries_seen.append(all_text)
@@ -2601,7 +2564,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"DISTINCTIVE_ANSWER_{answer_num}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2674,7 +2636,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2757,7 +2718,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
 
         # Create worker
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2811,7 +2771,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"Answer at history length {len(context.conversation_history)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2935,7 +2894,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"T704 verification answer {questions_answered}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2945,7 +2903,7 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
         verification_client = VerificationClient()
 
         # Setup 5 questions with accumulating context
-        mock_client = MockClaudeSDKClient()
+        MockClaudeSDKClient()
         q1 = AskUserQuestionBlock(questions=[{"question": "T704 Q1?"}])
         q2 = AskUserQuestionBlock(questions=[{"question": "T704 Q2?"}])
         q3 = AskUserQuestionBlock(questions=[{"question": "T704 Q3?"}])
@@ -3039,11 +2997,10 @@ class TestT705WorkerRemembersPreviousMessages:
         throughout the entire execution, including those before and after Q&A.
         """
 
-        async def simple_callback(context: QuestionContext) -> str:
+        async def simple_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Memory test answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3128,7 +3085,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"Answer #{len(context_snapshots)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3225,7 +3181,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"ANSWER_FOR_[{question_text}]"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3286,11 +3241,10 @@ class TestT705WorkerRemembersPreviousMessages:
         be available for analysis and debugging of the evaluation.
         """
 
-        async def tracking_callback(context: QuestionContext) -> str:
+        async def tracking_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Tracked answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3361,7 +3315,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"Memory answer {exchange_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3493,7 +3446,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"T705_ANSWER_{question_number}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3614,7 +3566,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         """
         # Track client creation
         clients_created: list[Any] = []
-        original_client_class = None
 
         # Create a tracking mock for ClaudeSDKClient
         class TrackingClaudeSDKClient:
@@ -3639,14 +3590,13 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Tracked completion")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         # Patch the SDK client class
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", TrackingClaudeSDKClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -3690,13 +3640,12 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Sequence test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", SequenceTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -3751,7 +3700,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Storage test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3760,7 +3708,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         # Before evaluation, no client should exist
         assert worker._client is None, "Client should be None before evaluation"
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StorageTestClient):
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StorageTestClient):  # noqa: SIM117
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Storage test query")
 
@@ -3793,7 +3741,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             async def disconnect(self) -> None:
                 self._connected = False
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 # This is called at the start of streaming
                 connection_state_at_stream_start.append(self._connected)
 
@@ -3801,13 +3749,12 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Connection state test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", ConnectionStateClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -3854,13 +3801,12 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result=f"Client {self.client_number} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", CountingClient):
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", CountingClient):  # noqa: SIM117
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First evaluation
                 await worker.execute_query("First evaluation", resume_session=False)
@@ -3909,13 +3855,12 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result=f"Client {self.client_number} response")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", ReuseTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -3956,20 +3901,19 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             async def disconnect(self) -> None:
                 connection_attempts.append("disconnect_called")
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 connection_attempts.append("query_called")
 
             async def receive_response(self) -> Any:
                 yield ResultMessage(result="Should not reach here")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailingConnectClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4023,20 +3967,19 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 lifecycle_events.append("DISCONNECTED")
                 self._connected = False
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 lifecycle_events.append(f"QUERY:{self._connected}")
 
             async def receive_response(self) -> Any:
                 yield ResultMessage(result="T706 verification complete")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", VerificationClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4129,13 +4072,12 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="Disconnect test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", DisconnectTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4180,20 +4122,19 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             async def disconnect(self) -> None:
                 cleanup_sequence.append("disconnect_called")
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 cleanup_sequence.append("query_called")
 
             async def receive_response(self) -> Any:
                 yield ResultMessage(result="Should not reach")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailingConnectClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4236,7 +4177,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             async def disconnect(self) -> None:
                 cleanup_sequence.append("disconnected")
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 cleanup_sequence.append("query_sent")
 
             async def receive_response(self) -> Any:
@@ -4246,13 +4187,12 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 raise RuntimeError("T707: Streaming failed")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailingStreamClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4302,13 +4242,12 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="Should not reach")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", DoubleFailureClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4383,13 +4322,12 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result=f"Client {self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", TrackingClient):
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", TrackingClient):  # noqa: SIM117
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 # First query - creates client 1
                 await worker.execute_query("First query", resume_session=False)
@@ -4444,13 +4382,12 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result=f"{self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", LeakTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4510,13 +4447,12 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="Idempotent test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", IdempotentTestClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4562,7 +4498,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="State test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4571,7 +4506,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         # Before any query
         assert worker.has_active_client() is False, "No client before query"
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StateTestClient):
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StateTestClient):  # noqa: SIM117
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 await worker.execute_query("Test query")
 
@@ -4626,7 +4561,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                     active_connections.remove(self.client_id)
                 lifecycle_events.append(f"{self.client_id}:DISCONNECTED")
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 lifecycle_events.append(f"{self.client_id}:QUERY")
 
             async def receive_response(self) -> Any:
@@ -4634,7 +4569,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="T707 verification done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4643,38 +4577,37 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             ComprehensiveVerificationClient,
-        ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # SCENARIO 1: Successful query with explicit cleanup
-                await worker.execute_query("T707 success query")
-                await worker.clear_session()
+        ), patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
+            # SCENARIO 1: Successful query with explicit cleanup
+            await worker.execute_query("T707 success query")
+            await worker.clear_session()
 
-                # CRITERION 1: disconnect called on success via clear_session
-                verification_results["disconnect_on_success_via_clear_session"] = any(
-                    "DISCONNECTED" in e for e in lifecycle_events
-                )
+            # CRITERION 1: disconnect called on success via clear_session
+            verification_results["disconnect_on_success_via_clear_session"] = any(
+                "DISCONNECTED" in e for e in lifecycle_events
+            )
 
-                # Reset for failure scenario
-                lifecycle_events.clear()
-                active_connections.clear()
-                fail_on_next_connect[0] = True
+            # Reset for failure scenario
+            lifecycle_events.clear()
+            active_connections.clear()
+            fail_on_next_connect[0] = True
 
-                # SCENARIO 2: Failed connection with cleanup
-                try:
-                    await worker.execute_query("T707 failure query")
-                except ConnectionError:
-                    pass  # Expected
+            # SCENARIO 2: Failed connection with cleanup
+            try:  # noqa: SIM105
+                await worker.execute_query("T707 failure query")
+            except ConnectionError:
+                pass  # Expected
 
-                # CRITERION 2: disconnect called on failure
-                verification_results["disconnect_on_failure"] = any(
-                    "DISCONNECTED" in e for e in lifecycle_events
-                )
+            # CRITERION 2: disconnect called on failure
+            verification_results["disconnect_on_failure"] = any(
+                "DISCONNECTED" in e for e in lifecycle_events
+            )
 
-                # CRITERION 3: cleanup happens in exception path
-                # Verified by: client is None after failure
-                verification_results["cleanup_in_exception_path"] = (
-                    worker._client is None
-                )
+            # CRITERION 3: cleanup happens in exception path
+            # Verified by: client is None after failure
+            verification_results["cleanup_in_exception_path"] = (
+                worker._client is None
+            )
 
         # CRITERION 4: No connection leaks
         verification_results["no_connection_leaks"] = len(active_connections) == 0
@@ -4751,7 +4684,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"{self.client_id} completed")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_50_eval_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4760,18 +4692,17 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             LeakTrackingSequentialClient,
-        ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Run 50 sequential evaluations
-                for i in range(50):
-                    await worker.execute_query(f"Evaluation {i + 1}")
-                    await worker.clear_session()
+        ), patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
+            # Run 50 sequential evaluations
+            for i in range(50):
+                await worker.execute_query(f"Evaluation {i + 1}")
+                await worker.clear_session()
 
-                    # After each cleanup, no connections should be active
-                    assert len(active_connections) == 0, (
-                        f"Evaluation {i + 1}: Active connections should be 0, "
-                        f"got {len(active_connections)}: {active_connections}"
-                    )
+                # After each cleanup, no connections should be active
+                assert len(active_connections) == 0, (
+                    f"Evaluation {i + 1}: Active connections should be 0, "
+                    f"got {len(active_connections)}: {active_connections}"
+                )
 
         # VERIFY: 50 connects and 50 disconnects
         assert total_connects == 50, f"Expected 50 connects, got {total_connects}"
@@ -4820,13 +4751,12 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"Client {self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_accumulation_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", AccumulationTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4873,7 +4803,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             async def disconnect(self) -> None:
                 active_connections.discard(self.client_id)
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 self._query_count += 1
 
             async def receive_response(self) -> Any:
@@ -4889,20 +4819,19 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                         result=f"{self.client_id} completed with answer"
                     )
 
-        async def count_and_answer(context: QuestionContext) -> str:
+        async def count_and_answer(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal question_count
             question_count += 1
             return f"Answer {question_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_qa_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
             on_question_callback=count_and_answer,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", QuestionLeakTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -4967,7 +4896,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"{self.client_id} completed")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_failure_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4976,7 +4904,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         success_count = 0
         failure_count = 0
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailureLeakTrackingClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -5034,13 +4962,12 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result="Done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_tool_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", SimpleClient):
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", SimpleClient):  # noqa: SIM117
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
                 for i in range(10):
                     # Before query, add some tool invocations to simulate previous state
@@ -5090,7 +5017,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             async def disconnect(self) -> None:
                 pass
 
-            async def query(self, prompt: str) -> None:
+            async def query(self, prompt: str) -> None:  # noqa: ARG002
                 self._query_count += 1
 
             async def receive_response(self) -> Any:
@@ -5109,14 +5036,13 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_counter_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
             on_question_callback=track_attempts,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", CounterCheckClient
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -5181,13 +5107,12 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"{self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_complete_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", ComprehensiveT708Client
         ):
             with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
@@ -5269,7 +5194,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5338,7 +5262,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer {len(session_ids)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5383,7 +5306,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer {len(history_lengths)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5440,7 +5362,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return "ANSWER_UNKNOWN"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5493,7 +5414,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return "Selected option"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5570,7 +5490,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5614,7 +5533,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer {len(questions_handled)} for {q_text}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5689,7 +5607,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer for {context.questions[0].question}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5794,7 +5711,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5854,7 +5770,7 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
         ]
         all_questions_correct = all(
             qa[0] == expected
-            for qa, expected in zip(questions_and_answers, expected_questions)
+            for qa, expected in zip(questions_and_answers, expected_questions, strict=False)
         )
         verification_results["each_question_handled_correctly"] = all_questions_correct
 
@@ -5878,7 +5794,7 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
         # Additional verification: All answers were sent
         assert len(mock_client._queries) == 6  # 1 initial + 5 answers
         assert mock_client._queries[0] == "Design complete system"
-        for i, (question, answer) in enumerate(questions_and_answers):
+        for i, (_question, answer) in enumerate(questions_and_answers):
             assert mock_client._queries[i + 1] == answer, (
                 f"Answer {i + 1} not sent correctly"
             )
@@ -5926,12 +5842,11 @@ class TestT710TimeoutTriggersGracefulFailure:
         - The error message should include the question text for debugging
         """
 
-        async def slow_callback(context: QuestionContext) -> str:
+        async def slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(10)  # Much longer than timeout
             return "this will never be returned"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5984,7 +5899,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         callback_started = False
         callback_finished = False
 
-        async def tracked_slow_callback(context: QuestionContext) -> str:
+        async def tracked_slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal callback_started, callback_finished
             callback_started = True
             await asyncio.sleep(10)
@@ -5992,7 +5907,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6038,7 +5952,7 @@ class TestT710TimeoutTriggersGracefulFailure:
             "tasks_after": 0,
         }
 
-        async def cancellable_callback(context: QuestionContext) -> str:
+        async def cancellable_callback(context: QuestionContext) -> str:  # noqa: ARG001
             try:
                 await asyncio.sleep(100)
                 return "never returned"
@@ -6047,7 +5961,6 @@ class TestT710TimeoutTriggersGracefulFailure:
                 raise
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6103,11 +6016,10 @@ class TestT710TimeoutTriggersGracefulFailure:
         The WorkerAgent should have a default question_timeout_seconds of 60.
         """
 
-        async def dummy_callback(context: QuestionContext) -> str:
+        async def dummy_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6130,7 +6042,7 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         callback_times: list[float] = []
 
-        async def timed_callback(context: QuestionContext) -> str:
+        async def timed_callback(context: QuestionContext) -> str:  # noqa: ARG001
             start = time.monotonic()
             try:
                 await asyncio.sleep(100)  # Will be interrupted
@@ -6141,7 +6053,6 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         # Use a 2-second timeout
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6176,12 +6087,11 @@ class TestT710TimeoutTriggersGracefulFailure:
         The error message should summarize the questions appropriately.
         """
 
-        async def slow_callback(context: QuestionContext) -> str:
+        async def slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(10)
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6225,7 +6135,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         """
         call_count = 0
 
-        async def sometimes_slow_callback(context: QuestionContext) -> str:
+        async def sometimes_slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -6233,7 +6143,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return f"Fast answer {call_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6290,12 +6199,11 @@ class TestT710TimeoutTriggersGracefulFailure:
         and in what context.
         """
 
-        async def slow_callback(context: QuestionContext) -> str:
+        async def slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             await asyncio.sleep(10)
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6352,14 +6260,13 @@ class TestT710TimeoutTriggersGracefulFailure:
         """
         callback_completed = False
 
-        async def fast_callback(context: QuestionContext) -> str:
+        async def fast_callback(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal callback_completed
             await asyncio.sleep(0.05)  # Very fast
             callback_completed = True
             return "Quick answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6415,7 +6322,7 @@ class TestT710TimeoutTriggersGracefulFailure:
             "completed": False,
         }
 
-        async def tracked_slow_callback(context: QuestionContext) -> str:
+        async def tracked_slow_callback(context: QuestionContext) -> str:  # noqa: ARG001
             callback_state["invoked"] = True
             try:
                 await asyncio.sleep(100)
@@ -6426,7 +6333,6 @@ class TestT710TimeoutTriggersGracefulFailure:
                 raise
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6464,7 +6370,7 @@ class TestT710TimeoutTriggersGracefulFailure:
             # CRITERION 2: Error message is descriptive
             has_timeout_info = "timed out" in error_message.lower()
             has_duration = "1 seconds" in error_message
-            has_question_context = (
+            (
                 "T710" in error_message or "verification" in error_message.lower()
             )
             verification_results["error_message_is_descriptive"] = (
@@ -6532,7 +6438,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             return f"Attempt {context.attempt_number} answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6588,7 +6493,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         messages (context_window_size), giving more context for a better answer.
         """
         context_sizes_used: list[int] = []
-        context_strategies: list[str] = []
 
         # Create Developer agent with small context_window_size to make the
         # difference between limited and full history obvious
@@ -6599,7 +6503,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         )
 
         # Track which context strategy was used
-        async def mock_sdk_query(*args, **kwargs):
+        async def mock_sdk_query(*args, **kwargs):  # noqa: ARG001
             return "Answer based on context"
 
         # Build a large conversation history (more than context_window_size)
@@ -6670,7 +6574,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             max_answer_retries=1,
         )
 
-        async def mock_sdk_query(*args, **kwargs):
+        async def mock_sdk_query(*args, **kwargs):  # noqa: ARG001
             return "Answer"
 
         history = [
@@ -6747,7 +6651,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6884,7 +6787,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
                 return "Use PostgreSQL with read replicas for high availability"  # More detailed
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6966,7 +6868,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             max_answer_retries=1,  # Allow 1 retry (so 2 total attempts)
         )
 
-        async def mock_query(*args, **kwargs):
+        async def mock_query(*args, **kwargs):  # noqa: ARG001
             return "Answer"
 
         history = [{"role": "user", "content": "test"}]
@@ -7020,7 +6922,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7112,7 +7013,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
 
         # Test Worker-side retry detection
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7237,7 +7137,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Providing guidance for the unclear question"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7289,11 +7188,10 @@ class TestT712EmptyInvalidQuestionHandling:
         This test documents this behavior as expected edge case handling.
         """
 
-        async def capture_callback(context: QuestionContext) -> str:
+        async def capture_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Answer for whitespace question"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7335,13 +7233,12 @@ class TestT712EmptyInvalidQuestionHandling:
         """
         callback_invoked = False
 
-        async def simple_callback(context: QuestionContext) -> str:
+        async def simple_callback(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal callback_invoked
             callback_invoked = True
             return "Answering despite no questions"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7387,7 +7284,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7439,7 +7335,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7491,13 +7386,12 @@ class TestT712EmptyInvalidQuestionHandling:
         callback_invoked = False
         error_occurred = False
 
-        async def safe_callback(context: QuestionContext) -> str:
+        async def safe_callback(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal callback_invoked
             callback_invoked = True
             return "Handled malformed data"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7544,11 +7438,10 @@ class TestT712EmptyInvalidQuestionHandling:
         This test documents this behavior as an expected edge case.
         """
 
-        async def track_callback(context: QuestionContext) -> str:
+        async def track_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Answered"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7593,7 +7486,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7637,7 +7529,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7688,7 +7579,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Providing clarification"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7738,7 +7628,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Selected"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7806,7 +7695,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Context validated"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7858,11 +7746,10 @@ class TestT712EmptyInvalidQuestionHandling:
         When the questions array is empty, a fallback is created and the answer is sent.
         """
 
-        async def answer_callback(ctx: QuestionContext) -> str:
+        async def answer_callback(ctx: QuestionContext) -> str:  # noqa: ARG001
             return "UNIQUE_ANSWER_FOR_T712_TEST"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7898,13 +7785,12 @@ class TestT712EmptyInvalidQuestionHandling:
         """
         answer_count = 0
 
-        async def count_answers(context: QuestionContext) -> str:
+        async def count_answers(context: QuestionContext) -> str:  # noqa: ARG001
             nonlocal answer_count
             answer_count += 1
             return f"Answer {answer_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7965,7 +7851,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer 1"
 
         worker_1 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -8001,7 +7886,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer 2"
 
         worker_2 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -8034,11 +7918,10 @@ class TestT712EmptyInvalidQuestionHandling:
         test_3_crashed = False
         test_3_completed = False
 
-        async def test_3_callback(context: QuestionContext) -> str:
+        async def test_3_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "Answer 3"
 
         worker_3 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -8086,7 +7969,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer 4"
 
         worker_4 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,

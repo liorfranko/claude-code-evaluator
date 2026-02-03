@@ -2,7 +2,7 @@
 
 This module contains data models including:
 - Base: BaseSchema for Pydantic models
-- Enums: WorkflowType, EvaluationStatus, ExecutionMode, PermissionMode, Outcome, DeveloperState
+- Enums: WorkflowType, EvaluationStatus, PermissionMode, Outcome, DeveloperState
 - Models: Decision, ToolInvocation, QueryMetrics, Metrics, TimelineEvent,
           QuestionOption, QuestionItem, QuestionContext, AnswerResult,
           ProgressEvent, ProgressEventType
@@ -17,7 +17,6 @@ from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
-    ExecutionMode,
     Outcome,
     PermissionMode,
     WorkflowType,
@@ -54,7 +53,6 @@ __all__ = [
     # Enums
     "DeveloperState",
     "EvaluationStatus",
-    "ExecutionMode",
     "Outcome",
     "PermissionMode",
     "WorkflowType",

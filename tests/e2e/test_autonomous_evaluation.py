@@ -14,7 +14,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     Outcome,
     PermissionMode,
     WorkflowType,
@@ -34,14 +33,13 @@ class TestAutonomousEvaluationSC001:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent that returns predictable results."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -157,7 +155,7 @@ class TestAutonomousEvaluationSC001:
                 workflow = PlanThenImplementWorkflow(collector)
 
             # Execute - should complete without any prompts for input
-            metrics = await workflow.execute(evaluation)
+            await workflow.execute(evaluation)
             # Workflow handles evaluation.complete(metrics)
             evaluation.cleanup()
 
@@ -196,7 +194,7 @@ class TestAutonomousEvaluationSC001:
                 ]
                 workflow = MultiCommandWorkflow(collector, phases)
 
-            metrics = await workflow.execute(evaluation)
+            await workflow.execute(evaluation)
             # Workflow handles evaluation.complete(metrics)
             evaluation.cleanup()
 
@@ -240,7 +238,7 @@ class TestAutonomousEvaluationSC001:
             evaluation.start()
 
             workflow = DirectWorkflow(collector)
-            metrics = await workflow.execute(evaluation)
+            await workflow.execute(evaluation)
             # Workflow handles evaluation.complete(metrics)
             evaluation.cleanup()
 
@@ -256,14 +254,13 @@ class TestAutonomousEvaluationSequential:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -302,7 +299,7 @@ class TestAutonomousEvaluationSequential:
             evaluation.start()
 
             workflow = DirectWorkflow(collector)
-            metrics = await workflow.execute(evaluation)
+            await workflow.execute(evaluation)
             # Workflow handles evaluation.complete(metrics)
             evaluation.cleanup()
 
@@ -337,7 +334,7 @@ class TestAutonomousEvaluationSequential:
             assert workspace_path is not None
 
             workflow = DirectWorkflow(collector)
-            metrics = await workflow.execute(evaluation)
+            await workflow.execute(evaluation)
             # Workflow handles evaluation.complete(metrics)
             evaluation.cleanup()
 

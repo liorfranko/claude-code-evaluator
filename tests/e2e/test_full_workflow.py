@@ -18,7 +18,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     Outcome,
     PermissionMode,
     WorkflowType,
@@ -39,7 +38,6 @@ class TestFullWorkflowExecution:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -48,7 +46,7 @@ class TestFullWorkflowExecution:
         self.query_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             self.query_count += 1
             return QueryMetrics(
@@ -226,14 +224,13 @@ class TestFullWorkflowWithYAMLConfig:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -323,14 +320,13 @@ class TestFullWorkflowReportPersistence:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -446,13 +442,12 @@ class TestFullWorkflowErrorScenarios:
         """Test that workflow failure still generates a report."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        async def failing_query(query: str, phase: str) -> QueryMetrics:
+        async def failing_query(query: str, phase: str) -> QueryMetrics:  # noqa: ARG001
             raise RuntimeError("Simulated failure")
 
         worker.execute_query = failing_query  # type: ignore
@@ -492,7 +487,6 @@ class TestFullWorkflowErrorScenarios:
         """Test that partial workflow completion is captured."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -501,7 +495,7 @@ class TestFullWorkflowErrorScenarios:
         call_count = [0]
 
         async def sometimes_failing_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             call_count[0] += 1
             if call_count[0] == 2:  # Fail on second call

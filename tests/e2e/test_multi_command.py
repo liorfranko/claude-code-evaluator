@@ -19,7 +19,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -36,7 +35,6 @@ class TestMultiCommandE2ESequentialExecution:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -64,7 +62,7 @@ class TestMultiCommandE2ESequentialExecution:
         execution_order: list[str] = []
 
         async def capture_order(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             execution_order.append(phase)
             return QueryMetrics(
@@ -100,7 +98,7 @@ class TestMultiCommandE2ESequentialExecution:
         events: list[tuple[str, str]] = []  # (phase, event_type)
 
         async def capture_events(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             events.append((phase, "start"))
             events.append((phase, "end"))
@@ -165,7 +163,7 @@ class TestMultiCommandE2ESequentialExecution:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
@@ -202,7 +200,7 @@ class TestMultiCommandE2ESequentialExecution:
         )
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return sample_metrics
 
@@ -223,7 +221,6 @@ class TestMultiCommandE2EContextPassing:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -262,7 +259,7 @@ class TestMultiCommandE2EContextPassing:
         received_prompts: list[tuple[str, str]] = []  # (phase, prompt)
 
         async def capture_prompts(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             received_prompts.append((phase, query))
             responses = {
@@ -317,7 +314,7 @@ class TestMultiCommandE2EContextPassing:
         received_prompts: list[str] = []
 
         async def capture_prompts(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             received_prompts.append(query)
             return QueryMetrics(
@@ -373,7 +370,7 @@ class TestMultiCommandE2EContextPassing:
         call_count = [0]
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             call_count[0] += 1
             return QueryMetrics(
@@ -415,7 +412,7 @@ class TestMultiCommandE2EContextPassing:
         received_prompt: str | None = None
 
         async def capture_prompt(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal received_prompt
             received_prompt = query
@@ -449,7 +446,6 @@ class TestMultiCommandE2EMetrics:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -480,7 +476,7 @@ class TestMultiCommandE2EMetrics:
         }
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             inp, out = phase_tokens[phase]
             return QueryMetrics(
@@ -524,7 +520,7 @@ class TestMultiCommandE2EMetrics:
         }
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             inp, out, cost, turns = phase_metrics[phase]
             return QueryMetrics(
@@ -587,7 +583,7 @@ class TestMultiCommandE2EMetrics:
         call_count = [0]
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             nonlocal call_count
             call_count[0] += 1
@@ -628,7 +624,7 @@ class TestMultiCommandE2EMetrics:
         evaluation = self.create_evaluation()
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=1,
@@ -664,7 +660,6 @@ class TestMultiCommandE2EErrorHandling:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -691,7 +686,7 @@ class TestMultiCommandE2EErrorHandling:
         executed_phases: list[str] = []
 
         async def mock_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             executed_phases.append(phase)
             if phase == "phase2":
@@ -727,7 +722,7 @@ class TestMultiCommandE2EErrorHandling:
         evaluation = self.create_evaluation()
 
         async def mock_query_error(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             raise ValueError("Specific failure reason")
 

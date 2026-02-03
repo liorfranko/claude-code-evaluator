@@ -1,29 +1,22 @@
 """Evaluation model for claude-evaluator.
 
 This module defines the Evaluation class which represents a single end-to-end
-test run. It manages state transitions, workspace lifecycle, and collects metrics
-during evaluation execution.
+test run as a pure state container. It manages state transitions and collects
+metrics during evaluation execution. Workspace management and agent creation
+are handled by workflow implementations.
 """
 
-import shutil
-import tempfile
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import TYPE_CHECKING
 
-from pydantic import ConfigDict, Field, PrivateAttr
+from pydantic import ConfigDict, Field
 
-from claude_evaluator.core.agents.developer import DeveloperAgent
-from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.core.exceptions import InvalidEvaluationStateError
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.base import BaseSchema
+from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, WorkflowType
 from claude_evaluator.models.metrics import Metrics
-
-if TYPE_CHECKING:
-    from claude_evaluator.metrics.collector import MetricsCollector
 
 logger = get_logger(__name__)
 
@@ -48,10 +41,8 @@ _VALID_TRANSITIONS: dict[EvaluationStatus, set[EvaluationStatus]] = {
 class Evaluation(BaseSchema):
     """Represents a single end-to-end evaluation test run.
 
-    An Evaluation encapsulates all the context needed for a complete evaluation,
-    including the task to be performed, the agents involved, workspace management,
-    and collected metrics. It manages state transitions through the evaluation
-    lifecycle.
+    An Evaluation is a pure state container that tracks the lifecycle of an
+    evaluation. Agents are created and owned by workflows, not by Evaluation.
 
     Attributes:
         id: Unique evaluation identifier (UUID v4).
@@ -60,9 +51,8 @@ class Evaluation(BaseSchema):
         status: Current execution status.
         start_time: When the evaluation started.
         end_time: When the evaluation completed (optional).
-        workspace_path: Path to temporary workspace directory.
-        developer_agent: The Developer agent instance.
-        worker_agent: The Worker agent instance.
+        workspace_path: Path to workspace directory.
+        decisions_log: Log of developer decisions during evaluation.
         metrics: Collected metrics (populated on completion).
         error: Error message if evaluation failed (optional).
 
@@ -76,26 +66,17 @@ class Evaluation(BaseSchema):
 
     task_description: str
     workflow_type: WorkflowType
-    developer_agent: DeveloperAgent
-    worker_agent: WorkerAgent
+    workspace_path: str
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: EvaluationStatus = Field(default=EvaluationStatus.pending)
     start_time: datetime = Field(default_factory=datetime.now)
     end_time: datetime | None = Field(default=None)
-    workspace_path: str | None = Field(default=None)
+    decisions_log: list[Decision] = Field(default_factory=list)
     metrics: Metrics | None = Field(default=None)
     error: str | None = Field(default=None)
-    _owns_workspace: bool = PrivateAttr(default=True)
 
-    def start(self, workspace_path: str | None = None) -> None:
+    def start(self) -> None:
         """Start the evaluation, transitioning from pending to running.
-
-        Creates a temporary workspace directory (or uses provided path) and
-        transitions the evaluation status to running.
-
-        Args:
-            workspace_path: Optional path to use as workspace. If not provided,
-                a temporary directory will be created.
 
         Raises:
             InvalidEvaluationStateError: If not in pending state.
@@ -107,13 +88,6 @@ class Evaluation(BaseSchema):
                 "expected 'pending'"
             )
 
-        # Use provided workspace path or create temporary directory
-        if workspace_path:
-            self.workspace_path = workspace_path
-            self._owns_workspace = False  # Don't cleanup externally-provided workspace
-        else:
-            self.workspace_path = tempfile.mkdtemp(prefix=f"eval_{self.id[:8]}_")
-            self._owns_workspace = True
         self.status = EvaluationStatus.running
         self.start_time = datetime.now()
 
@@ -164,33 +138,6 @@ class Evaluation(BaseSchema):
         self.end_time = datetime.now()
         self.status = EvaluationStatus.failed
 
-    def cleanup(self) -> None:
-        """Remove the temporary workspace directory.
-
-        Cleans up the workspace directory created during start(). This method
-        is safe to call multiple times and will silently handle cases where
-        the workspace doesn't exist or has already been cleaned up.
-
-        Cleanup failures are logged as warnings but don't raise exceptions,
-        since cleanup is best-effort and shouldn't mask the original result.
-
-        Note: If a workspace path was provided externally (not created by start()),
-        it will NOT be deleted to preserve the evaluation output.
-        """
-        if self.workspace_path is not None and self._owns_workspace:
-            workspace = Path(self.workspace_path)
-            if workspace.exists():
-                try:
-                    shutil.rmtree(self.workspace_path)
-                except (OSError, PermissionError) as e:
-                    # Log but don't raise - cleanup is best effort
-                    logger.warning(
-                        "workspace_cleanup_failed",
-                        workspace_path=self.workspace_path,
-                        error=str(e),
-                    )
-            self.workspace_path = None
-
     def is_terminal(self) -> bool:
         """Check if the evaluation is in a terminal state.
 
@@ -224,39 +171,3 @@ class Evaluation(BaseSchema):
             return None
         delta = self.end_time - self.start_time
         return int(delta.total_seconds() * 1000)
-
-    async def run_direct_workflow(
-        self, metrics_collector: "MetricsCollector"
-    ) -> Metrics:
-        """Execute this evaluation using the DirectWorkflow.
-
-        Convenience method for running a single-phase direct implementation
-        workflow. Creates a DirectWorkflow instance and executes it.
-
-        Args:
-            metrics_collector: The MetricsCollector instance for aggregating
-                metrics during execution.
-
-        Returns:
-            A Metrics object containing all collected metrics from the execution.
-
-        Raises:
-            InvalidEvaluationStateError: If the evaluation is in a terminal state.
-            Exception: If the workflow execution fails.
-
-        Example:
-            collector = MetricsCollector()
-            evaluation = Evaluation(
-                task_description="Create a hello world script",
-                workflow_type=WorkflowType.direct,
-                developer_agent=developer,
-                worker_agent=worker,
-            )
-            metrics = await evaluation.run_direct_workflow(collector)
-
-        """
-        # Import here to avoid circular imports
-        from claude_evaluator.workflows.direct import DirectWorkflow
-
-        workflow = DirectWorkflow(metrics_collector)
-        return await workflow.execute(self)

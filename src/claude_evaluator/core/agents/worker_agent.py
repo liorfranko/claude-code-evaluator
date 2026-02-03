@@ -1,8 +1,8 @@
 """Worker Agent for Claude Code execution.
 
 This module defines the WorkerAgent model that executes Claude Code
-commands and returns results. It supports both SDK and CLI execution modes
-with configurable permission levels and tool access.
+commands and returns results via the SDK with configurable permission
+levels and tool access.
 
 The WorkerAgent acts as a facade, delegating to extracted components:
 - ToolTracker: Tool invocation tracking
@@ -13,14 +13,13 @@ The WorkerAgent acts as a facade, delegating to extracted components:
 """
 
 import asyncio
-import contextlib
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from claude_agent_sdk import ClaudeSDKClient  # pyright: ignore[reportMissingImports]
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from claude_evaluator.config.defaults import (
-    DEFAULT_MAX_TURNS,
     DEFAULT_QUESTION_TIMEOUT_SECONDS,
     DEFAULT_WORKER_MODEL,
     QUESTION_TIMEOUT_MAX,
@@ -36,7 +35,7 @@ from claude_evaluator.core.agents.worker.sdk_config import (
 from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode
+from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.query_metrics import QueryMetrics
 from claude_evaluator.models.question import QuestionContext
@@ -44,7 +43,6 @@ from claude_evaluator.models.tool_invocation import ToolInvocation
 
 logger = get_logger(__name__)
 
-from claude_agent_sdk import ClaudeSDKClient
 
 __all__ = ["WorkerAgent", "DEFAULT_MODEL"]
 
@@ -56,22 +54,19 @@ DEFAULT_MODEL = DEFAULT_WORKER_MODEL
 class WorkerAgent(BaseSchema):
     """Agent that executes Claude Code commands and returns results.
 
-    The WorkerAgent is responsible for interfacing with Claude Code through
-    either the SDK or CLI. It manages session state, permissions, and execution
-    limits for each query.
+    The WorkerAgent interfaces with Claude Code through the SDK.
+    It manages session state, permissions, and execution limits for each query.
 
     This class acts as a facade, delegating to internal components for
     specific functionality (tool tracking, permission management, etc.).
 
     Attributes:
-        execution_mode: SDK or CLI execution mode.
         project_directory: Target directory for code execution.
         active_session: Whether a Claude Code session is currently active.
         session_id: Current Claude Code session ID (optional).
         permission_mode: Current permission mode for tool execution.
         allowed_tools: List of tools that are auto-approved for execution.
         additional_dirs: Additional directories Claude can access.
-        max_turns: Maximum number of conversation turns per query.
         max_budget_usd: Maximum spend limit per query in USD (optional).
         model: Model identifier to use for SDK execution.
         on_question_callback: Async callback invoked when Claude asks a question.
@@ -83,16 +78,17 @@ class WorkerAgent(BaseSchema):
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
-        extra="allow",  # Allow setting extra attributes (needed for test mocking)
+        # Allow extra attributes for test mocking. Tests set mock methods directly
+        # on instances (e.g., worker.execute_query = AsyncMock(...)). This could be
+        # refactored to use unittest.mock.patch instead for stricter type safety.
+        extra="allow",
     )
 
-    execution_mode: ExecutionMode
     project_directory: str
     active_session: bool
     permission_mode: PermissionMode
     allowed_tools: list[str] = Field(default_factory=list)
     additional_dirs: list[str] = Field(default_factory=list)
-    max_turns: int = DEFAULT_MAX_TURNS
     session_id: str | None = None
     max_budget_usd: float | None = None
     model: str | None = None
@@ -101,8 +97,14 @@ class WorkerAgent(BaseSchema):
         Callable[[str, list[dict[str, Any]]], Awaitable[str | None]] | None
     ) = None
     on_progress_callback: Callable[[ProgressEvent], None] | None = None
-    question_timeout_seconds: int = DEFAULT_QUESTION_TIMEOUT_SECONDS
+    question_timeout_seconds: int = Field(
+        default=DEFAULT_QUESTION_TIMEOUT_SECONDS,
+        ge=QUESTION_TIMEOUT_MIN,
+        le=QUESTION_TIMEOUT_MAX,
+        description="Timeout in seconds for question callbacks",
+    )
     use_user_plugins: bool = False
+    max_turns: int | None = None
     tool_invocations: list[ToolInvocation] = Field(default_factory=list)
 
     # Internal state (private attributes)
@@ -120,21 +122,9 @@ class WorkerAgent(BaseSchema):
     @model_validator(mode="after")
     def _validate_and_init_components(self) -> "WorkerAgent":
         """Validate WorkerAgent parameters and initialize components."""
-        # Validate question_timeout_seconds is in valid range
-        if not (
-            QUESTION_TIMEOUT_MIN
-            <= self.question_timeout_seconds
-            <= QUESTION_TIMEOUT_MAX
-        ):
-            raise ValueError(
-                f"question_timeout_seconds must be between {QUESTION_TIMEOUT_MIN} "
-                f"and {QUESTION_TIMEOUT_MAX}, got {self.question_timeout_seconds}"
-            )
-
         # Validate on_question_callback is async if provided
-        if (
-            self.on_question_callback is not None
-            and not asyncio.iscoroutinefunction(self.on_question_callback)
+        if self.on_question_callback is not None and not asyncio.iscoroutinefunction(
+            self.on_question_callback
         ):
             raise TypeError(
                 "on_question_callback must be an async function (coroutine function)"
@@ -167,10 +157,7 @@ class WorkerAgent(BaseSchema):
         phase: str | None = None,
         resume_session: bool = False,
     ) -> QueryMetrics:
-        """Execute a query through Claude Code.
-
-        This method sends a query to Claude Code using the configured
-        execution mode (SDK or CLI) and returns metrics about the execution.
+        """Execute a query through Claude Code via the SDK.
 
         Args:
             query: The prompt or query to send to Claude Code.
@@ -181,30 +168,7 @@ class WorkerAgent(BaseSchema):
             QueryMetrics containing execution results and performance data.
 
         Raises:
-            RuntimeError: If SDK is not available and SDK mode is configured.
-            NotImplementedError: If CLI mode is requested.
-
-        """
-        if self.execution_mode == ExecutionMode.sdk:
-            return await self._execute_via_sdk(query, phase, resume_session)
-        else:
-            raise NotImplementedError("CLI execution mode not yet implemented")
-
-    async def _execute_via_sdk(
-        self,
-        query: str,
-        phase: str | None = None,
-        resume_session: bool = False,
-    ) -> QueryMetrics:
-        """Execute a query using the Claude SDK.
-
-        Args:
-            query: The prompt to send to Claude Code.
-            phase: Current workflow phase for tracking.
-            resume_session: If True, resume the previous session.
-
-        Returns:
-            QueryMetrics with execution results.
+            RuntimeError: If no result message is received from the SDK.
 
         """
         # Prepare for new query
@@ -233,10 +197,10 @@ class WorkerAgent(BaseSchema):
                 permission_mode=self.permission_mode,
                 additional_dirs=self.additional_dirs,
                 allowed_tools=self.allowed_tools,
-                max_turns=self.max_turns,
                 max_budget_usd=self.max_budget_usd,
                 model=self.model,
                 use_user_plugins=self.use_user_plugins,
+                max_turns=self.max_turns,
             )
             config_builder.set_tool_permission_handler(
                 self._permission_handler.handle_tool_permission
@@ -255,8 +219,16 @@ class WorkerAgent(BaseSchema):
                     all_messages,
                 ) = await self._stream_sdk_messages_with_client(query, self._client)
             except Exception:
-                with contextlib.suppress(Exception):
+                # Log and suppress cleanup errors during error recovery
+                try:
                     await new_client.disconnect()
+                except Exception as cleanup_error:
+                    logger.debug(
+                        "client_cleanup_during_error_failed",
+                        cleanup_error_type=type(cleanup_error).__name__,
+                        cleanup_error=str(cleanup_error),
+                        message="Cleanup failed during error recovery (continuing with original error)",
+                    )
                 if self._client is new_client:
                     self._client = None
                 raise
@@ -279,8 +251,14 @@ class WorkerAgent(BaseSchema):
         if self._client is not None:
             try:
                 await self._client.disconnect()
-            except Exception:
-                pass
+            except Exception as e:
+                # Log cleanup errors for debugging but don't raise (cleanup is best-effort)
+                logger.debug(
+                    "client_disconnect_error",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    message="Failed to disconnect client during cleanup (non-fatal)",
+                )
             finally:
                 self._client = None
 
@@ -318,8 +296,10 @@ class WorkerAgent(BaseSchema):
                 message_type = type(message).__name__
 
                 if message_type == "AssistantMessage" and hasattr(message, "content"):
-                    response_content = self._message_processor.process_assistant_message(
-                        message, pending_tool_uses, all_messages
+                    response_content = (
+                        self._message_processor.process_assistant_message(
+                            message, pending_tool_uses, all_messages
+                        )
                     )
                     question_block = self._question_handler.find_question_block(message)
                 elif message_type == "UserMessage" and hasattr(message, "content"):
@@ -327,7 +307,9 @@ class WorkerAgent(BaseSchema):
                         message, pending_tool_uses, all_messages
                     )
                 elif message_type == "SystemMessage":
-                    self._message_processor.process_system_message(message, all_messages)
+                    self._message_processor.process_system_message(
+                        message, all_messages
+                    )
                 elif message_type == "ResultMessage":
                     result_message = message
 
@@ -455,6 +437,16 @@ class WorkerAgent(BaseSchema):
     def set_permission_mode(self, mode: PermissionMode) -> None:
         """Update the permission mode for subsequent executions."""
         self.permission_mode = mode
+
+    def set_max_turns(self, max_turns: int | None) -> None:
+        """Update the max turns limit for subsequent executions.
+
+        Args:
+            max_turns: Maximum conversation turns. Pass None to use settings default,
+                or 0/negative to use SDK default (unlimited).
+
+        """
+        self.max_turns = max_turns
 
     def start_session(self) -> str:
         """Start a new Claude Code session."""

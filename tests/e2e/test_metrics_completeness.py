@@ -14,7 +14,6 @@ from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -75,7 +74,6 @@ class TestMetricsSchemaValidation:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent with complete metrics."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -93,7 +91,7 @@ class TestMetricsSchemaValidation:
         ]
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=0,
@@ -130,7 +128,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         # Generate report
@@ -164,7 +162,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -193,7 +191,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -259,7 +257,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -302,7 +300,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -333,7 +331,7 @@ class TestMetricsSchemaValidation:
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -357,7 +355,6 @@ class TestMultiPhaseMetricsCompleteness:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -366,7 +363,7 @@ class TestMultiPhaseMetricsCompleteness:
         self.call_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             self.call_count += 1
             return QueryMetrics(
@@ -409,7 +406,7 @@ class TestMultiPhaseMetricsCompleteness:
         evaluation.start()
 
         workflow = MultiCommandWorkflow(collector, phases)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -456,7 +453,7 @@ class TestMultiPhaseMetricsCompleteness:
         evaluation.start()
 
         workflow = MultiCommandWorkflow(collector, phases)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()

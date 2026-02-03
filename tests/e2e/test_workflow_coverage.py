@@ -14,7 +14,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     Outcome,
     PermissionMode,
     WorkflowType,
@@ -34,14 +33,13 @@ class TestWorkflowCoverageSC003:
     def create_mock_worker(self, call_counter: list[int]) -> WorkerAgent:
         """Create a mock worker that tracks calls."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False
+            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
         ) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(
@@ -155,7 +153,7 @@ class TestDirectWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation.start()
 
         workflow = DirectWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -283,7 +281,7 @@ class TestPlanThenImplementWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation.start()
 
         workflow = PlanThenImplementWorkflow(collector)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()
@@ -450,7 +448,7 @@ class TestMultiCommandWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation.start()
 
         workflow = MultiCommandWorkflow(collector, phases)
-        metrics = await workflow.execute(evaluation)
+        await workflow.execute(evaluation)
         # Workflow handles evaluation.complete(metrics)
 
         generator = ReportGenerator()

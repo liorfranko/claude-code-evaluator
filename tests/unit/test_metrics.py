@@ -447,7 +447,7 @@ class TestReset:
         assert metrics.prompt_count == 0
         assert metrics.total_tokens == 0
 
-    def test_reset_clears_queries(self) -> None:
+    def test_reset_clears_queries(self) -> None:  # noqa: F811
         """Test that reset clears all queries."""
         collector = MetricsCollector()
 

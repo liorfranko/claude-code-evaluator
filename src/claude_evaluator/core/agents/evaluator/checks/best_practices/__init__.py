@@ -20,7 +20,9 @@ __all__ = [
 ]
 
 
-def get_all_best_practices_checks(client: "GeminiClient | None" = None) -> list[LLMCheck]:
+def get_all_best_practices_checks(
+    client: "GeminiClient | None" = None,
+) -> list[LLMCheck]:
     """Get all best practices check instances.
 
     Args:

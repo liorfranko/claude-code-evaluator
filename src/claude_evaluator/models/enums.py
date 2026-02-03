@@ -1,7 +1,7 @@
 """Enumeration types for claude-evaluator.
 
 This module defines all enum types used throughout the evaluation framework,
-including workflow types, execution modes, and status indicators.
+including workflow types, permission modes, and status indicators.
 """
 
 from enum import Enum
@@ -9,7 +9,6 @@ from enum import Enum
 __all__ = [
     "WorkflowType",
     "EvaluationStatus",
-    "ExecutionMode",
     "PermissionMode",
     "Outcome",
     "DeveloperState",
@@ -46,19 +45,6 @@ class EvaluationStatus(str, Enum):
     running = "running"
     completed = "completed"
     failed = "failed"
-
-
-class ExecutionMode(str, Enum):
-    """Mode of Claude execution.
-
-    Attributes:
-        sdk: Use claude-agent-sdk Python package.
-        cli: Use claude -p subprocess invocation.
-
-    """
-
-    sdk = "sdk"
-    cli = "cli"
 
 
 class PermissionMode(str, Enum):

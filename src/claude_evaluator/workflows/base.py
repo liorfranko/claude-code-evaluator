@@ -6,12 +6,18 @@ process, managing the execution of tasks and collection of metrics.
 """
 
 import asyncio
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from claude_evaluator.core.agents.developer import DeveloperAgent
+from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.logging_config import get_logger
+from claude_evaluator.models.enums import PermissionMode
+from claude_evaluator.models.progress import ProgressEvent
 from claude_evaluator.workflows.exceptions import (
     QuestionHandlingError,
     WorkflowTimeoutError,
@@ -20,7 +26,6 @@ from claude_evaluator.workflows.exceptions import (
 if TYPE_CHECKING:
     from claude_evaluator.config.models import EvalDefaults
     from claude_evaluator.core import Evaluation
-    from claude_evaluator.core.agents import DeveloperAgent
     from claude_evaluator.metrics.collector import MetricsCollector
     from claude_evaluator.models.metrics import Metrics
     from claude_evaluator.models.question import QuestionContext
@@ -34,8 +39,16 @@ class BaseWorkflow(ABC):
     """Abstract base class for evaluation workflows.
 
     A workflow orchestrates the evaluation process, coordinating between agents,
-    managing phases, and collecting metrics throughout execution. Concrete
-    implementations include:
+    managing phases, and collecting metrics throughout execution. Workflows are
+    responsible for creating and owning agents via _create_agents(), configuring
+    them for question handling, and cleaning them up when execution completes.
+
+    Subclasses must:
+    - Call _create_agents() at the start of execute()
+    - Call configure_worker_for_questions() if question handling is needed
+    - Call cleanup_worker() in a finally block to ensure proper cleanup
+
+    Concrete implementations include:
 
     - DirectWorkflow: Single-phase execution
     - PlanThenImplementWorkflow: Plan mode followed by implementation
@@ -49,15 +62,18 @@ class BaseWorkflow(ABC):
 
     Example:
         class DirectWorkflow(BaseWorkflow):
-            def execute(self, evaluation: Evaluation) -> Metrics:
+            async def execute(self, evaluation: Evaluation) -> Metrics:
                 self.on_execution_start(evaluation)
+                self._create_agents(evaluation)
                 try:
                     # Execute the task
-                    result = self._run_task(evaluation)
+                    result = await self._run_task(evaluation)
                     return self.on_execution_complete(evaluation)
                 except Exception as e:
                     self.on_execution_error(evaluation, e)
                     raise
+                finally:
+                    await self.cleanup_worker(evaluation)
 
     """
 
@@ -65,6 +81,9 @@ class BaseWorkflow(ABC):
         self,
         metrics_collector: "MetricsCollector",
         defaults: "EvalDefaults | None" = None,
+        model: str | None = None,
+        max_turns: int | None = None,
+        on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the workflow with a metrics collector and optional defaults.
 
@@ -74,17 +93,74 @@ class BaseWorkflow(ABC):
             defaults: Optional EvalDefaults containing configuration for
                 question handling (developer_qa_model, question_timeout_seconds,
                 context_window_size). If not provided, defaults are used.
+            model: Model identifier for the WorkerAgent (optional).
+            max_turns: Maximum conversation turns per query. Overrides defaults.
+            on_progress_callback: Optional callback for progress events (verbose output).
 
         """
         self._metrics_collector = metrics_collector
         self._question_timeout_seconds: int = 60
         self._context_window_size: int = 10
         self._developer_qa_model: str | None = None
+        self._model: str | None = model
+        self._max_turns: int | None = max_turns
+        self._on_progress_callback: Callable[[ProgressEvent], None] | None = (
+            on_progress_callback
+        )
+
+        # Agents created per-execution
+        self._developer: DeveloperAgent | None = None
+        self._worker: WorkerAgent | None = None
 
         if defaults is not None:
             self._question_timeout_seconds = defaults.question_timeout_seconds
             self._context_window_size = defaults.context_window_size
             self._developer_qa_model = defaults.developer_qa_model
+            # Only use defaults.max_turns if max_turns not explicitly provided
+            if self._max_turns is None:
+                self._max_turns = defaults.max_turns
+            # Use defaults.model if model not explicitly provided
+            if self._model is None:
+                self._model = defaults.model
+
+    def _create_agents(self, evaluation: "Evaluation") -> tuple[DeveloperAgent, WorkerAgent]:
+        """Create agents for this workflow execution.
+
+        Creates DeveloperAgent and WorkerAgent configured for the evaluation.
+        The created agents are stored in self._developer and self._worker and
+        are owned by this workflow instance. Agents read additional configuration
+        from settings.
+
+        This method should be called at the start of execute() before any
+        agent interaction. Call cleanup_worker() when execution completes.
+
+        Args:
+            evaluation: The evaluation context containing workspace_path and task.
+
+        Returns:
+            Tuple of (developer, worker) agents.
+
+        """
+        # Build additional directories
+        claude_plans_dir = str(Path.home() / ".claude" / "plans")
+        claude_plugins_dir = str(Path.home() / ".claude" / "plugins")
+        user_temp_dir = tempfile.gettempdir()
+        additional_dirs = [claude_plans_dir, claude_plugins_dir, user_temp_dir]
+
+        developer = DeveloperAgent()
+        worker = WorkerAgent(
+            project_directory=evaluation.workspace_path,
+            active_session=False,
+            permission_mode=PermissionMode.acceptEdits,
+            additional_dirs=additional_dirs,
+            use_user_plugins=True,
+            model=self._model,
+            max_turns=self._max_turns,
+            on_progress_callback=self._on_progress_callback,
+        )
+        self._developer = developer
+        self._worker = worker
+        return developer, worker
 
     @property
     def question_timeout_seconds(self) -> int:
@@ -112,7 +188,7 @@ class BaseWorkflow(ABC):
         return self._metrics_collector
 
     @abstractmethod
-    def execute(self, evaluation: "Evaluation") -> "Metrics":
+    async def execute(self, evaluation: "Evaluation") -> "Metrics":
         """Execute the workflow for the given evaluation.
 
         This is the main entry point for running a workflow. Implementations
@@ -120,7 +196,7 @@ class BaseWorkflow(ABC):
         and collecting metrics.
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
+            evaluation: The Evaluation instance containing the task description and state.
 
         Returns:
             A Metrics object containing all collected metrics from the execution.
@@ -209,17 +285,17 @@ class BaseWorkflow(ABC):
     async def execute_with_timeout(
         self,
         evaluation: "Evaluation",
-        timeout_seconds: int | None = None,
+        timeout_seconds: int,
     ) -> "Metrics":
-        """Execute the workflow with an optional timeout.
+        """Execute the workflow with a timeout.
 
         Wraps the execute() method with asyncio timeout handling. If the
         workflow exceeds the timeout, a WorkflowTimeoutError is raised
         and the evaluation is marked as failed.
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
-            timeout_seconds: Maximum execution time in seconds. If None, no timeout.
+            evaluation: The Evaluation instance containing the task description and state.
+            timeout_seconds: Maximum execution time in seconds.
 
         Returns:
             A Metrics object containing all collected metrics from the execution.
@@ -229,12 +305,10 @@ class BaseWorkflow(ABC):
             Exception: If the workflow execution fails for other reasons.
 
         """
-        if timeout_seconds is None:
-            return await self.execute(evaluation)
-
         try:
-            async with asyncio.timeout(timeout_seconds):
-                return await self.execute(evaluation)
+            return await asyncio.wait_for(
+                self.execute(evaluation), timeout=timeout_seconds
+            )
         except asyncio.TimeoutError:
             logger.warning(
                 "workflow_timeout",
@@ -321,25 +395,22 @@ class BaseWorkflow(ABC):
 
         return question_callback
 
-    def configure_worker_for_questions(
-        self,
-        evaluation: "Evaluation",
-    ) -> None:
+    def configure_worker_for_questions(self) -> None:
         """Configure the WorkerAgent for question handling.
 
         Sets up the WorkerAgent with the question callback and timeout settings
         from the workflow configuration. Also configures the DeveloperAgent
         with the appropriate Q&A model and context settings.
 
-        This method should be called before executing queries that might
-        result in questions from Claude.
-
-        Args:
-            evaluation: The Evaluation containing both Worker and Developer agents.
+        This method should be called after _create_agents() and before
+        executing queries that might result in questions from Claude.
 
         """
-        developer = evaluation.developer_agent
-        worker = evaluation.worker_agent
+        if self._developer is None or self._worker is None:
+            raise RuntimeError("Agents not created. Call _create_agents first.")
+
+        developer = self._developer
+        worker = self._worker
 
         # Configure DeveloperAgent with Q&A settings
         if self._developer_qa_model is not None:
@@ -430,19 +501,35 @@ class BaseWorkflow(ABC):
         return result
 
     async def cleanup_worker(self, evaluation: "Evaluation") -> None:
-        """Clean up WorkerAgent resources on workflow completion or failure.
+        """Clean up WorkerAgent resources and copy decisions to evaluation.
 
         Ensures the WorkerAgent's SDK client is properly disconnected and
-        cleaned up. This method is safe to call multiple times and will
-        silently handle cases where cleanup has already occurred.
+        copies developer decisions to the evaluation for reporting. The decisions
+        log contains records of developer responses to worker questions, which
+        are useful for analyzing the human-in-the-loop interactions.
+
+        This method is safe to call multiple times and should be called in a
+        finally block to ensure cleanup even on error.
 
         Args:
-            evaluation: The Evaluation containing the WorkerAgent to clean up.
+            evaluation: The Evaluation to store decisions in.
 
         """
-        try:
-            await evaluation.worker_agent.clear_session()
-            logger.debug("worker_session_cleanup_complete")
-        except Exception as e:
-            # Log but don't raise - cleanup is best effort
-            logger.warning("worker_cleanup_error", error=str(e))
+        # Copy decisions from developer to evaluation
+        if self._developer is not None:
+            evaluation.decisions_log = list(self._developer.decisions_log)
+
+        # Clean up worker session
+        if self._worker is not None:
+            try:
+                await self._worker.clear_session()
+                logger.debug("worker_session_cleanup_complete")
+            except Exception as e:
+                # Log but don't raise - cleanup is best effort
+                logger.warning(
+                    "worker_cleanup_error",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    evaluation_id=str(evaluation.id),
+                    message="Worker cleanup failed (non-fatal, continuing)",
+                )

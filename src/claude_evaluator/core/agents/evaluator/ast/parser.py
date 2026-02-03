@@ -140,10 +140,7 @@ class ASTParser:
             language = detect_language(file_path)
 
         # Convert source to bytes
-        if isinstance(source, str):
-            source_bytes = source.encode("utf-8")
-        else:
-            source_bytes = source
+        source_bytes = source.encode("utf-8") if isinstance(source, str) else source
 
         # Handle unknown language
         if language == Language.unknown:

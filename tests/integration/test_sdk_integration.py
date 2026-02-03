@@ -19,12 +19,12 @@ import pytest
 from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.core.agents.worker_agent import DEFAULT_MODEL
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode
+from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.query_metrics import QueryMetrics
 
 # Check if SDK is available for conditional test skipping
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient  # noqa: F401
 
     HAS_SDK = True
 except ImportError:
@@ -37,13 +37,11 @@ class TestWorkerAgentSDKConfiguration:
     def test_configure_worker_agent_for_sdk_mode(self) -> None:
         """Test that WorkerAgent can be configured for SDK execution mode."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        assert agent.execution_mode == ExecutionMode.sdk
         # Query counter starts at 0
         assert agent._query_counter == 0
 
@@ -51,20 +49,17 @@ class TestWorkerAgentSDKConfiguration:
         """Test SDK mode configuration with specific allowed tools."""
         allowed_tools = ["Read", "Bash", "Edit", "Write", "Glob"]
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.bypassPermissions,
             allowed_tools=allowed_tools,
         )
 
-        assert agent.execution_mode == ExecutionMode.sdk
         assert agent.allowed_tools == allowed_tools
 
     def test_configure_sdk_mode_with_max_budget(self) -> None:
         """Test SDK mode configuration with spending budget limit."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.acceptEdits,
@@ -76,7 +71,6 @@ class TestWorkerAgentSDKConfiguration:
     def test_configure_sdk_mode_with_custom_max_turns(self) -> None:
         """Test SDK mode configuration with custom max turns."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -88,7 +82,6 @@ class TestWorkerAgentSDKConfiguration:
     def test_configure_sdk_mode_with_custom_model(self) -> None:
         """Test SDK mode configuration with custom model."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -169,7 +162,6 @@ class TestExecuteQueryWithMockedSDK:
     def worker_agent(self) -> WorkerAgent:
         """Create a WorkerAgent configured for SDK mode."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -249,7 +241,6 @@ class TestSDKOptionsConfiguration:
     def worker_agent(self) -> WorkerAgent:
         """Create a WorkerAgent for testing."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/home/user/project",
             active_session=False,
             permission_mode=PermissionMode.acceptEdits,
@@ -388,7 +379,6 @@ class TestPermissionModeMapping:
     ) -> None:
         """Test that each PermissionMode maps to correct SDK string."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=permission_mode,
@@ -426,7 +416,6 @@ class TestToolInvocationTrackingDuringSDKExecution:
     def worker_agent(self) -> WorkerAgent:
         """Create a WorkerAgent for testing."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -478,7 +467,6 @@ class TestSDKExecutionWithEmptyAllowedTools:
     def test_empty_allowed_tools_passed_as_empty_list(self) -> None:
         """Test that empty allowed_tools list is passed as empty list to SDK."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -518,7 +506,6 @@ class TestQueryMetricsFromSDKResult:
     def test_query_metrics_captures_all_fields(self) -> None:
         """Test that QueryMetrics captures all fields from SDK result."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -552,7 +539,6 @@ class TestQueryMetricsFromSDKResult:
     def test_query_metrics_without_phase(self) -> None:
         """Test QueryMetrics when no phase is specified."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -582,7 +568,6 @@ class TestClientSessionManagement:
     def test_has_active_client_after_query(self) -> None:
         """Test that has_active_client returns True after a query."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -607,7 +592,6 @@ class TestClientSessionManagement:
     def test_clear_session_method(self) -> None:
         """Test that clear_session method resets client."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -629,7 +613,6 @@ class TestClientSessionManagement:
     def test_session_resumption_reuses_client(self) -> None:
         """Test that resume_session=True reuses existing client."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -645,7 +628,7 @@ class TestClientSessionManagement:
         mock_client = create_mock_client(mock_result)
         client_created_count = 0
 
-        def track_client_creation(options):
+        def track_client_creation(options):  # noqa: ARG001
             nonlocal client_created_count
             client_created_count += 1
             return mock_client
@@ -678,7 +661,6 @@ class TestClaudeSDKClientCreation:
     def test_worker_agent_creates_sdk_client_instance(self) -> None:
         """Test that WorkerAgent creates a ClaudeSDKClient instance on query."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -694,7 +676,7 @@ class TestClaudeSDKClientCreation:
         mock_client = create_mock_client(mock_result)
         client_class_called = False
 
-        def track_client_creation(options):
+        def track_client_creation(options):  # noqa: ARG001
             nonlocal client_class_called
             client_class_called = True
             return mock_client
@@ -712,7 +694,6 @@ class TestClaudeSDKClientCreation:
     def test_sdk_client_receives_configured_options(self) -> None:
         """Test that ClaudeSDKClient receives properly configured options."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/home/test/project",
             active_session=False,
             permission_mode=PermissionMode.bypassPermissions,
@@ -764,7 +745,6 @@ class TestAsyncClientLifecycle:
     def test_connect_called_before_query(self) -> None:
         """Test that connect() is called before sending a query."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -807,7 +787,6 @@ class TestAsyncClientLifecycle:
     def test_client_stored_for_session_resumption(self) -> None:
         """Test that client is stored after successful connection."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -837,7 +816,6 @@ class TestAsyncClientLifecycle:
     def test_disconnect_called_on_clear_session(self) -> None:
         """Test that disconnect() is called when clearing session."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -878,7 +856,6 @@ class TestClientCleanupNormalCompletion:
     def test_client_persists_after_normal_completion(self) -> None:
         """Test that client persists after successful query for session reuse."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -906,7 +883,6 @@ class TestClientCleanupNormalCompletion:
     def test_old_client_disconnected_on_new_session(self) -> None:
         """Test that old client is disconnected when starting new session."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -926,7 +902,7 @@ class TestClientCleanupNormalCompletion:
         clients = [mock_client1, mock_client2]
         client_index = 0
 
-        def create_client(options):
+        def create_client(options):  # noqa: ARG001
             nonlocal client_index
             client = clients[client_index]
             client_index += 1
@@ -951,7 +927,6 @@ class TestClientCleanupNormalCompletion:
     def test_manual_cleanup_via_clear_session(self) -> None:
         """Test manual cleanup using clear_session method."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -991,7 +966,6 @@ class TestClientCleanupOnException:
     def test_client_cleanup_on_connect_failure(self) -> None:
         """Test that client is cleaned up when connect() fails."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1017,7 +991,6 @@ class TestClientCleanupOnException:
     def test_client_cleanup_on_query_failure(self) -> None:
         """Test that client is cleaned up when query() fails."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1031,7 +1004,7 @@ class TestClientCleanupOnException:
         # receive_response should not be called if query fails
         mock_client.receive_response = MagicMock()
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             with pytest.raises(RuntimeError, match="Query failed"):
@@ -1045,7 +1018,6 @@ class TestClientCleanupOnException:
     def test_client_cleanup_on_streaming_failure(self) -> None:
         """Test behavior when streaming response fails."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1064,7 +1036,7 @@ class TestClientCleanupOnException:
 
         mock_client.receive_response = failing_receive
 
-        with patch(
+        with patch(  # noqa: SIM117
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", return_value=mock_client
         ):
             with pytest.raises(RuntimeError, match="Streaming failed"):
@@ -1074,7 +1046,6 @@ class TestClientCleanupOnException:
     def test_disconnect_error_ignored_during_cleanup(self) -> None:
         """Test that disconnect errors are silently ignored during cleanup."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1102,7 +1073,6 @@ class TestClientCleanupOnException:
     def test_client_preserved_on_resume_session_error(self) -> None:
         """Test that client is preserved when error occurs during session resumption."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1139,7 +1109,6 @@ class TestClientCleanupOnException:
     def test_clear_session_handles_no_client(self) -> None:
         """Test that clear_session works when no client exists."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1164,7 +1133,6 @@ class TestIntegrationWorkflow:
     def test_plan_then_implement_workflow(self) -> None:
         """Test workflow: plan query followed by implement query with session reuse."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1225,7 +1193,6 @@ class TestIntegrationWorkflow:
     def test_multiple_independent_tasks(self) -> None:
         """Test workflow: multiple independent tasks without session sharing."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1241,7 +1208,7 @@ class TestIntegrationWorkflow:
         client_count = 0
         clients = []
 
-        def create_fresh_client(options):
+        def create_fresh_client(options):  # noqa: ARG001
             nonlocal client_count
             client_count += 1
             client = create_mock_client(mock_result)
@@ -1267,7 +1234,6 @@ class TestIntegrationWorkflow:
     def test_error_recovery_workflow(self) -> None:
         """Test workflow: recover from error and continue with new session."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1296,7 +1262,7 @@ class TestIntegrationWorkflow:
         clients = [failing_client, success_client]
         client_index = 0
 
-        def create_client(options):
+        def create_client(options):  # noqa: ARG001
             nonlocal client_index
             client = clients[client_index]
             client_index += 1

@@ -144,13 +144,12 @@ class TestAnswerQuestionGeneratesResponse:
             result="I recommend using React for this project."
         )
 
-        def mock_sdk_query(**kwargs):
+        def mock_sdk_query(**kwargs):  # noqa: ARG001
             return create_async_generator(mock_response)
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 # Transition to awaiting_response first (required for answering_question transition)
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
@@ -184,7 +183,6 @@ class TestAnswerQuestionGeneratesResponse:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_prompt,
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -229,7 +227,6 @@ class TestAnswerQuestionGeneratesResponse:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_prompt,
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent.transition_to(DeveloperState.prompting)
                 agent.transition_to(DeveloperState.awaiting_response)
 
@@ -259,13 +256,12 @@ class TestAnswerQuestionGeneratesResponse:
         """Test that answer_question logs appropriate decisions."""
         mock_response = ResultMessage(result="Decision logged answer")
 
-        def mock_sdk_query(**kwargs):
+        def mock_sdk_query(**kwargs):  # noqa: ARG001
             return create_async_generator(mock_response)
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -289,13 +285,12 @@ class TestAnswerQuestionGeneratesResponse:
         """Test that answer_question manages state transitions correctly."""
         mock_response = ResultMessage(result="State transition answer")
 
-        def mock_sdk_query(**kwargs):
+        def mock_sdk_query(**kwargs):  # noqa: ARG001
             return create_async_generator(mock_response)
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -332,7 +327,6 @@ class TestDeveloperQAModelSelection:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_model,
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent_with_custom_model.transition_to(DeveloperState.prompting)
                 agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
 
@@ -361,7 +355,6 @@ class TestDeveloperQAModelSelection:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_model,
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -382,13 +375,12 @@ class TestDeveloperQAModelSelection:
         """Test that model_used is correctly recorded in AnswerResult."""
         mock_response = ResultMessage(result="Model recorded answer")
 
-        def mock_sdk_query(**kwargs):
+        def mock_sdk_query(**kwargs):  # noqa: ARG001
             return create_async_generator(mock_response)
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent_with_custom_model.transition_to(DeveloperState.prompting)
                 agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
 
@@ -433,7 +425,6 @@ class TestRetryUsesFullHistory:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_prompt,
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -479,7 +470,6 @@ class TestRetryUsesFullHistory:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_prompt,
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent.transition_to(DeveloperState.prompting)
                 agent.transition_to(DeveloperState.awaiting_response)
 
@@ -502,13 +492,12 @@ class TestRetryUsesFullHistory:
         """Test that retry logs indicate full history is being used."""
         mock_response = ResultMessage(result="Logged retry answer")
 
-        def mock_sdk_query(**kwargs):
+        def mock_sdk_query(**kwargs):  # noqa: ARG001
             return create_async_generator(mock_response)
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -527,13 +516,12 @@ class TestRetryUsesFullHistory:
         """Test that attempt_number is correctly preserved in AnswerResult."""
         mock_response = ResultMessage(result="Attempt number preserved")
 
-        def mock_sdk_query(**kwargs):
+        def mock_sdk_query(**kwargs):  # noqa: ARG001
             return create_async_generator(mock_response)
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -586,7 +574,6 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.side_effect = Exception("SDK query failed")
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -608,7 +595,6 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.side_effect = Exception("Connection timeout")
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -632,7 +618,6 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.return_value = ""  # Empty string response
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -653,7 +638,6 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 mock_query.return_value = None
 
                 base_developer_agent.transition_to(DeveloperState.prompting)
@@ -929,7 +913,6 @@ class TestAnswerGenerationIntegration:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 base_developer_agent.transition_to(DeveloperState.prompting)
                 base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
@@ -984,7 +967,6 @@ class TestAnswerGenerationIntegration:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_and_respond,
         ):
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
                 agent.transition_to(DeveloperState.prompting)
                 agent.transition_to(DeveloperState.awaiting_response)
 
