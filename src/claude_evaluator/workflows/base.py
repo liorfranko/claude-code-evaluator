@@ -126,7 +126,8 @@ class BaseWorkflow(ABC):
         """
         # Build additional directories
         claude_plans_dir = str(Path.home() / ".claude" / "plans")
-        additional_dirs = [claude_plans_dir, "/tmp"]
+        claude_plugins_dir = str(Path.home() / ".claude" / "plugins")
+        additional_dirs = [claude_plans_dir, claude_plugins_dir, "/tmp"]
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
