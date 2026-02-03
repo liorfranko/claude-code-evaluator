@@ -54,6 +54,7 @@ class DirectWorkflow(BaseWorkflow):
         defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
         model: str | None = None,
+        max_turns: int | None = None,
         on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the DirectWorkflow.
@@ -67,6 +68,7 @@ class DirectWorkflow(BaseWorkflow):
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
             model: Model identifier for the WorkerAgent (optional).
+            max_turns: Maximum conversation turns per query. Overrides defaults.
             on_progress_callback: Optional callback for progress events (verbose output).
 
         """
@@ -74,6 +76,7 @@ class DirectWorkflow(BaseWorkflow):
             metrics_collector,
             defaults,
             model=model,
+            max_turns=max_turns,
             on_progress_callback=on_progress_callback,
         )
         self._enable_question_handling = enable_question_handling

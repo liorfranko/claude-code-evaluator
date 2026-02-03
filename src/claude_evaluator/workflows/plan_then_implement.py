@@ -85,6 +85,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
         model: str | None = None,
+        max_turns: int | None = None,
         on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the workflow with optional custom prompt templates.
@@ -102,6 +103,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
             model: Model identifier for the WorkerAgent (optional).
+            max_turns: Maximum conversation turns per query. Overrides defaults.
             on_progress_callback: Optional callback for progress events (verbose output).
 
         """
@@ -109,6 +111,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
             metrics_collector,
             defaults,
             model=model,
+            max_turns=max_turns,
             on_progress_callback=on_progress_callback,
         )
         self._planning_prompt_template = (

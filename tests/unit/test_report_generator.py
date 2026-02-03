@@ -42,8 +42,7 @@ class TestReportGeneratorGenerate:
             turn_count=3,
             tokens_by_phase={},
         )
-        mock.developer_agent = MagicMock()
-        mock.developer_agent.decisions_log = []
+        mock.decisions_log = []  # Decisions stored directly on evaluation
         mock.is_terminal.return_value = status in {
             EvaluationStatus.completed,
             EvaluationStatus.failed,
@@ -106,7 +105,7 @@ class TestReportGeneratorGenerate:
             action="Test action",
             rationale="Test rationale",
         )
-        evaluation.developer_agent.decisions_log = [decision]
+        evaluation.decisions_log = [decision]
 
         report = generator.generate(evaluation)
 
@@ -318,8 +317,7 @@ class TestReportGeneratorBuildTimeline:
         mock.end_time = datetime(2024, 1, 1, 12, 5, 0)
         mock.status = EvaluationStatus.completed
         mock.error = None
-        mock.developer_agent = MagicMock()
-        mock.developer_agent.decisions_log = []
+        mock.decisions_log = []  # Decisions stored directly on evaluation
         return mock
 
     def test_build_timeline_includes_start_event(self) -> None:
@@ -352,7 +350,7 @@ class TestReportGeneratorBuildTimeline:
             action="Test action",
             rationale="Test rationale",
         )
-        evaluation.developer_agent.decisions_log = [decision]
+        evaluation.decisions_log = [decision]
 
         timeline = generator.build_timeline(evaluation)
 
@@ -372,7 +370,7 @@ class TestReportGeneratorBuildTimeline:
             action="Middle action",
             rationale="Middle rationale",
         )
-        evaluation.developer_agent.decisions_log = [decision]
+        evaluation.decisions_log = [decision]
 
         timeline = generator.build_timeline(evaluation)
 

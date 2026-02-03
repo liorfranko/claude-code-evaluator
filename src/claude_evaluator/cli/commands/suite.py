@@ -106,6 +106,7 @@ class RunSuiteCommand(BaseCommand):
                     phases=config.phases,
                     model=config.model,
                     repository_source=config.repository_source,
+                    max_turns=config.max_turns,
                 )
                 reports.append(report)
             except Exception as e:

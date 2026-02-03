@@ -1629,6 +1629,39 @@ class TestMultiCommandWorkflowInitialization:
 
         assert isinstance(workflow, BaseWorkflow)
 
+    def test_max_turns_is_stored(self) -> None:
+        """Test that max_turns is stored in workflow."""
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+
+        workflow = MultiCommandWorkflow(collector, phases, max_turns=2000)
+
+        assert workflow._max_turns == 2000
+
+    def test_max_turns_from_defaults_is_stored(self) -> None:
+        """Test that max_turns from defaults is stored in workflow when not explicitly set."""
+        from claude_evaluator.config.models import EvalDefaults
+
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+        defaults = EvalDefaults(max_turns=1500)
+
+        workflow = MultiCommandWorkflow(collector, phases, defaults=defaults)
+
+        assert workflow._max_turns == 1500
+
+    def test_max_turns_overrides_defaults(self) -> None:
+        """Test that explicit max_turns overrides defaults."""
+        from claude_evaluator.config.models import EvalDefaults
+
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+        defaults = EvalDefaults(max_turns=1500)
+
+        workflow = MultiCommandWorkflow(collector, phases, defaults=defaults, max_turns=2000)
+
+        assert workflow._max_turns == 2000
+
 
 class TestMultiCommandWorkflowExecution:
     """Tests for MultiCommandWorkflow execution."""

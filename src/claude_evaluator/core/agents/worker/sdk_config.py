@@ -47,6 +47,7 @@ class SDKConfigBuilder:
         max_budget_usd: float | None = None,
         model: str | None = None,
         use_user_plugins: bool = False,
+        max_turns: int | None = None,
     ) -> None:
         """Initialize the SDK config builder.
 
@@ -58,6 +59,8 @@ class SDKConfigBuilder:
             max_budget_usd: Maximum spend limit.
             model: Model identifier (optional).
             use_user_plugins: Whether to enable user plugins.
+            max_turns: Maximum conversation turns. If None, uses settings default.
+                Pass 0 or negative to use SDK default (unlimited).
 
         """
         self._project_directory = project_directory
@@ -67,6 +70,7 @@ class SDKConfigBuilder:
         self._max_budget_usd = max_budget_usd
         self._model = model
         self._use_user_plugins = use_user_plugins
+        self._max_turns = max_turns
         self._can_use_tool_handler: (
             Callable[[str, dict[str, Any], Any], Awaitable[Any]] | None
         ) = None
@@ -96,12 +100,27 @@ class SDKConfigBuilder:
             PermissionMode.bypassPermissions: "bypassPermissions",
         }
 
+        # Determine max_turns: use provided value, or fall back to settings default
+        # If max_turns is 0 or negative, pass None to use SDK default (unlimited)
+        if self._max_turns is not None:
+            max_turns = self._max_turns if self._max_turns > 0 else None
+            source = "config" if self._max_turns > 0 else "unlimited (config=0)"
+        else:
+            max_turns = get_settings().worker.max_turns
+            source = "settings default"
+
+        logger.info(
+            "sdk_max_turns_configured",
+            max_turns=max_turns,
+            source=source,
+        )
+
         return ClaudeAgentOptions(
             cwd=self._project_directory,
             add_dirs=self._additional_dirs if self._additional_dirs else [],
             permission_mode=permission_map.get(self._permission_mode, "plan"),
             allowed_tools=self._allowed_tools if self._allowed_tools else [],
-            max_turns=get_settings().worker.max_turns,
+            max_turns=max_turns,
             max_budget_usd=self._max_budget_usd,
             model=self._model or DEFAULT_WORKER_MODEL,
             setting_sources=["user"] if self._use_user_plugins else None,

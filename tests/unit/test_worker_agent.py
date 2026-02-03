@@ -40,15 +40,16 @@ class TestWorkerAgentInitialization:
         assert agent.allowed_tools == []
         assert isinstance(agent.allowed_tools, list)
 
-    def test_default_max_turns(self) -> None:
-        """Test that max_turns defaults to 10."""
+    def test_default_max_turns_is_none(self) -> None:
+        """Test that max_turns defaults to None (use settings default at build time)."""
         agent = WorkerAgent(
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        assert agent.max_turns == 10
+        # max_turns defaults to None, meaning "use settings default at build time"
+        assert agent.max_turns is None
 
     def test_default_session_id_is_none(self) -> None:
         """Test that session_id defaults to None."""

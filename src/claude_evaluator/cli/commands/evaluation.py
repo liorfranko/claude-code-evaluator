@@ -77,6 +77,7 @@ class RunEvaluationCommand(BaseCommand):
         phases: list[Phase] | None = None,
         model: str | None = None,
         repository_source: RepositorySource | None = None,
+        max_turns: int | None = None,
     ) -> EvaluationReport:
         """Run a single evaluation.
 
@@ -89,6 +90,7 @@ class RunEvaluationCommand(BaseCommand):
             phases: Phases for multi-command workflow (optional).
             model: Model identifier to use (optional).
             repository_source: Source repository for brownfield mode (optional).
+            max_turns: Maximum conversation turns per query.
 
         Returns:
             The generated EvaluationReport.
@@ -158,7 +160,7 @@ class RunEvaluationCommand(BaseCommand):
             print(f"model: {model}")
         try:
             # Execute workflow
-            workflow = self._create_workflow(workflow_type, collector, phases, model, verbose)
+            workflow = self._create_workflow(workflow_type, collector, phases, model, verbose, max_turns)
             await workflow.execute_with_timeout(evaluation, effective_timeout)
 
             if verbose:
@@ -235,15 +237,16 @@ class RunEvaluationCommand(BaseCommand):
         phases: list[Phase] | None,
         model: str | None = None,
         verbose: bool = False,
+        max_turns: int | None = None,
     ) -> DirectWorkflow | PlanThenImplementWorkflow | MultiCommandWorkflow:
         """Create the appropriate workflow instance."""
         # Create progress callback for verbose output
         progress_callback = create_progress_callback() if verbose else None
 
         if workflow_type == WorkflowType.direct:
-            return DirectWorkflow(collector, model=model, on_progress_callback=progress_callback)
+            return DirectWorkflow(collector, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
         elif workflow_type == WorkflowType.plan_then_implement:
-            return PlanThenImplementWorkflow(collector, model=model, on_progress_callback=progress_callback)
+            return PlanThenImplementWorkflow(collector, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
         elif workflow_type == WorkflowType.multi_command:
             if phases is None:
                 phases = [
@@ -253,7 +256,7 @@ class RunEvaluationCommand(BaseCommand):
                         prompt_template="{task}",
                     ),
                 ]
-            return MultiCommandWorkflow(collector, phases, model=model, on_progress_callback=progress_callback)
+            return MultiCommandWorkflow(collector, phases, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
         else:
             raise ValueError(f"Unknown workflow type: {workflow_type}")
 

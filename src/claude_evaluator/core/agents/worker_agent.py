@@ -97,6 +97,7 @@ class WorkerAgent(BaseSchema):
     on_progress_callback: Callable[[ProgressEvent], None] | None = None
     question_timeout_seconds: int = DEFAULT_QUESTION_TIMEOUT_SECONDS
     use_user_plugins: bool = False
+    max_turns: int | None = None
     tool_invocations: list[ToolInvocation] = Field(default_factory=list)
 
     # Internal state (private attributes)
@@ -203,6 +204,7 @@ class WorkerAgent(BaseSchema):
                 max_budget_usd=self.max_budget_usd,
                 model=self.model,
                 use_user_plugins=self.use_user_plugins,
+                max_turns=self.max_turns,
             )
             config_builder.set_tool_permission_handler(
                 self._permission_handler.handle_tool_permission
@@ -425,6 +427,16 @@ class WorkerAgent(BaseSchema):
     def set_permission_mode(self, mode: PermissionMode) -> None:
         """Update the permission mode for subsequent executions."""
         self.permission_mode = mode
+
+    def set_max_turns(self, max_turns: int | None) -> None:
+        """Update the max turns limit for subsequent executions.
+
+        Args:
+            max_turns: Maximum conversation turns. Pass None to use settings default,
+                or 0/negative to use SDK default (unlimited).
+
+        """
+        self.max_turns = max_turns
 
     def start_session(self) -> str:
         """Start a new Claude Code session."""

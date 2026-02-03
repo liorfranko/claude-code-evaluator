@@ -67,7 +67,6 @@ class WorkerSettings(BaseSettings):
         model: Model identifier for SDK execution.
         max_turns: Maximum conversation turns per query.
         question_timeout_seconds: Timeout for question callbacks.
-        sdk_max_turns: Default max turns for SDK execution.
 
     """
 

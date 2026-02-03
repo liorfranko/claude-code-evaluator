@@ -17,6 +17,7 @@ from claude_evaluator.models.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
+    from claude_evaluator.config.models import EvalDefaults
     from claude_evaluator.core import Evaluation
     from claude_evaluator.metrics.collector import MetricsCollector
     from claude_evaluator.models.metrics import Metrics
@@ -71,7 +72,9 @@ class MultiCommandWorkflow(BaseWorkflow):
         self,
         metrics_collector: "MetricsCollector",
         phases: list[Phase],
+        defaults: "EvalDefaults | None" = None,
         model: str | None = None,
+        max_turns: int | None = None,
         on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the workflow with phases to execute.
@@ -79,11 +82,13 @@ class MultiCommandWorkflow(BaseWorkflow):
         Args:
             metrics_collector: The MetricsCollector instance for aggregating metrics.
             phases: List of Phase configurations defining the workflow steps.
+            defaults: Optional EvalDefaults containing configuration defaults.
             model: Model identifier for the WorkerAgent (optional).
+            max_turns: Maximum conversation turns per query. Overrides defaults.
             on_progress_callback: Optional callback for progress events (verbose output).
 
         """
-        super().__init__(metrics_collector, model=model, on_progress_callback=on_progress_callback)
+        super().__init__(metrics_collector, defaults=defaults, model=model, max_turns=max_turns, on_progress_callback=on_progress_callback)
         self._phases = phases
         self._phase_results: dict[str, str] = {}
         self._current_phase_index: int = 0
@@ -186,6 +191,10 @@ class MultiCommandWorkflow(BaseWorkflow):
         logger.info("setting permission mode to", phase=phase.name, permission_mode=phase.permission_mode)
         worker.set_permission_mode(phase.permission_mode)
 
+        # Configure max_turns if specified for this phase
+        if phase.max_turns is not None:
+            worker.set_max_turns(phase.max_turns)
+        logger.info("max_turns is set to", max_turns=worker.max_turns)
         # Emit phase start event for verbose output
         from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 
@@ -226,6 +235,28 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         # Have developer agent analyze response and continue if needed
         response = query_metrics.response
+
+        # Log warning if response is None and we may have hit max_turns
+        if response is None:
+            effective_max_turns = phase.max_turns or self._max_turns
+            if effective_max_turns is not None and query_metrics.num_turns >= effective_max_turns:
+                logger.warning(
+                    "max_turns_limit_reached",
+                    phase=phase.name,
+                    num_turns=query_metrics.num_turns,
+                    max_turns=effective_max_turns,
+                    message=f"Phase '{phase.name}' reached max_turns limit ({query_metrics.num_turns}/{effective_max_turns}). "
+                    "Consider increasing max_turns in defaults or phase configuration.",
+                )
+            else:
+                logger.warning(
+                    "empty_response_received",
+                    phase=phase.name,
+                    num_turns=query_metrics.num_turns,
+                    max_turns=effective_max_turns,
+                    message=f"Phase '{phase.name}' returned empty response after {query_metrics.num_turns} turns.",
+                )
+
         logger.info("developer_continuation_starting", response=response)
         continuation_count = 0
         developer = self._developer

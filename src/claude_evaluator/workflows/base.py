@@ -70,6 +70,7 @@ class BaseWorkflow(ABC):
         metrics_collector: "MetricsCollector",
         defaults: "EvalDefaults | None" = None,
         model: str | None = None,
+        max_turns: int | None = None,
         on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the workflow with a metrics collector and optional defaults.
@@ -81,6 +82,7 @@ class BaseWorkflow(ABC):
                 question handling (developer_qa_model, question_timeout_seconds,
                 context_window_size). If not provided, defaults are used.
             model: Model identifier for the WorkerAgent (optional).
+            max_turns: Maximum conversation turns per query. Overrides defaults.
             on_progress_callback: Optional callback for progress events (verbose output).
 
         """
@@ -89,6 +91,7 @@ class BaseWorkflow(ABC):
         self._context_window_size: int = 10
         self._developer_qa_model: str | None = None
         self._model: str | None = model
+        self._max_turns: int | None = max_turns
         self._on_progress_callback: Callable[[ProgressEvent], None] | None = (
             on_progress_callback
         )
@@ -101,6 +104,9 @@ class BaseWorkflow(ABC):
             self._question_timeout_seconds = defaults.question_timeout_seconds
             self._context_window_size = defaults.context_window_size
             self._developer_qa_model = defaults.developer_qa_model
+            # Only use defaults.max_turns if max_turns not explicitly provided
+            if self._max_turns is None:
+                self._max_turns = defaults.max_turns
             # Use defaults.model if model not explicitly provided
             if self._model is None:
                 self._model = defaults.model
@@ -130,6 +136,7 @@ class BaseWorkflow(ABC):
             additional_dirs=additional_dirs,
             use_user_plugins=True,
             model=self._model,
+            max_turns=self._max_turns,
             on_progress_callback=self._on_progress_callback,
         )
         self._developer = developer

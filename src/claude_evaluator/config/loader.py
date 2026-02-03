@@ -15,6 +15,7 @@ import yaml
 from claude_evaluator.config.defaults import (
     DEFAULT_CONTEXT_WINDOW_SIZE,
     DEFAULT_EVALUATION_TIMEOUT_SECONDS,
+    DEFAULT_MAX_TURNS,
     DEFAULT_QUESTION_TIMEOUT_SECONDS,
 )
 from claude_evaluator.config.exceptions import ConfigurationError
@@ -279,6 +280,10 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
         # Ensure timeout_seconds is always set (mandatory)
         if evaluation.timeout_seconds is None:
             evaluation.timeout_seconds = DEFAULT_EVALUATION_TIMEOUT_SECONDS
+
+        # Ensure max_turns is always set (mandatory)
+        if evaluation.max_turns is None:
+            evaluation.max_turns = DEFAULT_MAX_TURNS
 
     return suite
 

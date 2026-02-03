@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from claude_evaluator.config.defaults import DEFAULT_EVALUATION_TIMEOUT_SECONDS
+from claude_evaluator.config.defaults import DEFAULT_EVALUATION_TIMEOUT_SECONDS, DEFAULT_MAX_TURNS
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import apply_defaults, load_suite
 from claude_evaluator.config.models import (
@@ -635,9 +635,9 @@ class TestApplyDefaults:
 
         result = apply_defaults(suite)
 
-        # Should return suite with mandatory timeout applied
+        # Should return suite with mandatory values applied
         assert result is suite
-        assert result.evaluations[0].max_turns is None
+        assert result.evaluations[0].max_turns == DEFAULT_MAX_TURNS  # Mandatory
         assert result.evaluations[0].max_budget_usd is None
         # timeout_seconds is mandatory and always set
         assert result.evaluations[0].timeout_seconds == DEFAULT_EVALUATION_TIMEOUT_SECONDS
@@ -660,8 +660,8 @@ class TestApplyDefaults:
 
         result = apply_defaults(suite)
 
-        # Optional values should remain None, but timeout is mandatory
-        assert result.evaluations[0].max_turns is None
+        # max_budget_usd is optional, but max_turns and timeout are mandatory
+        assert result.evaluations[0].max_turns == DEFAULT_MAX_TURNS
         assert result.evaluations[0].max_budget_usd is None
         # timeout_seconds is mandatory and always set
         assert result.evaluations[0].timeout_seconds == DEFAULT_EVALUATION_TIMEOUT_SECONDS
