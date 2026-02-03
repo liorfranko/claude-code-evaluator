@@ -11,7 +11,6 @@ import pytest
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
-    ExecutionMode,
     Outcome,
     PermissionMode,
     WorkflowType,
@@ -96,42 +95,6 @@ class TestEvaluationStatus:
         assert "running" in [es.value for es in EvaluationStatus]
         assert EvaluationStatus.pending in EvaluationStatus
         assert EvaluationStatus("failed") == EvaluationStatus.failed
-
-
-class TestExecutionMode:
-    """Tests for ExecutionMode enum."""
-
-    def test_expected_values(self) -> None:
-        """Test that ExecutionMode has all expected values."""
-        assert ExecutionMode.sdk.value == "sdk"
-        assert ExecutionMode.cli.value == "cli"
-
-    def test_member_count(self) -> None:
-        """Test that ExecutionMode has exactly 2 members."""
-        assert len(ExecutionMode) == 2
-
-    def test_string_comparison(self) -> None:
-        """Test that ExecutionMode can be compared to strings."""
-        assert ExecutionMode.sdk == "sdk"
-        assert ExecutionMode.cli == "cli"
-
-    def test_string_operations(self) -> None:
-        """Test that ExecutionMode supports string operations."""
-        assert ExecutionMode.sdk.upper() == "SDK"
-        assert ExecutionMode.cli.upper() == "CLI"
-        assert len(ExecutionMode.sdk) == 3
-
-    def test_json_serialization(self) -> None:
-        """Test that ExecutionMode serializes to JSON as a string."""
-        data = {"mode": ExecutionMode.cli}
-        json_str = json.dumps(data)
-        assert json_str == '{"mode": "cli"}'
-
-    def test_membership(self) -> None:
-        """Test enum membership checks."""
-        assert "sdk" in [em.value for em in ExecutionMode]
-        assert ExecutionMode.cli in ExecutionMode
-        assert ExecutionMode("sdk") == ExecutionMode.sdk
 
 
 class TestPermissionMode:
@@ -276,7 +239,6 @@ class TestEnumInvalidValues:
         [
             (WorkflowType, "invalid_workflow"),
             (EvaluationStatus, "unknown_status"),
-            (ExecutionMode, "unknown_mode"),
             (PermissionMode, "invalid_permission"),
             (Outcome, "invalid_outcome"),
             (DeveloperState, "invalid_state"),
@@ -306,13 +268,6 @@ class TestEnumJsonDeserialization:
         data = json.loads(json_str)
         status = EvaluationStatus(data["status"])
         assert status == EvaluationStatus.running
-
-    def test_execution_mode_from_json(self) -> None:
-        """Test ExecutionMode can be created from JSON-parsed string."""
-        json_str = '{"mode": "sdk"}'
-        data = json.loads(json_str)
-        mode = ExecutionMode(data["mode"])
-        assert mode == ExecutionMode.sdk
 
     def test_permission_mode_from_json(self) -> None:
         """Test PermissionMode can be created from JSON-parsed string."""
@@ -350,7 +305,6 @@ class TestEnumIterability:
         all_enums = [
             WorkflowType,
             EvaluationStatus,
-            ExecutionMode,
             PermissionMode,
             Outcome,
             DeveloperState,

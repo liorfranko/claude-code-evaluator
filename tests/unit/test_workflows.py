@@ -16,7 +16,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -62,7 +61,6 @@ class TestDirectWorkflowExecuteReturnsMetrics:
     def mock_worker_agent(self) -> WorkerAgent:
         """Create a mock WorkerAgent for testing."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -228,7 +226,6 @@ class TestDirectWorkflowPermissionMode:
     def mock_worker_agent(self) -> WorkerAgent:
         """Create a mock WorkerAgent with initial plan mode."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,  # Start with plan mode
@@ -348,7 +345,6 @@ class TestDirectWorkflowMockedWorker:
     def mock_worker(self) -> WorkerAgent:
         """Create a fully mocked WorkerAgent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -545,7 +541,6 @@ class TestDirectWorkflowErrorHandling:
     def mock_worker(self) -> WorkerAgent:
         """Create a mock WorkerAgent for testing."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -627,7 +622,6 @@ class TestDirectWorkflowRuntimeTracking:
     def mock_worker(self) -> WorkerAgent:
         """Create a mock WorkerAgent for testing."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -691,7 +685,6 @@ class TestDirectWorkflowToolCounts:
     def mock_worker(self) -> WorkerAgent:
         """Create a mock WorkerAgent for testing."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -861,7 +854,6 @@ class TestPlanThenImplementWorkflowExecution:
         """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1172,7 +1164,6 @@ class TestPlanThenImplementWorkflowMetrics:
         """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1449,7 +1440,6 @@ class TestPlanThenImplementWorkflowErrorHandling:
         """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1647,7 +1637,6 @@ class TestMultiCommandWorkflowExecution:
         """Create a mock Evaluation for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1784,8 +1773,7 @@ class TestMultiCommandWorkflowExecution:
 #         """Create a mock Evaluation for testing."""
 #         developer = DeveloperAgent()
 #         worker = WorkerAgent(
-#             execution_mode=ExecutionMode.sdk,
-#             project_directory="/tmp/test",
+# #             project_directory="/tmp/test",
 #             active_session=False,
 #             permission_mode=PermissionMode.plan,
 #         )
@@ -1927,8 +1915,7 @@ class TestMultiCommandWorkflowExecution:
 #         """Create a mock Evaluation for testing."""
 #         developer = DeveloperAgent()
 #         worker = WorkerAgent(
-#             execution_mode=ExecutionMode.sdk,
-#             project_directory="/tmp/test",
+# #             project_directory="/tmp/test",
 #             active_session=False,
 #             permission_mode=PermissionMode.plan,
 #         )

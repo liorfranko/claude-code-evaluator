@@ -15,7 +15,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.enums import (
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -187,7 +186,6 @@ class TestWorkflowConfigurationPassing:
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -210,7 +208,6 @@ class TestWorkflowConfigurationPassing:
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -230,7 +227,6 @@ class TestWorkflowConfigurationPassing:
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -256,7 +252,6 @@ class TestWorkflowConfigurationPassing:
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -282,7 +277,6 @@ class TestDirectWorkflowQuestionHandling:
         """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -391,7 +385,6 @@ class TestPlanThenImplementWorkflowQuestionHandling:
         """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -585,7 +578,6 @@ class TestWorkflowResourceCleanup:
         """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -776,7 +768,6 @@ class TestWorkflowQuestionHandlingIntegration:
         """Create mock agents for testing."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,

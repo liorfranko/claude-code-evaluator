@@ -5,9 +5,11 @@ direct implementation without planning phases. It executes a task in a single
 shot with acceptEdits permission mode.
 """
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from claude_evaluator.models.enums import PermissionMode
+from claude_evaluator.models.progress import ProgressEvent
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
@@ -52,6 +54,7 @@ class DirectWorkflow(BaseWorkflow):
         defaults: "EvalDefaults | None" = None,
         enable_question_handling: bool = True,
         model: str | None = None,
+        on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the DirectWorkflow.
 
@@ -64,9 +67,15 @@ class DirectWorkflow(BaseWorkflow):
                 with a question callback. Set to False for tests or when
                 questions are not expected. Defaults to True.
             model: Model identifier for the WorkerAgent (optional).
+            on_progress_callback: Optional callback for progress events (verbose output).
 
         """
-        super().__init__(metrics_collector, defaults, model=model)
+        super().__init__(
+            metrics_collector,
+            defaults,
+            model=model,
+            on_progress_callback=on_progress_callback,
+        )
         self._enable_question_handling = enable_question_handling
 
     @property

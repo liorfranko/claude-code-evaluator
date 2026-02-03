@@ -15,7 +15,6 @@ import pytest
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.models.enums import (
     DeveloperState,
-    ExecutionMode,
     PermissionMode,
 )
 from claude_evaluator.models.question import (
@@ -148,7 +147,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
 
         # Create WorkerAgent with the callback
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -246,7 +244,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
 
         # Create Worker with Developer callback
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -299,7 +296,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -345,7 +341,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
             return f"Answer to question {question_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -390,7 +385,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
             return "Option A"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -442,7 +436,6 @@ class TestT700QuestionContextIntegrity:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -473,7 +466,6 @@ class TestT700QuestionContextIntegrity:
             return "retry answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -504,7 +496,6 @@ class TestT700ErrorHandling:
     async def test_no_callback_raises_runtime_error(self) -> None:
         """Test that missing callback raises clear RuntimeError."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -532,7 +523,6 @@ class TestT700ErrorHandling:
             return "late answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -600,7 +590,6 @@ class TestT700AcceptanceCriteriaVerification:
             return "Developer approves using pytest"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1033,7 +1022,6 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         # Create Worker with Developer callback
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t701_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1156,7 +1144,6 @@ class TestT702SessionContinuity:
             return "Answer from developer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1196,7 +1183,6 @@ class TestT702SessionContinuity:
             return "Answer for session"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1246,7 +1232,6 @@ class TestT702SessionContinuity:
             return "Answer without new client"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1322,7 +1307,6 @@ class TestT702SessionContinuity:
             return "Answer from callback"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1361,7 +1345,6 @@ class TestT702SessionContinuity:
             return f"Answer {len(history_lengths)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1414,7 +1397,6 @@ class TestT702SessionContinuity:
             return "Async answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1535,7 +1517,6 @@ class TestT702SessionContinuity:
             return "Verified answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t702_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1659,7 +1640,6 @@ class TestT703WorkerContinuesAfterAnswer:
             return "Use pytest"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1732,7 +1712,6 @@ class TestT703WorkerContinuesAfterAnswer:
             return "Yes, create the file"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1805,7 +1784,6 @@ class TestT703WorkerContinuesAfterAnswer:
             return "Use the REST API approach"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1898,7 +1876,6 @@ class TestT703WorkerContinuesAfterAnswer:
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2012,7 +1989,6 @@ class TestT703WorkerContinuesAfterAnswer:
             return "Continue"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2057,7 +2033,6 @@ class TestT703WorkerContinuesAfterAnswer:
             return "Proceed"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2186,7 +2161,6 @@ class TestT703WorkerContinuesAfterAnswer:
             return "Verification answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t703_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2288,7 +2262,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"Answer {len(session_ids_received)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2374,7 +2347,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"Answer to question {len(history_lengths)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2481,7 +2453,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2527,7 +2498,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2594,7 +2564,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"DISTINCTIVE_ANSWER_{answer_num}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2667,7 +2636,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2750,7 +2718,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
 
         # Create worker
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2804,7 +2771,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"Answer at history length {len(context.conversation_history)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -2928,7 +2894,6 @@ class TestT704SessionContextPreservedAcrossMultipleExchanges:
             return f"T704 verification answer {questions_answered}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t704_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3036,7 +3001,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return "Memory test answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3121,7 +3085,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"Answer #{len(context_snapshots)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3218,7 +3181,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"ANSWER_FOR_[{question_text}]"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3283,7 +3245,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return "Tracked answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3354,7 +3315,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"Memory answer {exchange_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3486,7 +3446,6 @@ class TestT705WorkerRemembersPreviousMessages:
             return f"T705_ANSWER_{question_number}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t705_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3631,7 +3590,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Tracked completion")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3682,7 +3640,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Sequence test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3743,7 +3700,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Storage test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3793,7 +3749,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Connection state test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3846,7 +3801,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result=f"Client {self.client_number} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3901,7 +3855,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result=f"Client {self.client_number} response")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -3955,7 +3908,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="Should not reach here")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4022,7 +3974,6 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
                 yield ResultMessage(result="T706 verification complete")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t706_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4121,7 +4072,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="Disconnect test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4179,7 +4129,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="Should not reach")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4238,7 +4187,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 raise RuntimeError("T707: Streaming failed")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4294,7 +4242,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="Should not reach")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4375,7 +4322,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result=f"Client {self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4436,7 +4382,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result=f"{self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4502,7 +4447,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="Idempotent test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4554,7 +4498,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="State test done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4626,7 +4569,6 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
                 yield ResultMessage(result="T707 verification done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t707_verification",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4742,7 +4684,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"{self.client_id} completed")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_50_eval_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4810,7 +4751,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"Client {self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_accumulation_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4885,7 +4825,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             return f"Answer {question_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_qa_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -4957,7 +4896,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"{self.client_id} completed")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_failure_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5024,7 +4962,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result="Done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_tool_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5099,7 +5036,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_counter_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5171,7 +5107,6 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
                 yield ResultMessage(result=f"{self.client_id} done")
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t708_complete_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5259,7 +5194,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5328,7 +5262,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer {len(session_ids)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5373,7 +5306,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer {len(history_lengths)}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5430,7 +5362,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return "ANSWER_UNKNOWN"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5483,7 +5414,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return "Selected option"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5560,7 +5490,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5604,7 +5533,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer {len(questions_handled)} for {q_text}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5679,7 +5607,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return f"Answer for {context.questions[0].question}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5784,7 +5711,6 @@ class TestT709WorkerAsksMultipleQuestionsInSequence:
             return answer
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t709_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5921,7 +5847,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "this will never be returned"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -5982,7 +5907,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6037,7 +5961,6 @@ class TestT710TimeoutTriggersGracefulFailure:
                 raise
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6097,7 +6020,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6131,7 +6053,6 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         # Use a 2-second timeout
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6171,7 +6092,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6223,7 +6143,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return f"Fast answer {call_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6285,7 +6204,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6349,7 +6267,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "Quick answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6416,7 +6333,6 @@ class TestT710TimeoutTriggersGracefulFailure:
                 raise
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t710_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6522,7 +6438,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             return f"Attempt {context.attempt_number} answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6736,7 +6651,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -6873,7 +6787,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
                 return "Use PostgreSQL with read replicas for high availability"  # More detailed
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7009,7 +6922,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7101,7 +7013,6 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
 
         # Test Worker-side retry detection
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t711_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7226,7 +7137,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Providing guidance for the unclear question"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7282,7 +7192,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer for whitespace question"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7330,7 +7239,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answering despite no questions"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7376,7 +7284,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7428,7 +7335,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7486,7 +7392,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Handled malformed data"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7537,7 +7442,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answered"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7582,7 +7486,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7626,7 +7529,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7677,7 +7579,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Providing clarification"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7727,7 +7628,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Selected"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7795,7 +7695,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Context validated"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7851,7 +7750,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "UNIQUE_ANSWER_FOR_T712_TEST"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7893,7 +7791,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return f"Answer {answer_count}"
 
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7954,7 +7851,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer 1"
 
         worker_1 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -7990,7 +7886,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer 2"
 
         worker_2 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -8027,7 +7922,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer 3"
 
         worker_3 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -8075,7 +7969,6 @@ class TestT712EmptyInvalidQuestionHandling:
             return "Answer 4"
 
         worker_4 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/t712_verify",
             active_session=False,
             permission_mode=PermissionMode.plan,

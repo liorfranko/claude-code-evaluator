@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING, Any
 from claude_evaluator.core.agents.developer import DeveloperAgent
 from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode
+from claude_evaluator.models.enums import PermissionMode
+from claude_evaluator.models.progress import ProgressEvent
 from claude_evaluator.workflows.exceptions import (
     QuestionHandlingError,
     WorkflowTimeoutError,
@@ -69,6 +70,7 @@ class BaseWorkflow(ABC):
         metrics_collector: "MetricsCollector",
         defaults: "EvalDefaults | None" = None,
         model: str | None = None,
+        on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the workflow with a metrics collector and optional defaults.
 
@@ -79,6 +81,7 @@ class BaseWorkflow(ABC):
                 question handling (developer_qa_model, question_timeout_seconds,
                 context_window_size). If not provided, defaults are used.
             model: Model identifier for the WorkerAgent (optional).
+            on_progress_callback: Optional callback for progress events (verbose output).
 
         """
         self._metrics_collector = metrics_collector
@@ -86,6 +89,9 @@ class BaseWorkflow(ABC):
         self._context_window_size: int = 10
         self._developer_qa_model: str | None = None
         self._model: str | None = model
+        self._on_progress_callback: Callable[[ProgressEvent], None] | None = (
+            on_progress_callback
+        )
 
         # Agents created per-execution
         self._developer: DeveloperAgent | None = None
@@ -118,15 +124,14 @@ class BaseWorkflow(ABC):
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory=evaluation.workspace_path,
             active_session=False,
             permission_mode=PermissionMode.acceptEdits,
             additional_dirs=additional_dirs,
             use_user_plugins=True,
             model=self._model,
+            on_progress_callback=self._on_progress_callback,
         )
-
         self._developer = developer
         self._worker = worker
         return developer, worker

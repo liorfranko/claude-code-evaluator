@@ -19,7 +19,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -36,7 +35,6 @@ class TestPlanWorkflowE2EPlanModeExecution:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -182,7 +180,6 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -385,7 +382,6 @@ class TestPlanWorkflowE2EMetricsCapture:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -620,7 +616,6 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,

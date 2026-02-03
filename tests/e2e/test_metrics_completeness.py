@@ -14,7 +14,6 @@ from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -75,7 +74,6 @@ class TestMetricsSchemaValidation:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent with complete metrics."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -357,7 +355,6 @@ class TestMultiPhaseMetricsCompleteness:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,

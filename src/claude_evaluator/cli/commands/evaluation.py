@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
+from claude_evaluator.cli.formatters import create_progress_callback
 from claude_evaluator.config.models import Phase, RepositorySource
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.git_operations import (
@@ -145,10 +146,11 @@ class RunEvaluationCommand(BaseCommand):
         if verbose:
             print(f"Workspace: {evaluation.workspace_path}")
             print(f"Evaluation ID: {evaluation.id}")
-
+            print(f"workflow type: {workflow_type}")
+            print(f"model: {model}")
         try:
             # Execute workflow
-            workflow = self._create_workflow(workflow_type, collector, phases, model)
+            workflow = self._create_workflow(workflow_type, collector, phases, model, verbose)
             await workflow.execute_with_timeout(evaluation, timeout_seconds)
 
             if verbose:
@@ -224,12 +226,16 @@ class RunEvaluationCommand(BaseCommand):
         collector: MetricsCollector,
         phases: list[Phase] | None,
         model: str | None = None,
+        verbose: bool = False,
     ) -> DirectWorkflow | PlanThenImplementWorkflow | MultiCommandWorkflow:
         """Create the appropriate workflow instance."""
+        # Create progress callback for verbose output
+        progress_callback = create_progress_callback() if verbose else None
+
         if workflow_type == WorkflowType.direct:
-            return DirectWorkflow(collector, model=model)
+            return DirectWorkflow(collector, model=model, on_progress_callback=progress_callback)
         elif workflow_type == WorkflowType.plan_then_implement:
-            return PlanThenImplementWorkflow(collector, model=model)
+            return PlanThenImplementWorkflow(collector, model=model, on_progress_callback=progress_callback)
         elif workflow_type == WorkflowType.multi_command:
             if phases is None:
                 phases = [
@@ -239,7 +245,7 @@ class RunEvaluationCommand(BaseCommand):
                         prompt_template="{task}",
                     ),
                 ]
-            return MultiCommandWorkflow(collector, phases, model=model)
+            return MultiCommandWorkflow(collector, phases, model=model, on_progress_callback=progress_callback)
         else:
             raise ValueError(f"Unknown workflow type: {workflow_type}")
 

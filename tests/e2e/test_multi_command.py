@@ -19,7 +19,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -36,7 +35,6 @@ class TestMultiCommandE2ESequentialExecution:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -223,7 +221,6 @@ class TestMultiCommandE2EContextPassing:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -449,7 +446,6 @@ class TestMultiCommandE2EMetrics:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -664,7 +660,6 @@ class TestMultiCommandE2EErrorHandling:
         """Create a test Evaluation instance."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test-project",
             active_session=False,
             permission_mode=PermissionMode.plan,

@@ -18,7 +18,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     Outcome,
     PermissionMode,
     WorkflowType,
@@ -39,7 +38,6 @@ class TestFullWorkflowExecution:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -226,7 +224,6 @@ class TestFullWorkflowWithYAMLConfig:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -323,7 +320,6 @@ class TestFullWorkflowReportPersistence:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker agent."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -446,7 +442,6 @@ class TestFullWorkflowErrorScenarios:
         """Test that workflow failure still generates a report."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -492,7 +487,6 @@ class TestFullWorkflowErrorScenarios:
         """Test that partial workflow completion is captured."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,

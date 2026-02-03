@@ -15,7 +15,7 @@ import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode
+from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.question import (
     QuestionContext,
 )
@@ -150,7 +150,6 @@ class MockClaudeSDKClient:
 def base_agent() -> WorkerAgent:
     """Create a base WorkerAgent for testing without question callback."""
     return WorkerAgent(
-        execution_mode=ExecutionMode.sdk,
         project_directory="/tmp/test_project",
         active_session=False,
         permission_mode=PermissionMode.plan,
@@ -165,7 +164,6 @@ def agent_with_callback() -> WorkerAgent:
         return "test answer"
 
     return WorkerAgent(
-        execution_mode=ExecutionMode.sdk,
         project_directory="/tmp/test_project",
         active_session=False,
         permission_mode=PermissionMode.plan,
@@ -452,7 +450,6 @@ class TestCallbackInvocation:
             return "user's answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -491,7 +488,6 @@ class TestCallbackInvocation:
             return "answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -526,7 +522,6 @@ class TestAnswerInjection:
             return "The answer is 42"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -574,7 +569,6 @@ class TestAnswerInjection:
             return "Continue with option A"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -625,7 +619,6 @@ class TestAnswerInjection:
             return f"Answer {answer_count}"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -668,7 +661,6 @@ class TestTimeoutHandling:
         """Test that valid timeout values are accepted."""
         # Minimum valid
         agent_min = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -678,7 +670,6 @@ class TestTimeoutHandling:
 
         # Maximum valid
         agent_max = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -689,7 +680,6 @@ class TestTimeoutHandling:
     def test_question_timeout_validation_default(self) -> None:
         """Test that default timeout is 60 seconds."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -700,7 +690,6 @@ class TestTimeoutHandling:
         """Test that timeout of 0 is rejected."""
         with pytest.raises(ValueError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
@@ -714,7 +703,6 @@ class TestTimeoutHandling:
         """Test that negative timeout is rejected."""
         with pytest.raises(ValueError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
@@ -728,7 +716,6 @@ class TestTimeoutHandling:
         """Test that timeout over 300 is rejected."""
         with pytest.raises(ValueError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
@@ -747,7 +734,6 @@ class TestTimeoutHandling:
             return "late answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -774,7 +760,6 @@ class TestTimeoutHandling:
             return "never"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -805,7 +790,6 @@ class TestTimeoutHandling:
             return "quick answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -837,7 +821,6 @@ class TestQuestionHandlingIntegration:
 
         with pytest.raises(TypeError) as exc_info:
             WorkerAgent(
-                execution_mode=ExecutionMode.sdk,
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
@@ -924,7 +907,6 @@ class TestQuestionHandlingIntegration:
             return "answer"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -992,7 +974,6 @@ class TestQuestionHandlingIntegration:
             return "Confirmed"
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -1130,7 +1111,6 @@ class TestQuestionHandlingEdgeCases:
             raise ValueError("Callback failed intentionally")
 
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,

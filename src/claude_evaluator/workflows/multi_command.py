@@ -7,10 +7,12 @@ commands to be executed in order.
 """
 
 import asyncio
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
 from claude_evaluator.logging_config import get_logger
+from claude_evaluator.models.progress import ProgressEvent
 from claude_evaluator.models.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
@@ -70,6 +72,7 @@ class MultiCommandWorkflow(BaseWorkflow):
         metrics_collector: "MetricsCollector",
         phases: list[Phase],
         model: str | None = None,
+        on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> None:
         """Initialize the workflow with phases to execute.
 
@@ -77,9 +80,10 @@ class MultiCommandWorkflow(BaseWorkflow):
             metrics_collector: The MetricsCollector instance for aggregating metrics.
             phases: List of Phase configurations defining the workflow steps.
             model: Model identifier for the WorkerAgent (optional).
+            on_progress_callback: Optional callback for progress events (verbose output).
 
         """
-        super().__init__(metrics_collector, model=model)
+        super().__init__(metrics_collector, model=model, on_progress_callback=on_progress_callback)
         self._phases = phases
         self._phase_results: dict[str, str] = {}
         self._current_phase_index: int = 0
@@ -129,13 +133,13 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         """
         self.on_execution_start(evaluation)
-
+        logger.info("on_execution_start", evaluation=evaluation)
         # Create agents for this execution
         self._create_agents(evaluation)
-
+        logger.info("agents created")
         try:
             previous_result: str | None = None
-
+            logger.info("starting phase execution")
             for i, phase in enumerate(self._phases):
                 self._current_phase_index = i
                 previous_result = await self._execute_phase(
@@ -178,6 +182,8 @@ class MultiCommandWorkflow(BaseWorkflow):
         # Configure Worker for this phase
         worker = self._worker
         assert worker is not None, "Agents not created"
+
+        logger.info("setting permission mode to", phase=phase.name, permission_mode=phase.permission_mode)
         worker.set_permission_mode(phase.permission_mode)
 
         # Emit phase start event for verbose output
@@ -198,14 +204,14 @@ class MultiCommandWorkflow(BaseWorkflow):
         # Configure allowed tools if specified
         if phase.allowed_tools:
             worker.configure_tools(phase.allowed_tools)
-
+        logger.info("allowed tools configured", allowed_tools=phase.allowed_tools)
         # Build the prompt for this phase
         prompt = self._build_prompt(
             phase=phase,
             task=evaluation.task_description,
             previous_result=previous_result,
         )
-
+        logger.info("prompt built", prompt=prompt)
         # Execute the phase query
         # Resume session if continue_session is True and not the first phase
         should_resume = phase.continue_session and self._current_phase_index > 0

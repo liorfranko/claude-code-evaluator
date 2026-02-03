@@ -16,7 +16,6 @@ from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -35,7 +34,6 @@ class TestDeveloperWorkerCommunication:
     def create_mock_worker(self) -> WorkerAgent:
         """Create a mock worker that simulates responses."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -173,7 +171,6 @@ class TestDeveloperWorkerCommunication:
         """Test that Worker tracks tool invocations during execution."""
         DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -215,7 +212,6 @@ class TestAgentCoordinationInWorkflows:
     def create_mock_worker(self, call_counter: list[int]) -> WorkerAgent:
         """Create a mock worker that counts calls."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -324,7 +320,6 @@ class TestAgentCoordinationInWorkflows:
         received_queries: list[str] = []
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -376,7 +371,6 @@ class TestAgentErrorHandling:
         """Test that worker errors are captured in evaluation."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -413,7 +407,6 @@ class TestAgentErrorHandling:
         """Test that developer transitions to failed state on error."""
         developer = DeveloperAgent()
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,

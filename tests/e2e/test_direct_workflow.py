@@ -20,7 +20,6 @@ from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
-    ExecutionMode,
     PermissionMode,
     WorkflowType,
 )
@@ -41,7 +40,6 @@ class TestDirectWorkflowE2EExecution:
     def worker_agent(self) -> WorkerAgent:
         """Create a WorkerAgent configured for e2e testing."""
         return WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/e2e_test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -269,7 +267,6 @@ class TestDirectWorkflowMetricsCapture:
     def evaluation(self) -> Evaluation:
         """Create an Evaluation for metrics capture testing."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/metrics_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -476,7 +473,6 @@ class TestDirectWorkflowSinglePhaseVerification:
     def evaluation(self) -> Evaluation:
         """Create an Evaluation for phase verification tests."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/phase_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -586,7 +582,6 @@ class TestDirectWorkflowCompleteLifecycle:
     def full_evaluation(self) -> Evaluation:
         """Create a fully configured Evaluation for lifecycle testing."""
         worker = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/lifecycle_test",
             active_session=False,
             permission_mode=PermissionMode.plan,

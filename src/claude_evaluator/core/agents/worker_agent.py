@@ -1,8 +1,8 @@
 """Worker Agent for Claude Code execution.
 
 This module defines the WorkerAgent model that executes Claude Code
-commands and returns results. It supports both SDK and CLI execution modes
-with configurable permission levels and tool access.
+commands and returns results via the SDK with configurable permission
+levels and tool access.
 
 The WorkerAgent acts as a facade, delegating to extracted components:
 - ToolTracker: Tool invocation tracking
@@ -36,7 +36,7 @@ from claude_evaluator.core.agents.worker.sdk_config import (
 from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode
+from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.query_metrics import QueryMetrics
 from claude_evaluator.models.question import QuestionContext
@@ -55,15 +55,13 @@ DEFAULT_MODEL = DEFAULT_WORKER_MODEL
 class WorkerAgent(BaseSchema):
     """Agent that executes Claude Code commands and returns results.
 
-    The WorkerAgent is responsible for interfacing with Claude Code through
-    either the SDK or CLI. It manages session state, permissions, and execution
-    limits for each query.
+    The WorkerAgent interfaces with Claude Code through the SDK.
+    It manages session state, permissions, and execution limits for each query.
 
     This class acts as a facade, delegating to internal components for
     specific functionality (tool tracking, permission management, etc.).
 
     Attributes:
-        execution_mode: SDK or CLI execution mode.
         project_directory: Target directory for code execution.
         active_session: Whether a Claude Code session is currently active.
         session_id: Current Claude Code session ID (optional).
@@ -84,7 +82,6 @@ class WorkerAgent(BaseSchema):
         extra="allow",  # Allow setting extra attributes (needed for test mocking)
     )
 
-    execution_mode: ExecutionMode
     project_directory: str
     active_session: bool
     permission_mode: PermissionMode
@@ -163,10 +160,7 @@ class WorkerAgent(BaseSchema):
         phase: str | None = None,
         resume_session: bool = False,
     ) -> QueryMetrics:
-        """Execute a query through Claude Code.
-
-        This method sends a query to Claude Code using the configured
-        execution mode (SDK or CLI) and returns metrics about the execution.
+        """Execute a query through Claude Code via the SDK.
 
         Args:
             query: The prompt or query to send to Claude Code.
@@ -177,30 +171,7 @@ class WorkerAgent(BaseSchema):
             QueryMetrics containing execution results and performance data.
 
         Raises:
-            RuntimeError: If SDK is not available and SDK mode is configured.
-            NotImplementedError: If CLI mode is requested.
-
-        """
-        if self.execution_mode == ExecutionMode.sdk:
-            return await self._execute_via_sdk(query, phase, resume_session)
-        else:
-            raise NotImplementedError("CLI execution mode not yet implemented")
-
-    async def _execute_via_sdk(
-        self,
-        query: str,
-        phase: str | None = None,
-        resume_session: bool = False,
-    ) -> QueryMetrics:
-        """Execute a query using the Claude SDK.
-
-        Args:
-            query: The prompt to send to Claude Code.
-            phase: Current workflow phase for tracking.
-            resume_session: If True, resume the previous session.
-
-        Returns:
-            QueryMetrics with execution results.
+            RuntimeError: If no result message is received from the SDK.
 
         """
         # Prepare for new query

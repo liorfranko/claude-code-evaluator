@@ -10,7 +10,7 @@ from datetime import datetime
 import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
-from claude_evaluator.models.enums import ExecutionMode, PermissionMode
+from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.tool_invocation import ToolInvocation
 
 
@@ -20,13 +20,11 @@ class TestWorkerAgentInitialization:
     def test_initialization_with_required_fields(self) -> None:
         """Test WorkerAgent initialization with only required fields."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test_project",
             active_session=False,
             permission_mode=PermissionMode.plan,
         )
 
-        assert agent.execution_mode == ExecutionMode.sdk
         assert agent.project_directory == "/tmp/test_project"
         assert agent.active_session is False
         assert agent.permission_mode == PermissionMode.plan
@@ -34,7 +32,6 @@ class TestWorkerAgentInitialization:
     def test_default_allowed_tools_is_empty_list(self) -> None:
         """Test that allowed_tools defaults to an empty list."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -46,7 +43,6 @@ class TestWorkerAgentInitialization:
     def test_default_max_turns(self) -> None:
         """Test that max_turns defaults to 10."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -57,7 +53,6 @@ class TestWorkerAgentInitialization:
     def test_default_session_id_is_none(self) -> None:
         """Test that session_id defaults to None."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -68,7 +63,6 @@ class TestWorkerAgentInitialization:
     def test_default_max_budget_usd_is_none(self) -> None:
         """Test that max_budget_usd defaults to None."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -79,7 +73,6 @@ class TestWorkerAgentInitialization:
     def test_default_tool_invocations_is_empty_list(self) -> None:
         """Test that tool_invocations defaults to an empty list."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -91,7 +84,6 @@ class TestWorkerAgentInitialization:
     def test_initialization_with_all_fields(self) -> None:
         """Test WorkerAgent initialization with all optional fields."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.cli,
             project_directory="/home/user/project",
             active_session=True,
             permission_mode=PermissionMode.bypassPermissions,
@@ -101,7 +93,6 @@ class TestWorkerAgentInitialization:
             max_budget_usd=5.0,
         )
 
-        assert agent.execution_mode == ExecutionMode.cli
         assert agent.project_directory == "/home/user/project"
         assert agent.active_session is True
         assert agent.permission_mode == PermissionMode.bypassPermissions
@@ -110,34 +101,9 @@ class TestWorkerAgentInitialization:
         assert agent.session_id == "session-12345"
         assert agent.max_budget_usd == 5.0
 
-    def test_execution_mode_sdk(self) -> None:
-        """Test WorkerAgent with SDK execution mode."""
-        agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-        )
-
-        assert agent.execution_mode == ExecutionMode.sdk
-        assert agent.execution_mode.value == "sdk"
-
-    def test_execution_mode_cli(self) -> None:
-        """Test WorkerAgent with CLI execution mode."""
-        agent = WorkerAgent(
-            execution_mode=ExecutionMode.cli,
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-        )
-
-        assert agent.execution_mode == ExecutionMode.cli
-        assert agent.execution_mode.value == "cli"
-
     def test_query_counter_initialized_to_zero(self) -> None:
         """Test that internal query counter starts at zero."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -152,7 +118,6 @@ class TestSetPermissionMode:
     def test_set_permission_mode_to_plan(self) -> None:
         """Test setting permission mode to plan."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.bypassPermissions,
@@ -164,7 +129,6 @@ class TestSetPermissionMode:
     def test_set_permission_mode_to_accept_edits(self) -> None:
         """Test setting permission mode to acceptEdits."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -176,7 +140,6 @@ class TestSetPermissionMode:
     def test_set_permission_mode_to_bypass_permissions(self) -> None:
         """Test setting permission mode to bypassPermissions."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -188,7 +151,6 @@ class TestSetPermissionMode:
     def test_set_permission_mode_multiple_times(self) -> None:
         """Test that permission mode can be changed multiple times."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -206,7 +168,6 @@ class TestSetPermissionMode:
     def test_set_same_permission_mode(self) -> None:
         """Test setting the same permission mode (no-op)."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -222,7 +183,6 @@ class TestConfigureTools:
     def test_configure_tools_with_single_tool(self) -> None:
         """Test configuring a single tool."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -234,7 +194,6 @@ class TestConfigureTools:
     def test_configure_tools_with_multiple_tools(self) -> None:
         """Test configuring multiple tools."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -247,7 +206,6 @@ class TestConfigureTools:
     def test_configure_tools_with_empty_list(self) -> None:
         """Test configuring with empty list clears tools."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -260,7 +218,6 @@ class TestConfigureTools:
     def test_configure_tools_replaces_existing(self) -> None:
         """Test that configure_tools replaces existing tools."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -275,7 +232,6 @@ class TestConfigureTools:
     def test_configure_tools_creates_copy(self) -> None:
         """Test that configure_tools creates a copy of the input list."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -294,7 +250,6 @@ class TestConfigureTools:
     def test_configure_tools_multiple_times(self) -> None:
         """Test configuring tools multiple times."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -316,7 +271,6 @@ class TestToolInvocationsTracking:
     def test_get_tool_invocations_empty(self) -> None:
         """Test getting tool invocations when none exist."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -329,7 +283,6 @@ class TestToolInvocationsTracking:
     def test_get_tool_invocations_returns_copy(self) -> None:
         """Test that get_tool_invocations returns a copy of the list."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -361,7 +314,6 @@ class TestToolInvocationsTracking:
     def test_get_tool_invocations_with_multiple_invocations(self) -> None:
         """Test getting multiple tool invocations."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -403,7 +355,6 @@ class TestToolInvocationsTracking:
     def test_clear_tool_invocations(self) -> None:
         """Test clearing tool invocations."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -437,7 +388,6 @@ class TestToolInvocationsTracking:
     def test_clear_tool_invocations_when_empty(self) -> None:
         """Test clearing tool invocations when already empty."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -450,7 +400,6 @@ class TestToolInvocationsTracking:
     def test_clear_and_add_new_invocations(self) -> None:
         """Test clearing invocations and then adding new ones."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -490,7 +439,6 @@ class TestAllowedToolsHandling:
     def test_allowed_tools_empty_by_default(self) -> None:
         """Test that allowed_tools starts empty."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -502,7 +450,6 @@ class TestAllowedToolsHandling:
         """Test initializing with allowed_tools list."""
         tools = ["Read", "Bash", "Edit"]
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -515,7 +462,6 @@ class TestAllowedToolsHandling:
         """Test that allowed_tools is independent of input list after init."""
         original_tools = ["Read", "Bash"]
         WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -537,7 +483,6 @@ class TestAllowedToolsHandling:
         """Test allowed_tools with duplicate tool names."""
         tools = ["Read", "Bash", "Read", "Edit", "Bash"]
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -553,7 +498,6 @@ class TestAllowedToolsHandling:
         """Test that allowed_tools preserves insertion order."""
         tools = ["Glob", "Grep", "Read", "Write", "Edit", "Bash"]
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -567,7 +511,6 @@ class TestAllowedToolsHandling:
     def test_allowed_tools_can_be_modified_directly(self) -> None:
         """Test that allowed_tools can be modified directly."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -676,7 +619,6 @@ class TestSessionManagement:
     def test_start_session_not_implemented(self) -> None:
         """Test that start_session raises NotImplementedError."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -690,7 +632,6 @@ class TestSessionManagement:
     def test_end_session_not_implemented(self) -> None:
         """Test that end_session raises NotImplementedError."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -702,33 +643,12 @@ class TestSessionManagement:
         assert "Session management not yet implemented" in str(exc_info.value)
 
 
-class TestExecuteQueryCLIMode:
-    """Tests for execute_query with CLI mode."""
-
-    def test_execute_query_cli_not_implemented(self) -> None:
-        """Test that CLI execution mode raises NotImplementedError."""
-        import asyncio
-
-        agent = WorkerAgent(
-            execution_mode=ExecutionMode.cli,
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-        )
-
-        with pytest.raises(NotImplementedError) as exc_info:
-            asyncio.run(agent.execute_query("test query"))
-
-        assert "CLI execution mode not yet implemented" in str(exc_info.value)
-
-
 class TestDataclassRepresentation:
     """Tests for dataclass representation and behavior."""
 
     def test_repr_excludes_private_fields(self) -> None:
         """Test that private fields are excluded from repr."""
         agent = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -747,7 +667,6 @@ class TestDataclassRepresentation:
         dataclass equality will fail. We verify public attributes match instead.
         """
         agent1 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -756,7 +675,6 @@ class TestDataclassRepresentation:
         )
 
         agent2 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
             project_directory="/tmp/test",
             active_session=False,
             permission_mode=PermissionMode.plan,
@@ -765,27 +683,8 @@ class TestDataclassRepresentation:
         )
 
         # Compare public configuration attributes
-        assert agent1.execution_mode == agent2.execution_mode
         assert agent1.project_directory == agent2.project_directory
         assert agent1.active_session == agent2.active_session
         assert agent1.permission_mode == agent2.permission_mode
         assert agent1.allowed_tools == agent2.allowed_tools
         assert agent1.max_turns == agent2.max_turns
-
-    def test_inequality_on_different_values(self) -> None:
-        """Test that agents with different values are not equal."""
-        agent1 = WorkerAgent(
-            execution_mode=ExecutionMode.sdk,
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-        )
-
-        agent2 = WorkerAgent(
-            execution_mode=ExecutionMode.cli,
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-        )
-
-        assert agent1 != agent2
