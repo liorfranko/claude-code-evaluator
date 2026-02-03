@@ -10,6 +10,7 @@ from pathlib import Path
 from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
 from claude_evaluator.cli.formatters import create_progress_callback
 from claude_evaluator.config.models import Phase, RepositorySource
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.git_operations import (
     clone_repository,
@@ -137,6 +138,13 @@ class RunEvaluationCommand(BaseCommand):
             workspace_path=str(workspace_path),
         )
 
+        # Apply default timeout from settings if not specified
+        effective_timeout: int = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else get_settings().workflow.timeout_seconds
+        )
+
         # Create metrics collector
         collector = MetricsCollector()
 
@@ -151,7 +159,7 @@ class RunEvaluationCommand(BaseCommand):
         try:
             # Execute workflow
             workflow = self._create_workflow(workflow_type, collector, phases, model, verbose)
-            await workflow.execute_with_timeout(evaluation, timeout_seconds)
+            await workflow.execute_with_timeout(evaluation, effective_timeout)
 
             if verbose:
                 print(f"Evaluation completed in {evaluation.get_duration_ms()}ms")

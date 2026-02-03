@@ -12,6 +12,11 @@ from typing import Any, TypeAlias
 
 import yaml
 
+from claude_evaluator.config.defaults import (
+    DEFAULT_CONTEXT_WINDOW_SIZE,
+    DEFAULT_EVALUATION_TIMEOUT_SECONDS,
+    DEFAULT_QUESTION_TIMEOUT_SECONDS,
+)
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.models import (
     EvalDefaults,
@@ -229,6 +234,7 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
 
     For each evaluation in the suite, applies default values from the suite's
     defaults for any fields that the evaluation doesn't explicitly override.
+    Ensures timeout_seconds is always set (mandatory).
 
     Args:
         suite: The evaluation suite to process.
@@ -243,34 +249,36 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
         >>> suite = apply_defaults(suite)
 
     """
-    if suite.defaults is None:
-        return suite
-
     defaults = suite.defaults
 
     for evaluation in suite.evaluations:
-        # Apply max_turns default if not overridden
-        if evaluation.max_turns is None and defaults.max_turns is not None:
-            evaluation.max_turns = defaults.max_turns
+        if defaults is not None:
+            # Apply max_turns default if not overridden
+            if evaluation.max_turns is None and defaults.max_turns is not None:
+                evaluation.max_turns = defaults.max_turns
 
-        # Apply max_budget_usd default if not overridden
-        if evaluation.max_budget_usd is None and defaults.max_budget_usd is not None:
-            evaluation.max_budget_usd = defaults.max_budget_usd
+            # Apply max_budget_usd default if not overridden
+            if evaluation.max_budget_usd is None and defaults.max_budget_usd is not None:
+                evaluation.max_budget_usd = defaults.max_budget_usd
 
-        # Apply timeout_seconds default if not overridden
-        if evaluation.timeout_seconds is None and defaults.timeout_seconds is not None:
-            evaluation.timeout_seconds = defaults.timeout_seconds
+            # Apply timeout_seconds default if not overridden
+            if evaluation.timeout_seconds is None and defaults.timeout_seconds is not None:
+                evaluation.timeout_seconds = defaults.timeout_seconds
 
-        # Apply developer_qa_model default if not overridden
-        if (
-            evaluation.developer_qa_model is None
-            and defaults.developer_qa_model is not None
-        ):
-            evaluation.developer_qa_model = defaults.developer_qa_model
+            # Apply developer_qa_model default if not overridden
+            if (
+                evaluation.developer_qa_model is None
+                and defaults.developer_qa_model is not None
+            ):
+                evaluation.developer_qa_model = defaults.developer_qa_model
 
-        # Apply model default if not overridden
-        if evaluation.model is None and defaults.model is not None:
-            evaluation.model = defaults.model
+            # Apply model default if not overridden
+            if evaluation.model is None and defaults.model is not None:
+                evaluation.model = defaults.model
+
+        # Ensure timeout_seconds is always set (mandatory)
+        if evaluation.timeout_seconds is None:
+            evaluation.timeout_seconds = DEFAULT_EVALUATION_TIMEOUT_SECONDS
 
     return suite
 
@@ -379,15 +387,15 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> EvalDefaults:
     context = f"defaults in {source_path}"
     _require_mapping(data, context)
 
-    # Parse question_timeout_seconds with default of 60
+    # Parse question_timeout_seconds with default
     question_timeout = _optional_int(data, "question_timeout_seconds", context)
     if question_timeout is None:
-        question_timeout = 60
+        question_timeout = DEFAULT_QUESTION_TIMEOUT_SECONDS
 
-    # Parse context_window_size with default of 10
+    # Parse context_window_size with default
     context_window = _optional_int(data, "context_window_size", context)
     if context_window is None:
-        context_window = 10
+        context_window = DEFAULT_CONTEXT_WINDOW_SIZE
 
     return EvalDefaults(
         max_turns=_optional_int(data, "max_turns", context),

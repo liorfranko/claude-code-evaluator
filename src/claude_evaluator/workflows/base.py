@@ -259,9 +259,9 @@ class BaseWorkflow(ABC):
     async def execute_with_timeout(
         self,
         evaluation: "Evaluation",
-        timeout_seconds: int | None = None,
+        timeout_seconds: int,
     ) -> "Metrics":
-        """Execute the workflow with an optional timeout.
+        """Execute the workflow with a timeout.
 
         Wraps the execute() method with asyncio timeout handling. If the
         workflow exceeds the timeout, a WorkflowTimeoutError is raised
@@ -269,7 +269,7 @@ class BaseWorkflow(ABC):
 
         Args:
             evaluation: The Evaluation instance containing the task and agents.
-            timeout_seconds: Maximum execution time in seconds. If None, no timeout.
+            timeout_seconds: Maximum execution time in seconds.
 
         Returns:
             A Metrics object containing all collected metrics from the execution.
@@ -279,9 +279,6 @@ class BaseWorkflow(ABC):
             Exception: If the workflow execution fails for other reasons.
 
         """
-        if timeout_seconds is None:
-            return await self.execute(evaluation)
-
         try:
             return await asyncio.wait_for(
                 self.execute(evaluation), timeout=timeout_seconds

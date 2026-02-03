@@ -32,6 +32,7 @@ from claude_evaluator.config.defaults import (
     DEFAULT_CODE_QUALITY_WEIGHT,
     DEFAULT_CONTEXT_WINDOW_SIZE,
     DEFAULT_EFFICIENCY_WEIGHT,
+    DEFAULT_EVALUATION_TIMEOUT_SECONDS,
     DEFAULT_EVALUATOR_ENABLE_AST,
     DEFAULT_EVALUATOR_MODEL,
     DEFAULT_EVALUATOR_TEMPERATURE,
@@ -53,6 +54,7 @@ __all__ = [
     "WorkerSettings",
     "DeveloperSettings",
     "EvaluatorSettings",
+    "WorkflowSettings",
     "Settings",
     "get_settings",
 ]
@@ -189,6 +191,27 @@ class EvaluatorSettings(BaseSettings):
     )
 
 
+class WorkflowSettings(BaseSettings):
+    """Settings for workflow execution.
+
+    Attributes:
+        timeout_seconds: Default timeout for evaluation execution in seconds.
+
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="CLAUDE_WORKFLOW_",
+        extra="ignore",
+    )
+
+    timeout_seconds: int = Field(
+        default=DEFAULT_EVALUATION_TIMEOUT_SECONDS,
+        ge=10,
+        le=3600,
+        description="Default timeout for evaluation execution in seconds",
+    )
+
+
 class Settings(BaseSettings):
     """Root settings container.
 
@@ -199,6 +222,7 @@ class Settings(BaseSettings):
         worker: WorkerAgent settings.
         developer: DeveloperAgent settings.
         evaluator: EvaluatorAgent settings.
+        workflow: Workflow execution settings.
 
     """
 
@@ -210,6 +234,7 @@ class Settings(BaseSettings):
     worker: WorkerSettings = Field(default_factory=WorkerSettings)
     developer: DeveloperSettings = Field(default_factory=DeveloperSettings)
     evaluator: EvaluatorSettings = Field(default_factory=EvaluatorSettings)
+    workflow: WorkflowSettings = Field(default_factory=WorkflowSettings)
 
 
 @lru_cache(maxsize=1)

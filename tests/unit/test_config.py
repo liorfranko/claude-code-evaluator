@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from claude_evaluator.config.defaults import DEFAULT_EVALUATION_TIMEOUT_SECONDS
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import apply_defaults, load_suite
 from claude_evaluator.config.models import (
@@ -634,11 +635,12 @@ class TestApplyDefaults:
 
         result = apply_defaults(suite)
 
-        # Should return suite unchanged
+        # Should return suite with mandatory timeout applied
         assert result is suite
         assert result.evaluations[0].max_turns is None
         assert result.evaluations[0].max_budget_usd is None
-        assert result.evaluations[0].timeout_seconds is None
+        # timeout_seconds is mandatory and always set
+        assert result.evaluations[0].timeout_seconds == DEFAULT_EVALUATION_TIMEOUT_SECONDS
 
     def test_apply_defaults_with_empty_defaults(self) -> None:
         """Test that apply_defaults handles suite with empty defaults gracefully."""
@@ -658,10 +660,11 @@ class TestApplyDefaults:
 
         result = apply_defaults(suite)
 
-        # Values should remain None
+        # Optional values should remain None, but timeout is mandatory
         assert result.evaluations[0].max_turns is None
         assert result.evaluations[0].max_budget_usd is None
-        assert result.evaluations[0].timeout_seconds is None
+        # timeout_seconds is mandatory and always set
+        assert result.evaluations[0].timeout_seconds == DEFAULT_EVALUATION_TIMEOUT_SECONDS
 
     def test_apply_defaults_multiple_evaluations(self) -> None:
         """Test that defaults are applied to all evaluations in the suite."""
