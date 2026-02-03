@@ -6,6 +6,7 @@ process, managing the execution of tasks and collection of metrics.
 """
 
 import asyncio
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
@@ -38,8 +39,16 @@ class BaseWorkflow(ABC):
     """Abstract base class for evaluation workflows.
 
     A workflow orchestrates the evaluation process, coordinating between agents,
-    managing phases, and collecting metrics throughout execution. Concrete
-    implementations include:
+    managing phases, and collecting metrics throughout execution. Workflows are
+    responsible for creating and owning agents via _create_agents(), configuring
+    them for question handling, and cleaning them up when execution completes.
+
+    Subclasses must:
+    - Call _create_agents() at the start of execute()
+    - Call configure_worker_for_questions() if question handling is needed
+    - Call cleanup_worker() in a finally block to ensure proper cleanup
+
+    Concrete implementations include:
 
     - DirectWorkflow: Single-phase execution
     - PlanThenImplementWorkflow: Plan mode followed by implementation
@@ -55,6 +64,7 @@ class BaseWorkflow(ABC):
         class DirectWorkflow(BaseWorkflow):
             async def execute(self, evaluation: Evaluation) -> Metrics:
                 self.on_execution_start(evaluation)
+                self._create_agents(evaluation)
                 try:
                     # Execute the task
                     result = await self._run_task(evaluation)
@@ -62,6 +72,8 @@ class BaseWorkflow(ABC):
                 except Exception as e:
                     self.on_execution_error(evaluation, e)
                     raise
+                finally:
+                    await self.cleanup_worker(evaluation)
 
     """
 
@@ -115,10 +127,15 @@ class BaseWorkflow(ABC):
         """Create agents for this workflow execution.
 
         Creates DeveloperAgent and WorkerAgent configured for the evaluation.
-        Agents read their configuration from settings.
+        The created agents are stored in self._developer and self._worker and
+        are owned by this workflow instance. Agents read additional configuration
+        from settings.
+
+        This method should be called at the start of execute() before any
+        agent interaction. Call cleanup_worker() when execution completes.
 
         Args:
-            evaluation: The evaluation context.
+            evaluation: The evaluation context containing workspace_path and task.
 
         Returns:
             Tuple of (developer, worker) agents.
@@ -127,7 +144,8 @@ class BaseWorkflow(ABC):
         # Build additional directories
         claude_plans_dir = str(Path.home() / ".claude" / "plans")
         claude_plugins_dir = str(Path.home() / ".claude" / "plugins")
-        additional_dirs = [claude_plans_dir, claude_plugins_dir, "/tmp"]
+        user_temp_dir = tempfile.gettempdir()
+        additional_dirs = [claude_plans_dir, claude_plugins_dir, user_temp_dir]
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -178,7 +196,7 @@ class BaseWorkflow(ABC):
         and collecting metrics.
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
+            evaluation: The Evaluation instance containing the task description and state.
 
         Returns:
             A Metrics object containing all collected metrics from the execution.
@@ -276,7 +294,7 @@ class BaseWorkflow(ABC):
         and the evaluation is marked as failed.
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
+            evaluation: The Evaluation instance containing the task description and state.
             timeout_seconds: Maximum execution time in seconds.
 
         Returns:
@@ -486,7 +504,12 @@ class BaseWorkflow(ABC):
         """Clean up WorkerAgent resources and copy decisions to evaluation.
 
         Ensures the WorkerAgent's SDK client is properly disconnected and
-        copies developer decisions to the evaluation for reporting.
+        copies developer decisions to the evaluation for reporting. The decisions
+        log contains records of developer responses to worker questions, which
+        are useful for analyzing the human-in-the-loop interactions.
+
+        This method is safe to call multiple times and should be called in a
+        finally block to ensure cleanup even on error.
 
         Args:
             evaluation: The Evaluation to store decisions in.
@@ -503,4 +526,10 @@ class BaseWorkflow(ABC):
                 logger.debug("worker_session_cleanup_complete")
             except Exception as e:
                 # Log but don't raise - cleanup is best effort
-                logger.warning("worker_cleanup_error", error=str(e))
+                logger.warning(
+                    "worker_cleanup_error",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    evaluation_id=str(evaluation.id),
+                    message="Worker cleanup failed (non-fatal, continuing)",
+                )

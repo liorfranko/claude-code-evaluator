@@ -128,7 +128,7 @@ class MultiCommandWorkflow(BaseWorkflow):
         from previous phases to subsequent ones.
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
+            evaluation: The Evaluation instance containing the task description and state.
 
         Returns:
             A Metrics object containing all collected metrics from all phases.
@@ -138,13 +138,17 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         """
         self.on_execution_start(evaluation)
-        logger.info("on_execution_start", evaluation=evaluation)
+        logger.info(
+            "execution_started",
+            evaluation_id=str(evaluation.id),
+            workflow_type=str(evaluation.workflow_type.value),
+        )
         # Create agents for this execution
         self._create_agents(evaluation)
-        logger.info("agents created")
+        logger.info("agents_created")
         try:
             previous_result: str | None = None
-            logger.info("starting phase execution")
+            logger.info("phase_execution_starting", total_phases=len(self._phases))
             for i, phase in enumerate(self._phases):
                 self._current_phase_index = i
                 previous_result = await self._execute_phase(
@@ -188,13 +192,17 @@ class MultiCommandWorkflow(BaseWorkflow):
         worker = self._worker
         assert worker is not None, "Agents not created"
 
-        logger.info("setting permission mode to", phase=phase.name, permission_mode=phase.permission_mode)
+        logger.info(
+            "permission_mode_set",
+            phase=phase.name,
+            permission_mode=str(phase.permission_mode.value),
+        )
         worker.set_permission_mode(phase.permission_mode)
 
         # Configure max_turns if specified for this phase
         if phase.max_turns is not None:
             worker.set_max_turns(phase.max_turns)
-        logger.info("max_turns is set to", max_turns=worker.max_turns)
+        logger.info("max_turns_configured", max_turns=worker.max_turns, phase=phase.name)
         # Emit phase start event for verbose output
         from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 
@@ -213,14 +221,18 @@ class MultiCommandWorkflow(BaseWorkflow):
         # Configure allowed tools if specified
         if phase.allowed_tools:
             worker.configure_tools(phase.allowed_tools)
-        logger.info("allowed tools configured", allowed_tools=phase.allowed_tools)
+        logger.info(
+            "allowed_tools_configured",
+            allowed_tools=phase.allowed_tools,
+            phase=phase.name,
+        )
         # Build the prompt for this phase
         prompt = self._build_prompt(
             phase=phase,
             task=evaluation.task_description,
             previous_result=previous_result,
         )
-        logger.info("prompt built", prompt=prompt)
+        logger.info("prompt_built", phase=phase.name, prompt_length=len(prompt))
         # Execute the phase query
         # Resume session if continue_session is True and not the first phase
         should_resume = phase.continue_session and self._current_phase_index > 0
@@ -257,7 +269,11 @@ class MultiCommandWorkflow(BaseWorkflow):
                     message=f"Phase '{phase.name}' returned empty response after {query_metrics.num_turns} turns.",
                 )
 
-        logger.info("developer_continuation_starting", response=response)
+        logger.info(
+            "developer_continuation_starting",
+            phase=phase.name,
+            has_response=response is not None,
+        )
         continuation_count = 0
         developer = self._developer
         # Only invoke developer continuation if developer exists, has answer_question capability,
@@ -316,18 +332,18 @@ class MultiCommandWorkflow(BaseWorkflow):
                 self.metrics_collector.add_query_metrics(query_metrics)
                 response = query_metrics.response
 
-            except (
-                RuntimeError,
-                AttributeError,
-                asyncio.CancelledError,
-                Exception,
-            ) as e:
-                # SDK not available, answer_question not working, or other error - skip continuation
-                # Log the error for debugging but don't fail the evaluation
-                logger.debug(
+            except asyncio.CancelledError:
+                # CancelledError should propagate for proper async cleanup
+                raise
+            except (RuntimeError, AttributeError, TimeoutError) as e:
+                # Known recoverable errors - skip continuation but warn for visibility
+                logger.warning(
                     "developer_continuation_skipped",
                     error_type=type(e).__name__,
                     error=str(e),
+                    phase=phase.name,
+                    continuation_attempt=continuation_count,
+                    message="Developer continuation failed, proceeding without further interaction",
                 )
                 break
 

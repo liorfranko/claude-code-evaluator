@@ -165,7 +165,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         coherent answers based on the accumulated conversation history.
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
+            evaluation: The Evaluation instance containing the task description and state.
 
         Returns:
             A Metrics object containing all collected metrics from both phases.

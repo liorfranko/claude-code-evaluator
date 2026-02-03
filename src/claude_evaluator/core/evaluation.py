@@ -1,8 +1,9 @@
 """Evaluation model for claude-evaluator.
 
 This module defines the Evaluation class which represents a single end-to-end
-test run. It manages state transitions, workspace lifecycle, and collects metrics
-during evaluation execution.
+test run as a pure state container. It manages state transitions and collects
+metrics during evaluation execution. Workspace management and agent creation
+are handled by workflow implementations.
 """
 
 import uuid

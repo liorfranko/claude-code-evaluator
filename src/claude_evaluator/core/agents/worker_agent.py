@@ -13,7 +13,6 @@ The WorkerAgent acts as a facade, delegating to extracted components:
 """
 
 import asyncio
-import contextlib
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -79,7 +78,10 @@ class WorkerAgent(BaseSchema):
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
-        extra="allow",  # Allow setting extra attributes (needed for test mocking)
+        # Allow extra attributes for test mocking. Tests set mock methods directly
+        # on instances (e.g., worker.execute_query = AsyncMock(...)). This could be
+        # refactored to use unittest.mock.patch instead for stricter type safety.
+        extra="allow",
     )
 
     project_directory: str
@@ -95,7 +97,12 @@ class WorkerAgent(BaseSchema):
         Callable[[str, list[dict[str, Any]]], Awaitable[str | None]] | None
     ) = None
     on_progress_callback: Callable[[ProgressEvent], None] | None = None
-    question_timeout_seconds: int = DEFAULT_QUESTION_TIMEOUT_SECONDS
+    question_timeout_seconds: int = Field(
+        default=DEFAULT_QUESTION_TIMEOUT_SECONDS,
+        ge=QUESTION_TIMEOUT_MIN,
+        le=QUESTION_TIMEOUT_MAX,
+        description="Timeout in seconds for question callbacks",
+    )
     use_user_plugins: bool = False
     max_turns: int | None = None
     tool_invocations: list[ToolInvocation] = Field(default_factory=list)
@@ -115,17 +122,6 @@ class WorkerAgent(BaseSchema):
     @model_validator(mode="after")
     def _validate_and_init_components(self) -> "WorkerAgent":
         """Validate WorkerAgent parameters and initialize components."""
-        # Validate question_timeout_seconds is in valid range
-        if not (
-            QUESTION_TIMEOUT_MIN
-            <= self.question_timeout_seconds
-            <= QUESTION_TIMEOUT_MAX
-        ):
-            raise ValueError(
-                f"question_timeout_seconds must be between {QUESTION_TIMEOUT_MIN} "
-                f"and {QUESTION_TIMEOUT_MAX}, got {self.question_timeout_seconds}"
-            )
-
         # Validate on_question_callback is async if provided
         if self.on_question_callback is not None and not asyncio.iscoroutinefunction(
             self.on_question_callback
@@ -223,8 +219,16 @@ class WorkerAgent(BaseSchema):
                     all_messages,
                 ) = await self._stream_sdk_messages_with_client(query, self._client)
             except Exception:
-                with contextlib.suppress(Exception):
+                # Log and suppress cleanup errors during error recovery
+                try:
                     await new_client.disconnect()
+                except Exception as cleanup_error:
+                    logger.debug(
+                        "client_cleanup_during_error_failed",
+                        cleanup_error_type=type(cleanup_error).__name__,
+                        cleanup_error=str(cleanup_error),
+                        message="Cleanup failed during error recovery (continuing with original error)",
+                    )
                 if self._client is new_client:
                     self._client = None
                 raise
@@ -247,8 +251,14 @@ class WorkerAgent(BaseSchema):
         if self._client is not None:
             try:
                 await self._client.disconnect()
-            except Exception:
-                pass
+            except Exception as e:
+                # Log cleanup errors for debugging but don't raise (cleanup is best-effort)
+                logger.debug(
+                    "client_disconnect_error",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    message="Failed to disconnect client during cleanup (non-fatal)",
+                )
             finally:
                 self._client = None
 

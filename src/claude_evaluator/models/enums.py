@@ -1,7 +1,7 @@
 """Enumeration types for claude-evaluator.
 
 This module defines all enum types used throughout the evaluation framework,
-including workflow types, execution modes, and status indicators.
+including workflow types, permission modes, and status indicators.
 """
 
 from enum import Enum

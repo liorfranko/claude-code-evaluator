@@ -695,9 +695,9 @@ class TestTimeoutHandling:
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=0,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(
-            exc_info.value
-        )
+        error_str = str(exc_info.value)
+        assert "question_timeout_seconds" in error_str
+        assert "greater than or equal to 1" in error_str
 
     def test_question_timeout_validation_rejects_negative(self) -> None:
         """Test that negative timeout is rejected."""
@@ -708,9 +708,9 @@ class TestTimeoutHandling:
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=-5,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(
-            exc_info.value
-        )
+        error_str = str(exc_info.value)
+        assert "question_timeout_seconds" in error_str
+        assert "greater than or equal to 1" in error_str
 
     def test_question_timeout_validation_rejects_over_max(self) -> None:
         """Test that timeout over 300 is rejected."""
@@ -721,9 +721,9 @@ class TestTimeoutHandling:
                 permission_mode=PermissionMode.plan,
                 question_timeout_seconds=301,
             )
-        assert "question_timeout_seconds must be between 1 and 300" in str(
-            exc_info.value
-        )
+        error_str = str(exc_info.value)
+        assert "question_timeout_seconds" in error_str
+        assert "less than or equal to 300" in error_str
 
     @pytest.mark.asyncio
     async def test_callback_timeout_raises_timeout_error(self) -> None:

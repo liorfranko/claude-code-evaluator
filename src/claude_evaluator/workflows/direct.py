@@ -98,7 +98,7 @@ class DirectWorkflow(BaseWorkflow):
         6. Returns aggregated Metrics
 
         Args:
-            evaluation: The Evaluation instance containing the task and agents.
+            evaluation: The Evaluation instance containing the task description and state.
 
         Returns:
             A Metrics object containing all collected metrics from the execution.

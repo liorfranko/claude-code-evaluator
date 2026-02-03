@@ -193,8 +193,16 @@ class EvaluatorSettings(BaseSettings):
 class WorkflowSettings(BaseSettings):
     """Settings for workflow execution.
 
+    Controls global workflow behavior including execution timeouts. These settings
+    can be overridden via environment variables with the CLAUDE_WORKFLOW_ prefix.
+
+    The timeout_seconds setting is used by execute_with_timeout() to limit total
+    workflow duration. It should be set higher than question_timeout_seconds in
+    WorkerSettings to allow for multiple question-answer cycles during execution.
+
     Attributes:
         timeout_seconds: Default timeout for evaluation execution in seconds.
+            Can be overridden per-evaluation via CLI or YAML configuration.
 
     """
 
