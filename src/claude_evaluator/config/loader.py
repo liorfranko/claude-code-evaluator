@@ -12,7 +12,6 @@ from typing import Any
 
 import yaml
 
-from claude_evaluator.config.settings import get_settings
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.models import (
     EvalDefaults,
@@ -21,6 +20,7 @@ from claude_evaluator.config.models import (
     Phase,
     RepositorySource,
 )
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.config.validators import FieldValidator
 from claude_evaluator.core.agents.evaluator.reviewers.registry import ReviewerConfig
 from claude_evaluator.models.enums import PermissionMode, WorkflowType
