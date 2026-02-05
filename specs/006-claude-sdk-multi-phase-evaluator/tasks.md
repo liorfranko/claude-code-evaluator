@@ -119,16 +119,16 @@ Story: As a developer, I want to enable or disable specific reviewer phases base
 Story: As a developer, I want to see detailed results from each evaluation phase separately so that I understand which aspects of the code need improvement.
 
 ### Output Formatting
-- [ ] T400 [US3] Format ReviewerOutput with clear phase labels (src/claude_evaluator/core/formatters.py)
-- [ ] T401 [US3] Include severity and confidence in issue display (src/claude_evaluator/core/formatters.py)
-- [ ] T402 [US3] Add file and line references to output (src/claude_evaluator/core/formatters.py)
-- [ ] T403 [US3] Include strengths and suggestions per phase (src/claude_evaluator/core/formatters.py)
+- [x] T400 [US3] Format ReviewerOutput with clear phase labels (src/claude_evaluator/core/formatters.py)
+- [x] T401 [US3] Include severity and confidence in issue display (src/claude_evaluator/core/formatters.py)
+- [x] T402 [US3] Add file and line references to output (src/claude_evaluator/core/formatters.py)
+- [x] T403 [US3] Include strengths and suggestions per phase (src/claude_evaluator/core/formatters.py)
 
 ### Tests
-- [ ] T410 [US3] Write tests for phase output formatting (tests/unit/test_formatters.py)
+- [x] T410 [US3] Write tests for phase output formatting (tests/unit/test_formatters.py)
 
 ### Checkpoint
-- [ ] T419 [US3] CHECKPOINT: Verify evaluation output shows clear per-phase results
+- [x] T419 [US3] CHECKPOINT: Verify evaluation output shows clear per-phase results
 
 ---
 
