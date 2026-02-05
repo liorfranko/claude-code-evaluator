@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
+from claude_evaluator.core.formatters import QuestionFormatter
 from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.question import (
     QuestionContext,
@@ -253,22 +254,5 @@ class QuestionHandler:
 
         """
         raw_questions = getattr(block, "questions", [])
-        if not raw_questions:
-            return "(no questions)"
-
-        summaries = []
-        for raw_q in raw_questions[:3]:  # Limit to first 3 questions
-            if isinstance(raw_q, dict):
-                q_text = raw_q.get("question", "")
-            else:
-                q_text = getattr(raw_q, "question", "")
-            if q_text:
-                # Truncate long questions
-                if len(q_text) > 100:
-                    q_text = q_text[:97] + "..."
-                summaries.append(q_text)
-
-        result = "; ".join(summaries)
-        if len(raw_questions) > 3:
-            result += f" (and {len(raw_questions) - 3} more)"
-        return result
+        formatter = QuestionFormatter(max_questions=3, max_length=100)
+        return formatter.summarize(raw_questions)

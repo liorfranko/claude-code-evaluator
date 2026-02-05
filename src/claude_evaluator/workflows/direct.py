@@ -9,7 +9,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from claude_evaluator.models.enums import PermissionMode
-from claude_evaluator.models.progress import ProgressEvent
+from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
@@ -37,9 +37,6 @@ class DirectWorkflow(BaseWorkflow):
     - Baseline measurements of single-shot task completion
     - Simple tasks that don't require planning
     - Comparing against more structured workflows
-
-    Attributes:
-        enable_question_handling: Whether to configure question handling (default True).
 
     Example:
         collector = MetricsCollector()
@@ -78,24 +75,17 @@ class DirectWorkflow(BaseWorkflow):
             model=model,
             max_turns=max_turns,
             on_progress_callback=on_progress_callback,
+            enable_question_handling=enable_question_handling,
         )
-        self._enable_question_handling = enable_question_handling
 
-    @property
-    def enable_question_handling(self) -> bool:
-        """Whether question handling is enabled."""
-        return self._enable_question_handling
-
-    async def execute(self, evaluation: "Evaluation") -> "Metrics":
-        """Execute the direct workflow for the given evaluation.
+    async def _execute_workflow(self, evaluation: "Evaluation") -> "Metrics":
+        """Execute the direct workflow logic.
 
         Performs a single-phase execution that:
-        1. Configures question handling (if enabled)
-        2. Sets the Worker permission mode to acceptEdits
-        3. Sends the task description directly to the Worker
-        4. Collects metrics from the execution
-        5. Cleans up resources
-        6. Returns aggregated Metrics
+        1. Sets the Worker permission mode to acceptEdits
+        2. Sends the task description directly to the Worker
+        3. Collects metrics from the execution
+        4. Returns aggregated Metrics
 
         Args:
             evaluation: The Evaluation instance containing the task description and state.
@@ -103,61 +93,37 @@ class DirectWorkflow(BaseWorkflow):
         Returns:
             A Metrics object containing all collected metrics from the execution.
 
-        Raises:
-            Exception: If the workflow execution fails.
-            QuestionHandlingError: If question handling fails during execution.
-
         """
-        self.on_execution_start(evaluation)
+        worker = self._worker
+        assert worker is not None, "Worker not created"
 
-        # Create agents for this execution
-        _, worker = self._create_agents(evaluation)
+        # Set the phase for metrics tracking
+        self.set_phase("implementation")
 
-        try:
-            # Configure question handling if enabled
-            if self._enable_question_handling:
-                self.configure_worker_for_questions()
+        # Configure Worker with acceptEdits permission for direct execution
+        worker.set_permission_mode(PermissionMode.acceptEdits)
 
-            # Set the phase for metrics tracking
-            self.set_phase("implementation")
-
-            # Configure Worker with acceptEdits permission for direct execution
-            worker.set_permission_mode(PermissionMode.acceptEdits)
-
-            # Emit phase start event for verbose output
-            from claude_evaluator.models.progress import (
-                ProgressEvent,
-                ProgressEventType,
+        # Emit phase start event for verbose output
+        worker._emit_progress(
+            ProgressEvent(
+                event_type=ProgressEventType.PHASE_START,
+                message="Starting phase: implementation",
+                data={
+                    "phase_name": "implementation",
+                    "phase_index": 0,
+                    "total_phases": 1,
+                },
             )
+        )
 
-            worker._emit_progress(
-                ProgressEvent(
-                    event_type=ProgressEventType.PHASE_START,
-                    message="Starting phase: implementation",
-                    data={
-                        "phase_name": "implementation",
-                        "phase_index": 0,
-                        "total_phases": 1,
-                    },
-                )
-            )
+        # Execute the task prompt directly
+        query_metrics = await worker.execute_query(
+            query=evaluation.task_description,
+            phase="implementation",
+        )
 
-            # Execute the task prompt directly
-            query_metrics = await worker.execute_query(
-                query=evaluation.task_description,
-                phase="implementation",
-            )
+        # Collect metrics from the execution
+        self.metrics_collector.add_query_metrics(query_metrics)
 
-            # Collect metrics from the execution
-            # Note: Tool invocations are now captured in query_metrics.messages
-            self.metrics_collector.add_query_metrics(query_metrics)
-
-            # Complete and return aggregated metrics
-            return self.on_execution_complete(evaluation)
-
-        except Exception as e:
-            self.on_execution_error(evaluation, e)
-            raise
-        finally:
-            # Ensure cleanup happens even on error
-            await self.cleanup_worker(evaluation)
+        # Complete and return aggregated metrics
+        return self.on_execution_complete(evaluation)

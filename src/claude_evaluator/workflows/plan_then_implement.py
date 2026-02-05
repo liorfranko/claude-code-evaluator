@@ -9,7 +9,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from claude_evaluator.models.enums import PermissionMode
-from claude_evaluator.models.progress import ProgressEvent
+from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
@@ -48,7 +48,6 @@ class PlanThenImplementWorkflow(BaseWorkflow):
     Attributes:
         planning_prompt_template: Template for the planning phase prompt.
         implementation_prompt_template: Template for the implementation phase prompt.
-        enable_question_handling: Whether to configure question handling (default True).
 
     Example:
         collector = MetricsCollector()
@@ -113,6 +112,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
             model=model,
             max_turns=max_turns,
             on_progress_callback=on_progress_callback,
+            enable_question_handling=enable_question_handling,
         )
         self._planning_prompt_template = (
             planning_prompt_template or self.DEFAULT_PLANNING_PROMPT
@@ -121,12 +121,6 @@ class PlanThenImplementWorkflow(BaseWorkflow):
             implementation_prompt_template or self.DEFAULT_IMPLEMENTATION_PROMPT
         )
         self._planning_response: str | None = None
-        self._enable_question_handling = enable_question_handling
-
-    @property
-    def enable_question_handling(self) -> bool:
-        """Whether question handling is enabled."""
-        return self._enable_question_handling
 
     @property
     def planning_prompt_template(self) -> str:
@@ -143,13 +137,12 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         """Get the response from the planning phase, if available."""
         return self._planning_response
 
-    async def execute(self, evaluation: "Evaluation") -> "Metrics":
+    async def _execute_workflow(self, evaluation: "Evaluation") -> "Metrics":
         """Execute the two-phase plan-then-implement workflow.
 
         Performs execution in two phases:
 
         1. **Planning Phase**:
-           - Configures question handling (if enabled)
            - Sets permission mode to plan (read-only)
            - Sends planning prompt with task description
            - Collects planning phase metrics
@@ -170,36 +163,15 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         Returns:
             A Metrics object containing all collected metrics from both phases.
 
-        Raises:
-            Exception: If either phase fails.
-            QuestionHandlingError: If question handling fails during execution.
-
         """
-        self.on_execution_start(evaluation)
+        # Phase 1: Planning
+        await self._execute_planning_phase(evaluation)
 
-        # Create agents for this execution
-        self._create_agents(evaluation)
+        # Phase 2: Implementation
+        await self._execute_implementation_phase(evaluation)
 
-        try:
-            # Configure question handling if enabled (once for both phases)
-            if self._enable_question_handling:
-                self.configure_worker_for_questions()
-
-            # Phase 1: Planning
-            await self._execute_planning_phase(evaluation)
-
-            # Phase 2: Implementation
-            await self._execute_implementation_phase(evaluation)
-
-            # Complete and return aggregated metrics
-            return self.on_execution_complete(evaluation)
-
-        except Exception as e:
-            self.on_execution_error(evaluation, e)
-            raise
-        finally:
-            # Ensure cleanup happens even on error
-            await self.cleanup_worker(evaluation)
+        # Complete and return aggregated metrics
+        return self.on_execution_complete(evaluation)
 
     async def _execute_planning_phase(self, evaluation: "Evaluation") -> None:
         """Execute the planning phase.
@@ -220,8 +192,6 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         worker.set_permission_mode(PermissionMode.plan)
 
         # Emit phase start event for verbose output
-        from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-
         worker._emit_progress(
             ProgressEvent(
                 event_type=ProgressEventType.PHASE_START,
@@ -249,7 +219,6 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         self._planning_response = query_metrics.response
 
         # Collect metrics from the planning phase
-        # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)
 
     async def _execute_implementation_phase(self, evaluation: "Evaluation") -> None:  # noqa: ARG002
@@ -275,8 +244,6 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         worker.set_permission_mode(PermissionMode.acceptEdits)
 
         # Emit phase start event for verbose output
-        from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-
         worker._emit_progress(
             ProgressEvent(
                 event_type=ProgressEventType.PHASE_START,
@@ -301,5 +268,4 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         )
 
         # Collect metrics from the implementation phase
-        # Note: Tool invocations are now captured in query_metrics.messages
         self.metrics_collector.add_query_metrics(query_metrics)

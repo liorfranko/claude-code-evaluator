@@ -138,9 +138,12 @@ class TestDirectWorkflowExecuteReturnsMetrics:
         mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
         mock_worker_agent.clear_session = AsyncMock()
 
-        workflow._create_agents = MagicMock(
-            return_value=(mock_developer_agent, mock_worker_agent)
-        )
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer_agent
+            workflow._worker = mock_worker_agent
+            return mock_developer_agent, mock_worker_agent
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -163,9 +166,12 @@ class TestDirectWorkflowExecuteReturnsMetrics:
         mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
         mock_worker_agent.clear_session = AsyncMock()
 
-        workflow._create_agents = MagicMock(
-            return_value=(mock_developer_agent, mock_worker_agent)
-        )
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer_agent
+            workflow._worker = mock_worker_agent
+            return mock_developer_agent, mock_worker_agent
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -186,9 +192,12 @@ class TestDirectWorkflowExecuteReturnsMetrics:
         mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
         mock_worker_agent.clear_session = AsyncMock()
 
-        workflow._create_agents = MagicMock(
-            return_value=(mock_developer_agent, mock_worker_agent)
-        )
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer_agent
+            workflow._worker = mock_worker_agent
+            return mock_developer_agent, mock_worker_agent
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -210,9 +219,12 @@ class TestDirectWorkflowExecuteReturnsMetrics:
         mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
         mock_worker_agent.clear_session = AsyncMock()
 
-        workflow._create_agents = MagicMock(
-            return_value=(mock_developer_agent, mock_worker_agent)
-        )
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer_agent
+            workflow._worker = mock_worker_agent
+            return mock_developer_agent, mock_worker_agent
+
+        workflow._create_agents = mock_create_agents
 
         result = asyncio.run(workflow.execute(evaluation))
 
@@ -282,9 +294,12 @@ class TestDirectWorkflowPermissionMode:
         mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
         mock_worker_agent.clear_session = AsyncMock()
 
-        workflow._create_agents = MagicMock(
-            return_value=(mock_developer_agent, mock_worker_agent)
-        )
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer_agent
+            workflow._worker = mock_worker_agent
+            return mock_developer_agent, mock_worker_agent
+
+        workflow._create_agents = mock_create_agents
 
         asyncio.run(workflow.execute(evaluation))
 
@@ -315,9 +330,12 @@ class TestDirectWorkflowPermissionMode:
         mock_worker_agent.get_tool_invocations = MagicMock(return_value=[])
         mock_worker_agent.clear_session = AsyncMock()
 
-        workflow._create_agents = MagicMock(
-            return_value=(mock_developer_agent, mock_worker_agent)
-        )
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer_agent
+            workflow._worker = mock_worker_agent
+            return mock_developer_agent, mock_worker_agent
+
+        workflow._create_agents = mock_create_agents
 
         # Initially plan mode
         assert mock_worker_agent.permission_mode == PermissionMode.plan
@@ -388,7 +406,12 @@ class TestDirectWorkflowMockedWorker:
         mock_worker.get_tool_invocations = MagicMock(return_value=[])
         mock_worker.clear_session = AsyncMock()
 
-        workflow._create_agents = MagicMock(return_value=(mock_developer, mock_worker))
+        def mock_create_agents(_eval_obj):
+            workflow._developer = mock_developer
+            workflow._worker = mock_worker
+            return mock_developer, mock_worker
+
+        workflow._create_agents = mock_create_agents
 
         asyncio.run(workflow.execute(evaluation))
 

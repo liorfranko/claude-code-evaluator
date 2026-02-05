@@ -28,6 +28,7 @@ from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
+from claude_evaluator.core.formatters import QuestionFormatter
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.base import BaseSchema
@@ -912,23 +913,8 @@ Your response:"""
             Truncated summary string.
 
         """
-        summaries = []
-        for q in questions[:3]:  # Limit to first 3
-            if hasattr(q, "question"):
-                text = q.question
-            elif isinstance(q, dict):
-                text = q.get("question", str(q))
-            else:
-                text = str(q)
-
-            if len(text) > 50:
-                text = text[:47] + "..."
-            summaries.append(text)
-
-        result = "; ".join(summaries)
-        if len(questions) > 3:
-            result += f" (and {len(questions) - 3} more)"
-        return result
+        formatter = QuestionFormatter(max_questions=3, max_length=50)
+        return formatter.summarize(questions)
 
     def _extract_answer_from_response(self, response: Any) -> str:  # noqa: ANN401
         """Extract the answer text from an SDK query response.
