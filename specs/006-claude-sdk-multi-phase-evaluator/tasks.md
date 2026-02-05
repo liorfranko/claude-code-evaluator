@@ -135,14 +135,14 @@ Story: As a developer, I want to see detailed results from each evaluation phase
 ## Phase 6: Cleanup and Integration
 
 ### Remove Old Code
-- [ ] T500 Delete gemini_client.py (src/claude_evaluator/core/agents/evaluator/gemini_client.py)
-- [ ] T501 Delete scorers/ directory (src/claude_evaluator/core/agents/evaluator/scorers/)
-- [ ] T502 Remove google-genai from pyproject.toml (pyproject.toml)
-- [ ] T503 Update all imports to use new reviewer system (codebase-wide)
+- [x] T500 Delete gemini_client.py (src/claude_evaluator/core/agents/evaluator/gemini_client.py)
+- [x] T501 Delete scorers/ directory (src/claude_evaluator/core/agents/evaluator/scorers/)
+- [x] T502 Remove google-genai from pyproject.toml (pyproject.toml)
+- [x] T503 Update all imports to use new reviewer system (codebase-wide)
 
 ### Integration Tests
-- [ ] T510 Write integration tests for full evaluation workflow (tests/integration/test_multi_phase_evaluation.py)
-- [ ] T511 Create sample evaluation.json test fixtures (tests/fixtures/)
+- [x] T510 Write integration tests for full evaluation workflow (tests/integration/test_multi_phase_evaluation.py)
+- [x] T511 Create sample evaluation.json test fixtures (tests/fixtures/)
 
 ---
 
