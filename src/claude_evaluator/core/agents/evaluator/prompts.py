@@ -11,6 +11,7 @@ __all__ = [
     "CODE_QUALITY_PROMPT_TEMPLATE",
     "TASK_COMPLETION_REVIEW_PROMPT",
     "CODE_QUALITY_REVIEW_PROMPT",
+    "ERROR_HANDLING_REVIEW_PROMPT",
 ]
 
 # Task Completion Scoring Prompts
@@ -188,3 +189,40 @@ Provide your analysis as a structured review with:
 - **strengths**: List of positive findings demonstrating good code quality
 
 Focus on code quality and maintainability, not whether the code works correctly."""
+
+# Phase Reviewer Prompts - Error Handling
+ERROR_HANDLING_REVIEW_PROMPT = """You are reviewing code for error handling, edge cases, and robustness.
+
+## Task Description
+{task_description}
+
+## Code Files
+{code_files}
+
+## Additional Context
+{evaluation_context}
+
+## Your Task
+Analyze the code's error handling and robustness focusing on:
+1. **Exception Handling**: Are exceptions caught and handled appropriately?
+2. **Input Validation**: Are inputs validated before use?
+3. **Edge Cases**: Are boundary conditions and edge cases handled?
+4. **Null/None Checks**: Are null/undefined values handled properly?
+5. **Resource Management**: Are resources (files, connections) properly closed/released?
+6. **Error Messages**: Are error messages informative and useful for debugging?
+7. **Defensive Coding**: Does the code fail gracefully under unexpected conditions?
+8. **Recovery Logic**: Does the code attempt recovery where appropriate?
+
+## Response Format
+Provide your analysis as a structured review with:
+- **confidence_score** (0-100): Your confidence in the review findings
+- **issues**: List of error handling issues, each with:
+  - severity (critical, high, medium, low)
+  - file_path: The file containing the issue
+  - line_number: Line number if applicable (null otherwise)
+  - message: Description of the missing or inadequate error handling
+  - suggestion: Recommended improvement for robustness
+  - confidence (0-100): Confidence in this specific issue
+- **strengths**: List of positive findings demonstrating good error handling
+
+Focus on robustness and defensive coding, not code style or whether requirements are met."""
