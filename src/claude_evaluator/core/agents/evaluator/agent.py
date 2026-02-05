@@ -295,6 +295,80 @@ class EvaluatorAgent:
 
         return files
 
+    def _build_review_context(
+        self,
+        task_description: str,
+        code_analysis: CodeAnalysis | None,
+        evaluation_context: str = "",
+    ) -> ReviewContext:
+        """Build ReviewContext from evaluation data.
+
+        Constructs a ReviewContext containing task description and code files
+        extracted from the code analysis results.
+
+        Args:
+            task_description: The original task being evaluated.
+            code_analysis: Code analysis results with file information.
+            evaluation_context: Additional context for the evaluation.
+
+        Returns:
+            ReviewContext ready for reviewer execution.
+
+        """
+        code_files: list[tuple[str, str, str]] = []
+
+        if code_analysis:
+            for file_analysis in code_analysis.files_analyzed:
+                # Read file content
+                path = self.workspace_path / file_analysis.file_path
+                if not path.exists():
+                    continue
+
+                try:
+                    content = path.read_text(encoding="utf-8")
+                    code_files.append(
+                        (file_analysis.file_path, file_analysis.language, content)
+                    )
+                except Exception:
+                    continue
+
+        return ReviewContext(
+            task_description=task_description,
+            code_files=code_files,
+            evaluation_context=evaluation_context,
+        )
+
+    async def run_reviewers(
+        self,
+        context: ReviewContext,
+    ) -> list[ReviewerOutput]:
+        """Execute all registered reviewers on the provided context.
+
+        Runs all reviewers in the registry on the given review context,
+        collecting and returning their outputs.
+
+        Args:
+            context: Review context containing task and code information.
+
+        Returns:
+            List of ReviewerOutput from all executed reviewers.
+
+        """
+        logger.info(
+            "running_reviewers",
+            reviewer_count=len(self.reviewer_registry.reviewers),
+        )
+
+        outputs = await self.reviewer_registry.run_all(context)
+
+        logger.info(
+            "reviewers_completed",
+            output_count=len(outputs),
+            skipped_count=len([o for o in outputs if o.skipped]),
+        )
+
+        return outputs
+
     async def evaluate(
         self,
         evaluation_path: Path | str,
