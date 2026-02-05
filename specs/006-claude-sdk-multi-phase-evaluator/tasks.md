@@ -54,12 +54,12 @@ Source: plan.md, spec.md, data-model.md, research.md
 - [x] T116 Implement ReviewerBase.filter_by_confidence() method (src/claude_evaluator/core/agents/evaluator/reviewers/base.py)
 
 ### Reviewer Registry (FR-002, FR-005)
-- [ ] T120 Define ExecutionMode enum (SEQUENTIAL/PARALLEL) (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
-- [ ] T121 Define ReviewerConfig Pydantic model (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
-- [ ] T122 Implement ReviewerRegistry.discover_reviewers() auto-discovery (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
-- [ ] T123 Implement ReviewerRegistry.register() method (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
-- [ ] T124 Implement ReviewerRegistry.run_all() sequential execution (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
-- [ ] T125 Implement ReviewerRegistry.aggregate_outputs() method (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T120 Define ExecutionMode enum (SEQUENTIAL/PARALLEL) (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T121 Define ReviewerConfig Pydantic model (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T122 Implement ReviewerRegistry.discover_reviewers() auto-discovery (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T123 Implement ReviewerRegistry.register() method (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T124 Implement ReviewerRegistry.run_all() sequential execution (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T125 Implement ReviewerRegistry.aggregate_outputs() method (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
 
 ### Unit Tests for Foundation
 - [ ] T130 [P] Write unit tests for ClaudeClient (tests/unit/evaluator/test_claude_client.py)
