@@ -14,7 +14,7 @@ from pydantic import Field, field_validator
 
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import PermissionMode, WorkflowType
-from claude_evaluator.report.models import EvaluationReport
+from claude_evaluator.models.report import EvaluationReport
 
 __all__ = [
     "RepositorySource",

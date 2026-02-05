@@ -8,10 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
-    ReviewerIssue,
-    ReviewerOutput,
-)
+from claude_evaluator.models.reviewer import ReviewerIssue, ReviewerOutput
 
 __all__ = ["QuestionFormatter", "ReviewerOutputFormatter", "format_reviewer_outputs"]
 

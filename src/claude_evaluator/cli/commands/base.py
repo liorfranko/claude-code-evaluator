@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from argparse import Namespace
 
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.report.models import EvaluationReport
+from claude_evaluator.models.report import EvaluationReport
 
 __all__ = ["BaseCommand", "CommandResult"]
 

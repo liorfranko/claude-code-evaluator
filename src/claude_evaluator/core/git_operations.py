@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from claude_evaluator.core.exceptions import BranchNotFoundError, CloneError
-from claude_evaluator.report.models import ChangeSummary
+from claude_evaluator.models.report import ChangeSummary
 
 if TYPE_CHECKING:
     from claude_evaluator.config.models import RepositorySource

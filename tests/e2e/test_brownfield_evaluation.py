@@ -236,7 +236,7 @@ class TestBrownfieldReportFields:
         """T050: Report includes workspace path for brownfield evaluations."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
         from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.report.models import EvaluationReport
+        from claude_evaluator.models.report import EvaluationReport
 
         # Create a report with brownfield fields
         report = EvaluationReport(
@@ -264,7 +264,7 @@ class TestBrownfieldReportFields:
         """T051: Report includes summary of modified/added/deleted files."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
         from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.report.models import ChangeSummary, EvaluationReport
+        from claude_evaluator.models.report import ChangeSummary, EvaluationReport
 
         change_summary = ChangeSummary(
             files_modified=["src/main.py"],
@@ -301,7 +301,7 @@ class TestBrownfieldReportFields:
         """Report includes the git ref that was used."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
         from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.report.models import EvaluationReport
+        from claude_evaluator.models.report import EvaluationReport
 
         report = EvaluationReport(
             evaluation_id="test-789",
@@ -329,7 +329,7 @@ class TestBrownfieldReportFields:
         from claude_evaluator.models.enums import Outcome, WorkflowType
         from claude_evaluator.models.metrics import Metrics
         from claude_evaluator.report.generator import ReportGenerator
-        from claude_evaluator.report.models import ChangeSummary, EvaluationReport
+        from claude_evaluator.models.report import ChangeSummary, EvaluationReport
 
         change_summary = ChangeSummary(
             files_modified=["main.py"],

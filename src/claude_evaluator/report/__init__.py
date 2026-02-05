@@ -7,7 +7,7 @@ This module provides report generation functionality:
 """
 
 from claude_evaluator.report.generator import ReportGenerationError, ReportGenerator
-from claude_evaluator.report.models import EvaluationReport
+from claude_evaluator.models.report import EvaluationReport
 
 __all__ = [
     "EvaluationReport",

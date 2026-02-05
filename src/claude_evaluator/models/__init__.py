@@ -45,6 +45,15 @@ from claude_evaluator.models.score_report import (
     TaskComplexityTier,
 )
 from claude_evaluator.models.timeline_event import TimelineEvent
+from claude_evaluator.models.report import ChangeSummary, EvaluationReport
+from claude_evaluator.models.reviewer import (
+    CodeFile,
+    ExecutionMode,
+    ReviewContext,
+    ReviewerConfig,
+    ReviewerIssue,
+    ReviewerOutput,
+)
 from claude_evaluator.models.tool_invocation import ToolInvocation
 
 __all__ = [
@@ -83,4 +92,14 @@ __all__ = [
     "ScoreReport",
     "StepAnalysis",
     "TaskComplexityTier",
+    # Report Models
+    "ChangeSummary",
+    "EvaluationReport",
+    # Reviewer Models
+    "CodeFile",
+    "ExecutionMode",
+    "ReviewContext",
+    "ReviewerConfig",
+    "ReviewerIssue",
+    "ReviewerOutput",
 ]

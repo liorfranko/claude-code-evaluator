@@ -8,11 +8,8 @@ import time
 
 from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 from claude_evaluator.core.agents.evaluator.prompts import TASK_COMPLETION_REVIEW_PROMPT
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
-    ReviewContext,
-    ReviewerBase,
-    ReviewerOutput,
-)
+from claude_evaluator.core.agents.evaluator.reviewers.base import ReviewerBase
+from claude_evaluator.models.reviewer import ReviewContext, ReviewerOutput
 
 __all__ = ["TaskCompletionReviewer"]
 

@@ -15,7 +15,7 @@ from claude_evaluator.models.enums import EvaluationStatus, Outcome
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.timeline_event import TimelineEvent
 from claude_evaluator.report.exceptions import ReportGenerationError
-from claude_evaluator.report.models import ChangeSummary, EvaluationReport
+from claude_evaluator.models.report import ChangeSummary, EvaluationReport
 
 if TYPE_CHECKING:
     from claude_evaluator.core import Evaluation

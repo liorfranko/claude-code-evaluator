@@ -7,78 +7,29 @@ and executing phase reviewers in sequential or parallel mode.
 import asyncio
 import importlib
 import pkgutil
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import structlog
-from pydantic import Field
 
 from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.core.agents.evaluator.reviewers.base import ReviewerBase
+from claude_evaluator.models.reviewer import (
+    ExecutionMode,
     IssueSeverity,
     ReviewContext,
-    ReviewerBase,
+    ReviewerConfig,
     ReviewerOutput,
 )
-from claude_evaluator.models.base import BaseSchema
 
 __all__ = [
+    "ReviewerRegistry",
+    # Re-exported from models.reviewer for backwards compatibility
     "ExecutionMode",
     "ReviewerConfig",
-    "ReviewerRegistry",
 ]
 
 logger = structlog.get_logger(__name__)
-
-
-class ExecutionMode(str, Enum):
-    """Execution mode for running reviewers.
-
-    Attributes:
-        SEQUENTIAL: Execute reviewers one at a time in order.
-        PARALLEL: Execute reviewers concurrently.
-
-    """
-
-    SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
-
-
-class ReviewerConfig(BaseSchema):
-    """Configuration for an individual reviewer.
-
-    Allows customizing reviewer behavior including enabling/disabling,
-    confidence thresholds, and execution timeouts.
-
-    Attributes:
-        reviewer_id: Identifier of the reviewer to configure.
-        enabled: Whether this reviewer should execute (default: true).
-        min_confidence: Override minimum confidence threshold.
-        timeout_seconds: Maximum execution time for this reviewer.
-
-    """
-
-    reviewer_id: str = Field(
-        ...,
-        min_length=1,
-        description="Identifier of the reviewer to configure",
-    )
-    enabled: bool = Field(
-        default=True,
-        description="Whether this reviewer should execute",
-    )
-    min_confidence: int | None = Field(
-        default=None,
-        ge=0,
-        le=100,
-        description="Override minimum confidence threshold",
-    )
-    timeout_seconds: int | None = Field(
-        default=None,
-        ge=1,
-        description="Maximum execution time for this reviewer",
-    )
 
 
 class ReviewerRegistry:

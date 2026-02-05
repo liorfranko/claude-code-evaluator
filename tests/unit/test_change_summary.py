@@ -5,7 +5,7 @@ during brownfield evaluations.
 """
 
 
-from claude_evaluator.report.models import ChangeSummary
+from claude_evaluator.models.report import ChangeSummary
 
 
 class TestChangeSummaryCreation:

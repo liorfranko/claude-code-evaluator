@@ -1,7 +1,8 @@
-"""Report models for claude-evaluator.
+"""Report data models for claude-evaluator.
 
-This module defines the EvaluationReport model which represents
-a complete evaluation report with metrics, timeline, and decisions.
+This module defines the data models for evaluation reports:
+- ChangeSummary: Summary of repository changes
+- EvaluationReport: Complete evaluation report
 """
 
 from datetime import datetime

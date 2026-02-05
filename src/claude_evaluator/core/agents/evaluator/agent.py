@@ -29,10 +29,7 @@ from claude_evaluator.core.agents.evaluator.exceptions import (
     EvaluatorError,
     ParsingError,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
-    ReviewContext,
-    ReviewerOutput,
-)
+from claude_evaluator.models.reviewer import ReviewContext, ReviewerOutput
 from claude_evaluator.core.agents.evaluator.reviewers.code_quality import (
     CodeQualityReviewer,
 )
@@ -49,7 +46,7 @@ from claude_evaluator.models.score_report import (
     DimensionType,
     ScoreReport,
 )
-from claude_evaluator.report.models import EvaluationReport
+from claude_evaluator.models.report import EvaluationReport
 
 __all__ = [
     "EvaluatorAgent",

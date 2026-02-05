@@ -10,7 +10,7 @@ from claude_evaluator.cli import (
 )
 from claude_evaluator.models.enums import Outcome, WorkflowType
 from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.report.models import EvaluationReport
+from claude_evaluator.models.report import EvaluationReport
 
 
 class TestCreateParser:
