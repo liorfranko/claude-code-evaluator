@@ -73,12 +73,12 @@ Source: plan.md, spec.md, data-model.md, research.md
 Story: As a developer, I want to evaluate a completed coding task using multiple specialized Claude-powered review phases so that I get comprehensive, high-quality feedback.
 
 ### Core Reviewers Implementation
-- [ ] T200 [US1] Implement TaskCompletionReviewer class (src/claude_evaluator/core/agents/evaluator/reviewers/task_completion.py)
-- [ ] T201 [US1] Add task completion prompt template (src/claude_evaluator/core/agents/evaluator/prompts.py)
-- [ ] T202 [US1] Implement CodeQualityReviewer class (src/claude_evaluator/core/agents/evaluator/reviewers/code_quality.py)
-- [ ] T203 [US1] Add code quality prompt template (src/claude_evaluator/core/agents/evaluator/prompts.py)
-- [ ] T204 [US1] Implement ErrorHandlingReviewer class (src/claude_evaluator/core/agents/evaluator/reviewers/error_handling.py)
-- [ ] T205 [US1] Add error handling prompt template (src/claude_evaluator/core/agents/evaluator/prompts.py)
+- [x] T200 [US1] Implement TaskCompletionReviewer class (src/claude_evaluator/core/agents/evaluator/reviewers/task_completion.py)
+- [x] T201 [US1] Add task completion prompt template (src/claude_evaluator/core/agents/evaluator/prompts.py)
+- [x] T202 [US1] Implement CodeQualityReviewer class (src/claude_evaluator/core/agents/evaluator/reviewers/code_quality.py)
+- [x] T203 [US1] Add code quality prompt template (src/claude_evaluator/core/agents/evaluator/prompts.py)
+- [x] T204 [US1] Implement ErrorHandlingReviewer class (src/claude_evaluator/core/agents/evaluator/reviewers/error_handling.py)
+- [x] T205 [US1] Add error handling prompt template (src/claude_evaluator/core/agents/evaluator/prompts.py)
 
 ### EvaluatorAgent Integration
 - [ ] T210 [US1] Refactor EvaluatorAgent to use ClaudeClient (src/claude_evaluator/core/agents/evaluator/agent.py)

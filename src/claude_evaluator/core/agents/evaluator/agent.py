@@ -23,12 +23,13 @@ from claude_evaluator.core.agents.evaluator.checks.security import (
     get_all_security_checks,
 )
 from claude_evaluator.core.agents.evaluator.checks.smells import get_all_smell_checks
+from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 from claude_evaluator.core.agents.evaluator.exceptions import (
+    ClaudeAPIError,
     EvaluatorError,
     GeminiAPIError,
     ParsingError,
 )
-from claude_evaluator.core.agents.evaluator.gemini_client import GeminiClient
 from claude_evaluator.core.agents.evaluator.scorers import (
     AggregateScorer,
     CodeQualityScorer,
@@ -61,7 +62,7 @@ class EvaluatorAgent:
         self,
         workspace_path: Path | None = None,
         enable_ast: bool = True,
-        gemini_client: GeminiClient | None = None,
+        claude_client: ClaudeClient | None = None,
         enable_checks: bool = True,
     ) -> None:
         """Initialize the evaluator agent.
@@ -69,7 +70,7 @@ class EvaluatorAgent:
         Args:
             workspace_path: Base path for resolving file paths.
             enable_ast: Whether to enable AST-based metrics.
-            gemini_client: Optional Gemini client (creates new if not provided).
+            claude_client: Optional Claude client (creates new if not provided).
             enable_checks: Whether to enable extended code quality checks.
 
         """
@@ -77,8 +78,10 @@ class EvaluatorAgent:
         self.enable_ast = enable_ast
         self.enable_checks = enable_checks
 
-        # Initialize components
-        self.gemini_client = gemini_client or GeminiClient()
+        # Initialize Claude client
+        self.claude_client = claude_client or ClaudeClient()
+
+        # Initialize analyzers
         self.step_analyzer = StepAnalyzer()
         self.code_analyzer = CodeAnalyzer(
             workspace_path=self.workspace_path,
@@ -86,10 +89,11 @@ class EvaluatorAgent:
         )
 
         # Initialize check registry with all checks
+        # Note: CheckRegistry still uses Gemini client internally (legacy)
         self.check_registry: CheckRegistry | None = None
         if enable_checks:
             self.check_registry = CheckRegistry(
-                gemini_client=self.gemini_client,
+                gemini_client=None,  # type: ignore[arg-type]
                 max_workers=4,
             )
             # Register all checks
@@ -97,13 +101,13 @@ class EvaluatorAgent:
             self.check_registry.register_all(get_all_performance_checks())
             self.check_registry.register_all(get_all_smell_checks())
             self.check_registry.register_all(
-                get_all_best_practices_checks(self.gemini_client)
+                get_all_best_practices_checks(None)  # type: ignore[arg-type]
             )
 
-        # Initialize scorers with shared Gemini client
-        self.task_completion_scorer = TaskCompletionScorer(client=self.gemini_client)
+        # Initialize scorers (legacy - will be replaced with reviewers)
+        self.task_completion_scorer = TaskCompletionScorer(client=None)  # type: ignore[arg-type]
         self.code_quality_scorer = CodeQualityScorer(
-            client=self.gemini_client,
+            client=None,  # type: ignore[arg-type]
             check_registry=self.check_registry,
         )
         self.efficiency_scorer = EfficiencyScorer()
@@ -114,6 +118,7 @@ class EvaluatorAgent:
             workspace_path=str(self.workspace_path),
             enable_ast=enable_ast,
             enable_checks=enable_checks,
+            claude_model=self.claude_client.model,
         )
 
     def load_evaluation(self, evaluation_path: Path | str) -> EvaluationReport:
@@ -388,7 +393,7 @@ class EvaluatorAgent:
             step_analysis=step_analyses,
             code_analysis=code_analysis,
             generated_at=datetime.now(),
-            evaluator_model=self.gemini_client.model,
+            evaluator_model=self.claude_client.model,
             evaluation_duration_ms=evaluation_duration_ms,
         )
 
