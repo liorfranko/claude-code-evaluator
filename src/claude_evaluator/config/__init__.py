@@ -15,8 +15,6 @@ from claude_evaluator.config.models import (
     EvaluationConfig,
     EvaluationSuite,
     Phase,
-    SuiteRunResult,
-    SuiteSummary,
 )
 from claude_evaluator.config.settings import (
     DeveloperSettings,
@@ -36,7 +34,5 @@ __all__ = [
     "load_suite",
     "Phase",
     "Settings",
-    "SuiteRunResult",
-    "SuiteSummary",
     "WorkerSettings",
 ]
