@@ -157,3 +157,67 @@ class ClaudeClient:
             return text
 
         raise ValueError("Could not extract text from SDK response")
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        model_cls: type[T],
+    ) -> T:
+        """Generate structured output using a Pydantic model.
+
+        Args:
+            prompt: The prompt to send to the model.
+            model_cls: Pydantic model class for response validation.
+
+        Returns:
+            Parsed Pydantic model instance.
+
+        Raises:
+            ClaudeAPIError: If the API call fails after retries.
+
+        """
+        from claude_evaluator.core.agents.evaluator.exceptions import ClaudeAPIError
+
+        # Add JSON format instructions to prompt
+        json_prompt = f"""{prompt}
+
+Respond with valid JSON matching this schema:
+{model_cls.model_json_schema()}"""
+
+        last_error: Exception | None = None
+
+        for attempt in range(self.max_retries):
+            try:
+                result_message = None
+                async for message in sdk_query(
+                    prompt=json_prompt,
+                    options=ClaudeAgentOptions(
+                        model=self.model,
+                        max_turns=1,
+                        permission_mode="plan",
+                    ),
+                ):
+                    if type(message).__name__ == "ResultMessage":
+                        result_message = message
+
+                result_text = self._extract_text(result_message)
+
+                # Parse JSON response
+                return model_cls.model_validate_json(result_text)
+
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    "claude_api_error",
+                    attempt=attempt + 1,
+                    max_retries=self.max_retries,
+                    error=str(e),
+                )
+
+                if attempt < self.max_retries - 1:
+                    delay = self.retry_delay * (2**attempt)
+                    await asyncio.sleep(delay)
+
+        raise ClaudeAPIError(
+            f"Claude API call failed after {self.max_retries} attempts: {last_error}"
+        )
