@@ -30,6 +30,20 @@ from claude_evaluator.core.agents.evaluator.exceptions import (
     GeminiAPIError,
     ParsingError,
 )
+from claude_evaluator.core.agents.evaluator.reviewers.base import (
+    ReviewContext,
+    ReviewerOutput,
+)
+from claude_evaluator.core.agents.evaluator.reviewers.code_quality import (
+    CodeQualityReviewer,
+)
+from claude_evaluator.core.agents.evaluator.reviewers.error_handling import (
+    ErrorHandlingReviewer,
+)
+from claude_evaluator.core.agents.evaluator.reviewers.registry import ReviewerRegistry
+from claude_evaluator.core.agents.evaluator.reviewers.task_completion import (
+    TaskCompletionReviewer,
+)
 from claude_evaluator.core.agents.evaluator.scorers import (
     AggregateScorer,
     CodeQualityScorer,
@@ -113,12 +127,34 @@ class EvaluatorAgent:
         self.efficiency_scorer = EfficiencyScorer()
         self.aggregate_scorer = AggregateScorer()
 
+        # Initialize reviewer registry with core reviewers
+        self.reviewer_registry = ReviewerRegistry(client=self.claude_client)
+        self._register_core_reviewers()
+
         logger.debug(
             "evaluator_agent_initialized",
             workspace_path=str(self.workspace_path),
             enable_ast=enable_ast,
             enable_checks=enable_checks,
             claude_model=self.claude_client.model,
+            reviewer_count=len(self.reviewer_registry.reviewers),
+        )
+
+    def _register_core_reviewers(self) -> None:
+        """Register the core reviewers with the registry.
+
+        Registers TaskCompletionReviewer, CodeQualityReviewer, and
+        ErrorHandlingReviewer instances with the shared Claude client.
+
+        """
+        self.reviewer_registry.register(
+            TaskCompletionReviewer(client=self.claude_client)
+        )
+        self.reviewer_registry.register(
+            CodeQualityReviewer(client=self.claude_client)
+        )
+        self.reviewer_registry.register(
+            ErrorHandlingReviewer(client=self.claude_client)
         )
 
     def load_evaluation(self, evaluation_path: Path | str) -> EvaluationReport:
