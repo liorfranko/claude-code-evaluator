@@ -13,6 +13,10 @@ from pydantic import BaseModel
 
 from claude_evaluator.config.settings import get_settings
 
+# SDK imports for Claude interaction
+from claude_agent_sdk import ClaudeAgentOptions  # noqa: E402
+from claude_agent_sdk import query as sdk_query  # noqa: E402
+
 __all__ = [
     "ClaudeClient",
 ]
@@ -59,3 +63,97 @@ class ClaudeClient:
             model=self.model,
             temperature=self.temperature,
         )
+
+    async def generate(self, prompt: str) -> str:
+        """Generate text response from Claude.
+
+        Args:
+            prompt: The prompt to send to the model.
+
+        Returns:
+            Generated text response.
+
+        Raises:
+            ClaudeAPIError: If the API call fails after retries.
+
+        """
+        from claude_evaluator.core.agents.evaluator.exceptions import ClaudeAPIError
+
+        last_error: Exception | None = None
+
+        for attempt in range(self.max_retries):
+            try:
+                result_message = None
+                async for message in sdk_query(
+                    prompt=prompt,
+                    options=ClaudeAgentOptions(
+                        model=self.model,
+                        max_turns=1,
+                        permission_mode="plan",
+                    ),
+                ):
+                    if type(message).__name__ == "ResultMessage":
+                        result_message = message
+
+                return self._extract_text(result_message)
+
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    "claude_api_error",
+                    attempt=attempt + 1,
+                    max_retries=self.max_retries,
+                    error=str(e),
+                )
+
+                if attempt < self.max_retries - 1:
+                    delay = self.retry_delay * (2**attempt)
+                    await asyncio.sleep(delay)
+
+        raise ClaudeAPIError(
+            f"Claude API call failed after {self.max_retries} attempts: {last_error}"
+        )
+
+    def _extract_text(self, result_message: object | None) -> str:
+        """Extract text from a ResultMessage.
+
+        Args:
+            result_message: The ResultMessage from SDK.
+
+        Returns:
+            Extracted text content.
+
+        Raises:
+            ValueError: If no text could be extracted.
+
+        """
+        if result_message is None:
+            raise ValueError("No result message received from Claude SDK")
+
+        # Handle ResultMessage object
+        if hasattr(result_message, "result") and result_message.result:
+            if isinstance(result_message.result, str):
+                return result_message.result.strip()
+
+        # Handle content attribute
+        if hasattr(result_message, "content"):
+            content = result_message.content
+            if isinstance(content, str):
+                return content.strip()
+            elif isinstance(content, list):
+                # Extract text from content blocks
+                texts = []
+                for block in content:
+                    if hasattr(block, "text"):
+                        texts.append(block.text)
+                    elif isinstance(block, dict) and "text" in block:
+                        texts.append(block["text"])
+                if texts:
+                    return "\n".join(texts).strip()
+
+        # Try converting to string as last resort
+        text = str(result_message).strip()
+        if text and text != "None":
+            return text
+
+        raise ValueError("Could not extract text from SDK response")
