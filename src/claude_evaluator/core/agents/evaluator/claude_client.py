@@ -122,7 +122,7 @@ class ClaudeClient:
                     if msg_type == "AssistantMessage":
                         # Capture assistant message content for text extraction
                         if hasattr(message, "content"):
-                            assistant_content = message.content
+                            assistant_content = getattr(message, "content")
                     elif msg_type == "ResultMessage":
                         result_message = message
 

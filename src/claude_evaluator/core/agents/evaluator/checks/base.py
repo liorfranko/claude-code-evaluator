@@ -109,11 +109,7 @@ class CheckStrategy(ABC):
     # Subclasses should define these as class variables
     check_id: str
     category: CheckCategory
-
-    @property
-    def description(self) -> str:
-        """Human-readable description of what this check detects."""
-        return f"Check: {self.check_id}"
+    description: str = ""
 
     @property
     def supported_languages(self) -> set[str] | None:

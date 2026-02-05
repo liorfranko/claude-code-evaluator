@@ -275,7 +275,7 @@ class EvaluatorAgent:
                 "tool_input": item.get("input", {}),
             }
         # Object format
-        if hasattr(item, "type") and item.type == "ToolUseBlock":
+        if hasattr(item, "type") and getattr(item, "type") == "ToolUseBlock":
             return {
                 "tool_name": getattr(item, "name", "unknown"),
                 "tool_input": getattr(item, "input", {}),
@@ -309,34 +309,6 @@ class EvaluatorAgent:
                 error_type=type(e).__name__,
             )
             return None
-
-    def _prepare_code_files(
-        self,
-        code_analysis: CodeAnalysis,
-    ) -> list[tuple[str, str, str, int, object]]:
-        """Prepare code files for quality scoring.
-
-        Args:
-            code_analysis: Analysis with file information.
-
-        Returns:
-            List of (file_path, language, content, loc, ast_metrics) tuples.
-
-        """
-        files = []
-        for file_analysis in code_analysis.files_analyzed:
-            content = self._read_file_safely(file_analysis.file_path)
-            if content is not None:
-                files.append(
-                    (
-                        file_analysis.file_path,
-                        file_analysis.language,
-                        content,
-                        file_analysis.lines_of_code,
-                        file_analysis.ast_metrics,
-                    )
-                )
-        return files
 
     def _build_review_context(
         self,

@@ -9,10 +9,11 @@ Task IDs: T307, T308, T309, T310, T311
 
 import asyncio
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
 from claude_evaluator.models.enums import PermissionMode
@@ -657,73 +658,24 @@ class TestAnswerInjection:
 class TestTimeoutHandling:
     """Tests for timeout triggering graceful failure (T310)."""
 
-    def test_question_timeout_validation_valid_values(self) -> None:
-        """Test that valid timeout values are accepted."""
-        # Minimum valid
-        agent_min = WorkerAgent(
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            question_timeout_seconds=1,
-        )
-        assert agent_min.question_timeout_seconds == 1
+    def test_question_timeout_default_from_settings(self) -> None:
+        """Test that default timeout is read from settings (60 seconds)."""
+        assert get_settings().worker.question_timeout_seconds == 60
 
-        # Maximum valid
-        agent_max = WorkerAgent(
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            question_timeout_seconds=300,
-        )
-        assert agent_max.question_timeout_seconds == 300
+    def test_question_timeout_settings_can_be_patched(self) -> None:
+        """Test that question_timeout_seconds can be patched in settings."""
+        with patch.object(get_settings().worker, "question_timeout_seconds", 120):
+            assert get_settings().worker.question_timeout_seconds == 120
 
-    def test_question_timeout_validation_default(self) -> None:
-        """Test that default timeout is 60 seconds."""
-        agent = WorkerAgent(
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-        )
-        assert agent.question_timeout_seconds == 60
-
-    def test_question_timeout_validation_rejects_zero(self) -> None:
-        """Test that timeout of 0 is rejected."""
-        with pytest.raises(ValueError) as exc_info:
-            WorkerAgent(
+    def test_question_handler_uses_settings_timeout(self) -> None:
+        """Test that QuestionHandler is initialized with timeout from settings."""
+        with patch.object(get_settings().worker, "question_timeout_seconds", 42):
+            agent = WorkerAgent(
                 project_directory="/tmp/test",
                 active_session=False,
                 permission_mode=PermissionMode.plan,
-                question_timeout_seconds=0,
             )
-        error_str = str(exc_info.value)
-        assert "question_timeout_seconds" in error_str
-        assert "greater than or equal to 1" in error_str
-
-    def test_question_timeout_validation_rejects_negative(self) -> None:
-        """Test that negative timeout is rejected."""
-        with pytest.raises(ValueError) as exc_info:
-            WorkerAgent(
-                project_directory="/tmp/test",
-                active_session=False,
-                permission_mode=PermissionMode.plan,
-                question_timeout_seconds=-5,
-            )
-        error_str = str(exc_info.value)
-        assert "question_timeout_seconds" in error_str
-        assert "greater than or equal to 1" in error_str
-
-    def test_question_timeout_validation_rejects_over_max(self) -> None:
-        """Test that timeout over 300 is rejected."""
-        with pytest.raises(ValueError) as exc_info:
-            WorkerAgent(
-                project_directory="/tmp/test",
-                active_session=False,
-                permission_mode=PermissionMode.plan,
-                question_timeout_seconds=301,
-            )
-        error_str = str(exc_info.value)
-        assert "question_timeout_seconds" in error_str
-        assert "less than or equal to 300" in error_str
+            assert agent._question_handler._timeout_seconds == 42
 
     @pytest.mark.asyncio
     async def test_callback_timeout_raises_timeout_error(self) -> None:
@@ -733,13 +685,13 @@ class TestTimeoutHandling:
             await asyncio.sleep(10)  # Very slow
             return "late answer"
 
-        agent = WorkerAgent(
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=slow_callback,
-            question_timeout_seconds=1,  # Very short timeout
-        )
+        with patch.object(get_settings().worker, "question_timeout_seconds", 1):
+            agent = WorkerAgent(
+                project_directory="/tmp/test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=slow_callback,
+            )
 
         block = AskUserQuestionBlock(questions=[{"question": "Will this timeout?"}])
         mock_client = MockClaudeSDKClient()
@@ -759,13 +711,13 @@ class TestTimeoutHandling:
             await asyncio.sleep(100)
             return "never"
 
-        agent = WorkerAgent(
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=never_returns,
-            question_timeout_seconds=1,
-        )
+        with patch.object(get_settings().worker, "question_timeout_seconds", 1):
+            agent = WorkerAgent(
+                project_directory="/tmp/test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=never_returns,
+            )
 
         block = AskUserQuestionBlock(
             questions=[
@@ -789,13 +741,13 @@ class TestTimeoutHandling:
             await asyncio.sleep(0.01)  # Very fast
             return "quick answer"
 
-        agent = WorkerAgent(
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=fast_callback,
-            question_timeout_seconds=5,
-        )
+        with patch.object(get_settings().worker, "question_timeout_seconds", 5):
+            agent = WorkerAgent(
+                project_directory="/tmp/test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=fast_callback,
+            )
 
         block = AskUserQuestionBlock(questions=[{"question": "Quick question?"}])
         mock_client = MockClaudeSDKClient()

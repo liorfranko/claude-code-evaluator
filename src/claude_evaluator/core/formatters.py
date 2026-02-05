@@ -29,12 +29,6 @@ class ReviewerOutputFormatter:
 
     """
 
-    # Box drawing characters for visual formatting
-    HEADER_LINE = "=" * 59
-    BOX_TOP = "\u250c\u2500"  # "|-"
-    BOX_MID = "\u2502"  # "|"
-    BOX_BOTTOM = "\u2514" + "\u2500" * 57  # "L---..."
-
     @staticmethod
     def format_phase_header(output: ReviewerOutput) -> str:
         """Format a clear phase header with reviewer name.
@@ -324,7 +318,3 @@ class QuestionFormatter:
         if isinstance(opt, dict):
             return opt.get("description")
         return None
-
-
-# Pre-configured formatters for common use cases
-DEFAULT_FORMATTER = QuestionFormatter(max_questions=3, max_length=80)

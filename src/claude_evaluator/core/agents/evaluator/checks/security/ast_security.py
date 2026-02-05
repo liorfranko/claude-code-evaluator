@@ -53,16 +53,6 @@ class HardcodedSecretsCheck(ASTCheck):
         re.compile(r"(?i)(credential|cred)"),
     ]
 
-    # Patterns for actual secret values
-    SECRET_VALUE_PATTERNS: ClassVar[list[re.Pattern]] = [
-        # AWS-style keys
-        re.compile(r"AKIA[0-9A-Z]{16}"),
-        # Generic long alphanumeric strings that look like secrets
-        re.compile(r"^[a-zA-Z0-9+/]{32,}={0,2}$"),
-        # Hex strings (potential keys)
-        re.compile(r"^[a-fA-F0-9]{32,}$"),
-    ]
-
     # Node types for assignments per language
     ASSIGNMENT_TYPES: ClassVar[dict[Language, set[str]]] = {
         Language.python: {"assignment", "augmented_assignment"},
@@ -232,19 +222,6 @@ class SQLInjectionCheck(ASTCheck):
         "EXEC",
         "EXECUTE",
     ]
-
-    # String concatenation node types
-    CONCAT_TYPES: ClassVar[dict[Language, set[str]]] = {
-        Language.python: {
-            "binary_operator",
-            "concatenated_string",
-            "call",  # f-strings become calls
-        },
-        Language.javascript: {"binary_expression", "template_string"},
-        Language.typescript: {"binary_expression", "template_string"},
-        Language.go: {"binary_expression"},
-        Language.java: {"binary_expression"},
-    }
 
     def run(
         self,

@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from claude_evaluator.config.models import EvalDefaults
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
@@ -198,12 +199,11 @@ class TestWorkflowConfigurationPassing:
 
         assert developer.developer_qa_model == "claude-sonnet"
 
-    def test_configure_worker_for_questions_sets_context_window_size(self) -> None:
-        """Test that configure_worker_for_questions sets context_window_size."""
-        defaults = EvalDefaults(context_window_size=50)
+    def test_context_window_size_read_from_settings_at_runtime(self) -> None:
+        """Test that context_window_size is read from settings, not set on agent."""
         collector = MetricsCollector()
         workflow = DirectWorkflow(
-            collector, defaults=defaults, enable_question_handling=False
+            collector, enable_question_handling=False
         )
 
         developer = DeveloperAgent()
@@ -218,7 +218,11 @@ class TestWorkflowConfigurationPassing:
 
         workflow.configure_worker_for_questions()
 
-        assert developer.context_window_size == 50
+        # context_window_size is no longer set as a dynamic attribute on the agent;
+        # it is read from settings at runtime
+        assert get_settings().developer.context_window_size == 10  # default value
+        with patch.object(get_settings().developer, "context_window_size", 50):
+            assert get_settings().developer.context_window_size == 50
 
     def test_configure_worker_for_questions_sets_callback_on_worker(self) -> None:
         """Test that configure_worker_for_questions sets the callback on WorkerAgent."""
@@ -242,12 +246,11 @@ class TestWorkflowConfigurationPassing:
         assert worker.on_question_callback is not None
         assert asyncio.iscoroutinefunction(worker.on_question_callback)
 
-    def test_configure_worker_for_questions_sets_timeout(self) -> None:
-        """Test that configure_worker_for_questions sets question_timeout_seconds."""
-        defaults = EvalDefaults(question_timeout_seconds=90)
+    def test_question_timeout_read_from_settings_at_runtime(self) -> None:
+        """Test that question_timeout_seconds is read from settings, not set on agent."""
         collector = MetricsCollector()
         workflow = DirectWorkflow(
-            collector, defaults=defaults, enable_question_handling=False
+            collector, enable_question_handling=False
         )
 
         developer = DeveloperAgent()
@@ -262,7 +265,11 @@ class TestWorkflowConfigurationPassing:
 
         workflow.configure_worker_for_questions()
 
-        assert worker.question_timeout_seconds == 90
+        # question_timeout_seconds is no longer set as a dynamic attribute on the agent;
+        # it is read from settings at runtime
+        assert get_settings().worker.question_timeout_seconds == 60  # default value
+        with patch.object(get_settings().worker, "question_timeout_seconds", 90):
+            assert get_settings().worker.question_timeout_seconds == 90
 
 
 # =============================================================================
@@ -814,8 +821,8 @@ class TestWorkflowQuestionHandlingIntegration:
 
         # Verify configuration was applied
         assert developer.developer_qa_model == "test-model"
-        assert developer.context_window_size == 15
-        assert worker.question_timeout_seconds == 30
+        # context_window_size and question_timeout_seconds are now read from
+        # settings at runtime, not set as dynamic attributes on agents
         assert worker.on_question_callback is not None
         assert result is not None
 
@@ -860,8 +867,8 @@ class TestWorkflowQuestionHandlingIntegration:
 
         # Verify configuration was applied
         assert developer.developer_qa_model == "qa-model"
-        assert developer.context_window_size == 25
-        assert worker.question_timeout_seconds == 45
+        # context_window_size and question_timeout_seconds are now read from
+        # settings at runtime, not set as dynamic attributes on agents
         assert worker.on_question_callback is not None
         assert result is not None
 

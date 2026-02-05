@@ -12,6 +12,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any, TypeAlias
 
+from claude_agent_sdk import ClaudeAgentOptions
+from claude_agent_sdk import query as sdk_query
 from pydantic import ConfigDict, Field, PrivateAttr
 
 from claude_evaluator.config.settings import get_settings
@@ -32,10 +34,6 @@ SendPromptCallback: TypeAlias = Callable[[str], None]
 ReceiveResponseCallback: TypeAlias = Callable[[], dict[str, Any]]
 
 logger = get_logger(__name__)
-
-# SDK imports for LLM-powered answer generation
-from claude_agent_sdk import ClaudeAgentOptions
-from claude_agent_sdk import query as sdk_query
 
 __all__ = ["DeveloperAgent"]
 
@@ -684,14 +682,18 @@ class DeveloperAgent(BaseSchema):
                 traceback=traceback.format_exc(),
             )
 
-            # Log additional error attributes if available
+            # Log additional error attributes if available (use getattr
+            # since subprocess errors have these but base Exception does not)
             extra_attrs: dict[str, Any] = {}
-            if hasattr(e, "stderr"):
-                extra_attrs["stderr"] = e.stderr
-            if hasattr(e, "stdout"):
-                extra_attrs["stdout"] = e.stdout
-            if hasattr(e, "returncode"):
-                extra_attrs["returncode"] = e.returncode
+            stderr = getattr(e, "stderr", None)
+            if stderr is not None:
+                extra_attrs["stderr"] = stderr
+            stdout = getattr(e, "stdout", None)
+            if stdout is not None:
+                extra_attrs["stdout"] = stdout
+            returncode = getattr(e, "returncode", None)
+            if returncode is not None:
+                extra_attrs["returncode"] = returncode
             if hasattr(e, "__cause__") and e.__cause__:
                 extra_attrs["cause_type"] = type(e.__cause__).__name__
                 extra_attrs["cause_message"] = str(e.__cause__)

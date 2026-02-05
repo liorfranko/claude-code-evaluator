@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents import WorkerAgent
-from claude_evaluator.core.agents.worker_agent import DEFAULT_MODEL
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.query_metrics import QueryMetrics
@@ -90,10 +90,11 @@ class TestWorkerAgentSDKConfiguration:
 
         assert agent.model == "claude-sonnet-4-5@20250929"
 
-    def test_default_model_constant_exists(self) -> None:
-        """Test that DEFAULT_MODEL constant is defined."""
-        assert DEFAULT_MODEL is not None
-        assert isinstance(DEFAULT_MODEL, str)
+    def test_default_model_from_settings(self) -> None:
+        """Test that the default worker model is defined in settings."""
+        default_model = get_settings().worker.model
+        assert default_model is not None
+        assert isinstance(default_model, str)
 
 
 class MockUsage(BaseSchema):

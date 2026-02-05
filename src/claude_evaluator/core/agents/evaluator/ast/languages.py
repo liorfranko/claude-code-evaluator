@@ -139,7 +139,7 @@ def get_grammar(language: Language):
             # TypeScript uses JavaScript grammar for basic parsing
             # or requires tree-sitter-typescript which may not be installed
             try:
-                import tree_sitter_typescript as ts_typescript
+                import tree_sitter_typescript as ts_typescript  # pyright: ignore[reportMissingImports]
 
                 capsule = ts_typescript.language_typescript()
             except ImportError:

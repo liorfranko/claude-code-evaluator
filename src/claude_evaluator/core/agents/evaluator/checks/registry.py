@@ -4,6 +4,7 @@ This module provides the CheckRegistry class that manages registration
 and parallel execution of code quality checks.
 """
 
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
@@ -66,7 +67,7 @@ class CheckRegistry:
             category=check.category.value,
         )
 
-    def register_all(self, checks: list[CheckStrategy]) -> None:
+    def register_all(self, checks: Sequence[CheckStrategy]) -> None:
         """Register multiple checks at once.
 
         Args:

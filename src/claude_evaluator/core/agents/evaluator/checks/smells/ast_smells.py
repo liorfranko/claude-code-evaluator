@@ -521,13 +521,6 @@ class MagicNumberCheck(ASTCheck):
         0.5,
     }
 
-    # Contexts where numbers are acceptable
-    ALLOWED_CONTEXTS: ClassVar[set[str]] = {
-        "index",  # array indexing
-        "range",  # range(0, 10)
-        "slice",  # [0:10]
-    }
-
     def run(
         self,
         parse_result: ParseResult,
