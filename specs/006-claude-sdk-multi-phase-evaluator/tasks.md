@@ -62,9 +62,9 @@ Source: plan.md, spec.md, data-model.md, research.md
 - [x] T125 Implement ReviewerRegistry.aggregate_outputs() method (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
 
 ### Unit Tests for Foundation
-- [ ] T130 [P] Write unit tests for ClaudeClient (tests/unit/evaluator/test_claude_client.py)
-- [ ] T131 [P] Write unit tests for ReviewerBase (tests/unit/evaluator/reviewers/test_base.py)
-- [ ] T132 [P] Write unit tests for ReviewerRegistry (tests/unit/evaluator/reviewers/test_registry.py)
+- [x] T130 [P] Write unit tests for ClaudeClient (tests/unit/evaluator/test_claude_client.py)
+- [x] T131 [P] Write unit tests for ReviewerBase (tests/unit/evaluator/reviewers/test_base.py)
+- [x] T132 [P] Write unit tests for ReviewerRegistry (tests/unit/evaluator/reviewers/test_registry.py)
 
 ---
 
