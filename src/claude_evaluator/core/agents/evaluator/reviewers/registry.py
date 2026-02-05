@@ -164,3 +164,38 @@ class ReviewerRegistry:
         )
 
         return discovered
+
+    def register(
+        self,
+        reviewer: ReviewerBase,
+        config: ReviewerConfig | None = None,
+    ) -> None:
+        """Register a reviewer instance with optional configuration.
+
+        Args:
+            reviewer: The reviewer instance to register.
+            config: Optional configuration overrides for this reviewer.
+
+        Raises:
+            ValueError: If a reviewer with the same ID is already registered.
+
+        """
+        # Check for duplicate registration
+        for existing in self.reviewers:
+            if existing.reviewer_id == reviewer.reviewer_id:
+                raise ValueError(
+                    f"Reviewer with ID '{reviewer.reviewer_id}' is already registered"
+                )
+
+        self.reviewers.append(reviewer)
+
+        # Store config if provided
+        if config is not None:
+            self.configs[reviewer.reviewer_id] = config
+
+        logger.debug(
+            "reviewer_registered",
+            reviewer_id=reviewer.reviewer_id,
+            focus_area=reviewer.focus_area,
+            has_config=config is not None,
+        )
