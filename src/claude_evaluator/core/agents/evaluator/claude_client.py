@@ -5,8 +5,7 @@ with built-in retry logic, error handling, and structured output support.
 """
 
 import asyncio
-import time
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import structlog
 from pydantic import BaseModel
@@ -64,6 +63,87 @@ class ClaudeClient:
             temperature=self.temperature,
         )
 
+    async def _query_with_retry(
+        self,
+        prompt: str,
+    ) -> Any:
+        """Execute SDK query with exponential backoff retry logic.
+
+        Args:
+            prompt: The prompt to send to Claude.
+
+        Returns:
+            The ResultMessage from the SDK.
+
+        Raises:
+            ClaudeAPIError: If all retry attempts fail.
+
+        """
+        from claude_evaluator.core.agents.evaluator.exceptions import ClaudeAPIError
+
+        last_error: Exception | None = None
+
+        for attempt in range(self.max_retries):
+            try:
+                logger.debug(
+                    "claude_query_attempt",
+                    attempt=attempt + 1,
+                    max_retries=self.max_retries,
+                    model=self.model,
+                )
+
+                result_message = None
+                async for message in sdk_query(
+                    prompt=prompt,
+                    options=ClaudeAgentOptions(
+                        model=self.model,
+                        max_turns=1,
+                        permission_mode="plan",
+                    ),
+                ):
+                    if type(message).__name__ == "ResultMessage":
+                        result_message = message
+
+                if result_message is None:
+                    raise ValueError("No ResultMessage received from SDK")
+
+                logger.debug(
+                    "claude_query_success",
+                    attempt=attempt + 1,
+                )
+                return result_message
+
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    "claude_api_error",
+                    attempt=attempt + 1,
+                    max_retries=self.max_retries,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+
+                if attempt < self.max_retries - 1:
+                    # Exponential backoff: delay = base * 2^attempt
+                    delay = self.retry_delay * (2**attempt)
+                    logger.debug(
+                        "claude_retry_backoff",
+                        delay_seconds=delay,
+                        next_attempt=attempt + 2,
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    # Final attempt failed, log before raising
+                    logger.error(
+                        "claude_all_retries_exhausted",
+                        attempts=self.max_retries,
+                        final_error=str(last_error),
+                    )
+
+        raise ClaudeAPIError(
+            f"Claude API call failed after {self.max_retries} attempts: {last_error}"
+        )
+
     async def generate(self, prompt: str) -> str:
         """Generate text response from Claude.
 
@@ -77,44 +157,10 @@ class ClaudeClient:
             ClaudeAPIError: If the API call fails after retries.
 
         """
-        from claude_evaluator.core.agents.evaluator.exceptions import ClaudeAPIError
+        result_message = await self._query_with_retry(prompt)
+        return self._extract_text(result_message)
 
-        last_error: Exception | None = None
-
-        for attempt in range(self.max_retries):
-            try:
-                result_message = None
-                async for message in sdk_query(
-                    prompt=prompt,
-                    options=ClaudeAgentOptions(
-                        model=self.model,
-                        max_turns=1,
-                        permission_mode="plan",
-                    ),
-                ):
-                    if type(message).__name__ == "ResultMessage":
-                        result_message = message
-
-                return self._extract_text(result_message)
-
-            except Exception as e:
-                last_error = e
-                logger.warning(
-                    "claude_api_error",
-                    attempt=attempt + 1,
-                    max_retries=self.max_retries,
-                    error=str(e),
-                )
-
-                if attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2**attempt)
-                    await asyncio.sleep(delay)
-
-        raise ClaudeAPIError(
-            f"Claude API call failed after {self.max_retries} attempts: {last_error}"
-        )
-
-    def _extract_text(self, result_message: object | None) -> str:
+    def _extract_text(self, result_message: Any) -> str:
         """Extract text from a ResultMessage.
 
         Args:
@@ -176,48 +222,22 @@ class ClaudeClient:
             ClaudeAPIError: If the API call fails after retries.
 
         """
-        from claude_evaluator.core.agents.evaluator.exceptions import ClaudeAPIError
-
         # Add JSON format instructions to prompt
         json_prompt = f"""{prompt}
 
 Respond with valid JSON matching this schema:
 {model_cls.model_json_schema()}"""
 
-        last_error: Exception | None = None
+        result_message = await self._query_with_retry(json_prompt)
+        result_text = self._extract_text(result_message)
 
-        for attempt in range(self.max_retries):
-            try:
-                result_message = None
-                async for message in sdk_query(
-                    prompt=json_prompt,
-                    options=ClaudeAgentOptions(
-                        model=self.model,
-                        max_turns=1,
-                        permission_mode="plan",
-                    ),
-                ):
-                    if type(message).__name__ == "ResultMessage":
-                        result_message = message
-
-                result_text = self._extract_text(result_message)
-
-                # Parse JSON response
-                return model_cls.model_validate_json(result_text)
-
-            except Exception as e:
-                last_error = e
-                logger.warning(
-                    "claude_api_error",
-                    attempt=attempt + 1,
-                    max_retries=self.max_retries,
-                    error=str(e),
-                )
-
-                if attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2**attempt)
-                    await asyncio.sleep(delay)
-
-        raise ClaudeAPIError(
-            f"Claude API call failed after {self.max_retries} attempts: {last_error}"
-        )
+        # Parse JSON response
+        try:
+            return model_cls.model_validate_json(result_text)
+        except Exception as e:
+            logger.error(
+                "claude_json_parse_error",
+                error=str(e),
+                response_text=result_text[:500],
+            )
+            raise
