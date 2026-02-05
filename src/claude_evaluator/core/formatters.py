@@ -107,6 +107,31 @@ class ReviewerOutputFormatter:
         return "\n".join(lines)
 
     @staticmethod
+    def format_strengths(strengths: list[str]) -> str:
+        """Format a list of strengths for display.
+
+        Creates a formatted strengths section with checkmark bullets
+        for each positive finding.
+
+        Args:
+            strengths: List of strength descriptions.
+
+        Returns:
+            Formatted strengths section string.
+
+        """
+        if not strengths:
+            return ""
+
+        lines = ["STRENGTHS:"]
+        # Use checkmark character for each strength
+        checkmark = "\u2713"  # Unicode checkmark
+        for strength in strengths:
+            lines.append(f"  {checkmark} {strength}")
+
+        return "\n".join(lines)
+
+    @staticmethod
     def format_output(output: ReviewerOutput) -> str:
         """Format complete ReviewerOutput for display.
 
@@ -128,6 +153,13 @@ class ReviewerOutputFormatter:
             sections.append(f"\nISSUES ({issue_count} found):")
             for issue in output.issues:
                 sections.append(ReviewerOutputFormatter.format_issue(issue))
+
+        # Add strengths section if there are any
+        if output.strengths:
+            strengths_section = ReviewerOutputFormatter.format_strengths(
+                output.strengths
+            )
+            sections.append(f"\n{strengths_section}")
 
         return "\n".join(sections)
 
