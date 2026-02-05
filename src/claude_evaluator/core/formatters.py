@@ -8,7 +8,98 @@ from __future__ import annotations
 
 from typing import Any
 
-__all__ = ["QuestionFormatter"]
+from claude_evaluator.core.agents.evaluator.reviewers.base import (
+    ReviewerOutput,
+)
+
+__all__ = ["QuestionFormatter", "ReviewerOutputFormatter", "format_reviewer_outputs"]
+
+
+class ReviewerOutputFormatter:
+    """Formats ReviewerOutput for human-readable display.
+
+    Provides methods to format reviewer outputs with clear phase labels,
+    making evaluation results easy to read and understand.
+
+    Example:
+        formatter = ReviewerOutputFormatter()
+        header = formatter.format_phase_header(output)
+        formatted = formatter.format_output(output)
+
+    """
+
+    # Box drawing characters for visual formatting
+    HEADER_LINE = "=" * 59
+    BOX_TOP = "\u250c\u2500"  # "|-"
+    BOX_MID = "\u2502"  # "|"
+    BOX_BOTTOM = "\u2514" + "\u2500" * 57  # "L---..."
+
+    @staticmethod
+    def format_phase_header(output: ReviewerOutput) -> str:
+        """Format a clear phase header with reviewer name.
+
+        Creates a visually distinct header section for a review phase,
+        including the reviewer name and overall confidence score.
+
+        Args:
+            output: The ReviewerOutput to format the header for.
+
+        Returns:
+            Formatted header string with phase name and confidence.
+
+        """
+        header_line = "=" * 59
+        # Convert reviewer_id to display name (e.g., task_completion -> Task Completion Review)
+        display_name = output.reviewer_name.replace("_", " ").title()
+        if not display_name.endswith("Review"):
+            display_name += " Review"
+
+        lines = [
+            header_line,
+            f"  PHASE: {display_name}",
+            f"  Confidence: {output.confidence_score}%",
+            header_line,
+        ]
+        return "\n".join(lines)
+
+    @staticmethod
+    def format_output(output: ReviewerOutput) -> str:
+        """Format complete ReviewerOutput for display.
+
+        Combines phase header with formatted content into a single
+        formatted string ready for display.
+
+        Args:
+            output: The ReviewerOutput to format.
+
+        Returns:
+            Complete formatted output string.
+
+        """
+        return ReviewerOutputFormatter.format_phase_header(output)
+
+
+def format_reviewer_outputs(outputs: list[ReviewerOutput]) -> str:
+    """Format multiple reviewer outputs into a single report.
+
+    Combines multiple ReviewerOutput objects into a comprehensive
+    report with clear separation between phases.
+
+    Args:
+        outputs: List of ReviewerOutput objects to format.
+
+    Returns:
+        Complete formatted report string with all phases.
+
+    """
+    if not outputs:
+        return "No reviewer outputs to display."
+
+    sections = []
+    for output in outputs:
+        sections.append(ReviewerOutputFormatter.format_output(output))
+
+    return "\n\n".join(sections)
 
 
 class QuestionFormatter:

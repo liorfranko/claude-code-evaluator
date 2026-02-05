@@ -101,16 +101,16 @@ Story: As a developer, I want to evaluate a completed coding task using multiple
 Story: As a developer, I want to enable or disable specific reviewer phases based on the evaluation context so that I can optimize evaluation time.
 
 ### Configuration Support
-- [ ] T300 [US2] Add reviewer configuration to YAML loader (src/claude_evaluator/config/loader.py)
-- [ ] T301 [US2] Implement ReviewerRegistry.apply_config() method (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
-- [ ] T302 [US2] Add enabled/disabled reviewer filtering (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
-- [ ] T303 [US2] Add per-reviewer min_confidence override support (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T300 [US2] Add reviewer configuration to YAML loader (src/claude_evaluator/config/loader.py)
+- [x] T301 [US2] Implement ReviewerRegistry.apply_config() method (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T302 [US2] Add enabled/disabled reviewer filtering (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
+- [x] T303 [US2] Add per-reviewer min_confidence override support (src/claude_evaluator/core/agents/evaluator/reviewers/registry.py)
 
 ### Tests
-- [ ] T310 [US2] Write tests for reviewer configuration loading (tests/unit/evaluator/reviewers/test_config.py)
+- [x] T310 [US2] Write tests for reviewer configuration loading (tests/unit/evaluator/reviewers/test_config.py)
 
 ### Checkpoint
-- [ ] T319 [US2] CHECKPOINT: Verify reviewers can be enabled/disabled via configuration
+- [x] T319 [US2] CHECKPOINT: Verify reviewers can be enabled/disabled via configuration
 
 ---
 
