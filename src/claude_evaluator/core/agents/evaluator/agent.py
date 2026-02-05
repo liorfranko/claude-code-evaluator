@@ -369,6 +369,24 @@ class EvaluatorAgent:
 
         return outputs
 
+    def aggregate_reviewer_outputs(
+        self,
+        outputs: list[ReviewerOutput],
+    ) -> dict:
+        """Aggregate results from reviewer outputs.
+
+        Uses the registry's aggregate_outputs method to combine issues,
+        strengths, and statistics across all reviewer outputs.
+
+        Args:
+            outputs: List of ReviewerOutput from all reviewers.
+
+        Returns:
+            Aggregated dictionary with combined results and statistics.
+
+        """
+        return self.reviewer_registry.aggregate_outputs(outputs)
+
     async def evaluate(
         self,
         evaluation_path: Path | str,
@@ -426,6 +444,21 @@ class EvaluatorAgent:
             code_analysis = self.code_analyzer.analyze(steps=steps)
         except Exception as e:
             logger.warning("code_analysis_failed", error=str(e))
+
+        # Run phase reviewers for multi-phase evaluation
+        reviewer_outputs: list[ReviewerOutput] = []
+        reviewer_summary: dict | None = None
+        try:
+            review_context = self._build_review_context(
+                task_description=evaluation.task_description,
+                code_analysis=code_analysis,
+                evaluation_context=context,
+            )
+            reviewer_outputs = await self.run_reviewers(review_context)
+            reviewer_summary = self.aggregate_reviewer_outputs(reviewer_outputs)
+        except Exception as e:
+            logger.warning("reviewer_execution_failed", error=str(e))
+            # Continue with legacy scoring if reviewers fail
 
         # T407: Score task completion with Gemini API error handling
         try:
@@ -489,6 +522,13 @@ class EvaluatorAgent:
             else 0
         )
 
+        # Convert reviewer outputs to dicts for serialization
+        reviewer_outputs_dicts: list[dict] | None = None
+        if reviewer_outputs:
+            reviewer_outputs_dicts = [
+                output.model_dump() for output in reviewer_outputs
+            ]
+
         # Assemble score report
         score_report = ScoreReport(
             evaluation_id=evaluation.evaluation_id,
@@ -505,6 +545,8 @@ class EvaluatorAgent:
             generated_at=datetime.now(),
             evaluator_model=self.claude_client.model,
             evaluation_duration_ms=evaluation_duration_ms,
+            reviewer_outputs=reviewer_outputs_dicts,
+            reviewer_summary=reviewer_summary,
         )
 
         logger.info(
@@ -512,6 +554,10 @@ class EvaluatorAgent:
             evaluation_id=evaluation.evaluation_id,
             aggregate_score=aggregate_score,
             dimension_count=len(score_report.dimension_scores),
+            reviewer_count=len(reviewer_outputs) if reviewer_outputs else 0,
+            reviewer_issues=(
+                reviewer_summary.get("total_issues", 0) if reviewer_summary else 0
+            ),
         )
 
         return score_report

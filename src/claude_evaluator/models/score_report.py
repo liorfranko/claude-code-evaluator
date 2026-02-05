@@ -480,3 +480,15 @@ class ScoreReport(BaseSchema):
         ge=0,
         description="Time taken to generate the score report in milliseconds",
     )
+    task_description: str = Field(
+        default="",
+        description="Original task description being evaluated",
+    )
+    reviewer_outputs: list[dict] | None = Field(
+        default=None,
+        description="Raw outputs from phase reviewers (optional)",
+    )
+    reviewer_summary: dict | None = Field(
+        default=None,
+        description="Aggregated summary from all reviewers (optional)",
+    )
