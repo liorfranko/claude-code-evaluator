@@ -24,14 +24,14 @@ Source: plan.md, spec.md, data-model.md, research.md
 ## Phase 1: Setup
 
 ### Configuration Tasks
-- [ ] T001 [P] Add claude_agent_sdk to pyproject.toml dependencies (pyproject.toml)
-- [ ] T002 [P] Add CLAUDE_EVALUATOR_MODEL to config/defaults.py (src/claude_evaluator/config/defaults.py)
-- [ ] T003 [P] Add CLAUDE_EVALUATOR_TEMPERATURE to config/defaults.py (src/claude_evaluator/config/defaults.py)
-- [ ] T004 Update EvaluatorSettings in settings.py for Claude (src/claude_evaluator/config/settings.py)
+- [x] T001 [P] Add claude_agent_sdk to pyproject.toml dependencies (pyproject.toml)
+- [x] T002 [P] Add CLAUDE_EVALUATOR_MODEL to config/defaults.py (src/claude_evaluator/config/defaults.py)
+- [x] T003 [P] Add CLAUDE_EVALUATOR_TEMPERATURE to config/defaults.py (src/claude_evaluator/config/defaults.py)
+- [x] T004 Update EvaluatorSettings in settings.py for Claude (src/claude_evaluator/config/settings.py)
 
 ### Directory Structure Tasks
-- [ ] T005 Create reviewers/ directory structure (src/claude_evaluator/core/agents/evaluator/reviewers/)
-- [ ] T006 Create reviewers/__init__.py with auto-registration (src/claude_evaluator/core/agents/evaluator/reviewers/__init__.py)
+- [x] T005 Create reviewers/ directory structure (src/claude_evaluator/core/agents/evaluator/reviewers/)
+- [x] T006 Create reviewers/__init__.py with auto-registration (src/claude_evaluator/core/agents/evaluator/reviewers/__init__.py)
 
 ---
 
