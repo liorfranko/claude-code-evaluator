@@ -207,6 +207,47 @@ class ReviewerRegistry:
             has_config=config is not None,
         )
 
+    def apply_config(self, configs: dict[str, ReviewerConfig]) -> None:
+        """Apply configuration overrides to registered reviewers.
+
+        Updates the registry's configuration store with the provided configs.
+        This allows external configuration sources (e.g., YAML files) to
+        customize reviewer behavior including enabling/disabling reviewers
+        and setting confidence thresholds.
+
+        Args:
+            configs: Dictionary mapping reviewer_id to ReviewerConfig instances.
+
+        Example:
+            >>> registry.apply_config({
+            ...     "task_completion": ReviewerConfig(
+            ...         reviewer_id="task_completion",
+            ...         enabled=True,
+            ...         min_confidence=70,
+            ...     ),
+            ...     "error_handling": ReviewerConfig(
+            ...         reviewer_id="error_handling",
+            ...         enabled=False,
+            ...     ),
+            ... })
+
+        """
+        for reviewer_id, config in configs.items():
+            self.configs[reviewer_id] = config
+            logger.debug(
+                "reviewer_config_applied",
+                reviewer_id=reviewer_id,
+                enabled=config.enabled,
+                min_confidence=config.min_confidence,
+                timeout_seconds=config.timeout_seconds,
+            )
+
+        logger.info(
+            "apply_config_complete",
+            configs_applied=len(configs),
+            total_configs=len(self.configs),
+        )
+
     def _is_reviewer_enabled(self, reviewer: ReviewerBase) -> bool:
         """Check if a reviewer is enabled based on its configuration.
 
