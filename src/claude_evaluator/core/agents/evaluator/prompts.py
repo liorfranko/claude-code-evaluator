@@ -10,6 +10,7 @@ __all__ = [
     "CODE_QUALITY_SYSTEM_PROMPT",
     "CODE_QUALITY_PROMPT_TEMPLATE",
     "TASK_COMPLETION_REVIEW_PROMPT",
+    "CODE_QUALITY_REVIEW_PROMPT",
 ]
 
 # Task Completion Scoring Prompts
@@ -151,3 +152,39 @@ Provide your analysis as a structured review with:
 - **strengths**: List of positive findings where requirements are well-addressed
 
 Focus on whether the code accomplishes what was asked, not on code style or quality."""
+
+# Phase Reviewer Prompts - Code Quality
+CODE_QUALITY_REVIEW_PROMPT = """You are reviewing code for quality, maintainability, and adherence to best practices.
+
+## Task Description
+{task_description}
+
+## Code Files
+{code_files}
+
+## Additional Context
+{evaluation_context}
+
+## Your Task
+Analyze the code quality focusing on:
+1. **Code Structure**: Is the code well-organized with proper separation of concerns?
+2. **Naming Conventions**: Are names clear, descriptive, and following language conventions?
+3. **Design Patterns**: Are appropriate patterns used? Is there unnecessary complexity?
+4. **Maintainability**: How easy would it be to modify or extend this code?
+5. **Documentation**: Are there adequate comments and docstrings where needed?
+6. **DRY Principle**: Is there code duplication that should be refactored?
+7. **SOLID Principles**: Does the code follow good object-oriented design principles?
+
+## Response Format
+Provide your analysis as a structured review with:
+- **confidence_score** (0-100): Your confidence in the review findings
+- **issues**: List of code quality issues, each with:
+  - severity (critical, high, medium, low)
+  - file_path: The file containing the issue
+  - line_number: Line number if applicable (null otherwise)
+  - message: Description of the quality issue
+  - suggestion: Recommended improvement
+  - confidence (0-100): Confidence in this specific issue
+- **strengths**: List of positive findings demonstrating good code quality
+
+Focus on code quality and maintainability, not whether the code works correctly."""
