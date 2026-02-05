@@ -10,7 +10,7 @@ from pathlib import Path
 import structlog
 
 from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
-from claude_evaluator.config.defaults import DEFAULT_OUTPUT_DIR
+from claude_evaluator.config.settings import DEFAULT_OUTPUT_DIR
 from claude_evaluator.core.agents.evaluator import EvaluatorAgent
 from claude_evaluator.models.score_report import ScoreReport
 

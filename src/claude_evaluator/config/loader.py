@@ -12,12 +12,7 @@ from typing import Any
 
 import yaml
 
-from claude_evaluator.config.defaults import (
-    DEFAULT_CONTEXT_WINDOW_SIZE,
-    DEFAULT_EVALUATION_TIMEOUT_SECONDS,
-    DEFAULT_MAX_TURNS,
-    DEFAULT_QUESTION_TIMEOUT_SECONDS,
-)
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.models import (
     EvalDefaults,
@@ -74,11 +69,12 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
                         setattr(evaluation, field, default_value)
 
         # Ensure mandatory fields are always set
+        settings = get_settings()
         if evaluation.timeout_seconds is None:
-            evaluation.timeout_seconds = DEFAULT_EVALUATION_TIMEOUT_SECONDS
+            evaluation.timeout_seconds = settings.workflow.timeout_seconds
 
         if evaluation.max_turns is None:
-            evaluation.max_turns = DEFAULT_MAX_TURNS
+            evaluation.max_turns = settings.worker.max_turns
 
     return suite
 
@@ -189,6 +185,7 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> EvalDefaults:
     v = FieldValidator(data, context)
     v.require_mapping()
 
+    settings = get_settings()
     return EvalDefaults(
         max_turns=v.optional("max_turns", int),
         max_budget_usd=v.optional_number("max_budget_usd"),
@@ -197,10 +194,12 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> EvalDefaults:
         timeout_seconds=v.optional("timeout_seconds", int),
         developer_qa_model=v.optional("developer_qa_model", str),
         question_timeout_seconds=v.optional(
-            "question_timeout_seconds", int, default=DEFAULT_QUESTION_TIMEOUT_SECONDS
+            "question_timeout_seconds",
+            int,
+            default=settings.worker.question_timeout_seconds,
         ),
         context_window_size=v.optional(
-            "context_window_size", int, default=DEFAULT_CONTEXT_WINDOW_SIZE
+            "context_window_size", int, default=settings.developer.context_window_size
         ),
     )
 

@@ -4,6 +4,9 @@ This module provides environment variable support for configuration
 using pydantic-settings. Settings can be overridden via environment
 variables with the appropriate prefix.
 
+All default values are defined inline in Field() definitions to keep
+defaults co-located with their usage and avoid confusion.
+
 Environment Variables:
     CLAUDE_WORKER_MODEL: Worker agent model
     CLAUDE_WORKER_MAX_TURNS: Maximum turns per query
@@ -12,7 +15,7 @@ Environment Variables:
     CLAUDE_DEVELOPER_CONTEXT_WINDOW_SIZE: Conversation context size
     CLAUDE_DEVELOPER_MAX_ANSWER_RETRIES: Maximum answer retry attempts
     CLAUDE_DEVELOPER_MAX_ITERATIONS: Maximum loop iterations
-    CLAUDE_EVALUATOR_MODEL: Gemini model for evaluation scoring
+    CLAUDE_EVALUATOR_MODEL: Claude model for evaluation scoring
     CLAUDE_EVALUATOR_TIMEOUT_SECONDS: Evaluation operation timeout
     CLAUDE_EVALUATOR_TEMPERATURE: LLM temperature for scoring
     CLAUDE_EVALUATOR_ENABLE_AST_PARSING: Enable tree-sitter AST parsing
@@ -26,30 +29,8 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from claude_evaluator.config.defaults import (
-    CONTEXT_WINDOW_MAX,
-    CONTEXT_WINDOW_MIN,
-    DEFAULT_CODE_QUALITY_WEIGHT,
-    DEFAULT_CONTEXT_WINDOW_SIZE,
-    DEFAULT_EFFICIENCY_WEIGHT,
-    DEFAULT_EVALUATION_TIMEOUT_SECONDS,
-    DEFAULT_EVALUATOR_ENABLE_AST,
-    DEFAULT_EVALUATOR_MAX_TURNS,
-    DEFAULT_EVALUATOR_MODEL,
-    DEFAULT_EVALUATOR_TEMPERATURE,
-    DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
-    DEFAULT_MAX_ANSWER_RETRIES,
-    DEFAULT_MAX_ITERATIONS,
-    DEFAULT_MAX_TURNS,
-    DEFAULT_QA_MODEL,
-    DEFAULT_QUESTION_TIMEOUT_SECONDS,
-    DEFAULT_TASK_COMPLETION_WEIGHT,
-    DEFAULT_WORKER_MODEL,
-    MAX_ANSWER_RETRIES_MAX,
-    MAX_ANSWER_RETRIES_MIN,
-    QUESTION_TIMEOUT_MAX,
-    QUESTION_TIMEOUT_MIN,
-)
+# CLI defaults (not configurable via env vars)
+DEFAULT_OUTPUT_DIR = "evaluations"
 
 __all__ = [
     "WorkerSettings",
@@ -77,18 +58,18 @@ class WorkerSettings(BaseSettings):
     )
 
     model: str = Field(
-        default=DEFAULT_WORKER_MODEL,
+        default="claude-haiku-4-5@20251001",
         description="Model identifier for SDK execution",
     )
     max_turns: int = Field(
-        default=DEFAULT_MAX_TURNS,
+        default=10,
         ge=1,
         description="Maximum conversation turns per query",
     )
     question_timeout_seconds: int = Field(
-        default=DEFAULT_QUESTION_TIMEOUT_SECONDS,
-        ge=QUESTION_TIMEOUT_MIN,
-        le=QUESTION_TIMEOUT_MAX,
+        default=60,
+        ge=1,
+        le=300,
         description="Timeout in seconds for question callbacks",
     )
 
@@ -110,23 +91,23 @@ class DeveloperSettings(BaseSettings):
     )
 
     qa_model: str = Field(
-        default=DEFAULT_QA_MODEL,
+        default="claude-haiku-4-5@20251001",
         description="Model identifier for Q&A interactions",
     )
     context_window_size: int = Field(
-        default=DEFAULT_CONTEXT_WINDOW_SIZE,
-        ge=CONTEXT_WINDOW_MIN,
-        le=CONTEXT_WINDOW_MAX,
+        default=10,
+        ge=1,
+        le=100,
         description="Number of recent messages to include as context",
     )
     max_answer_retries: int = Field(
-        default=DEFAULT_MAX_ANSWER_RETRIES,
-        ge=MAX_ANSWER_RETRIES_MIN,
-        le=MAX_ANSWER_RETRIES_MAX,
+        default=1,
+        ge=0,
+        le=5,
         description="Maximum retries for rejected answers",
     )
     max_iterations: int = Field(
-        default=DEFAULT_MAX_ITERATIONS,
+        default=100,
         ge=1,
         description="Maximum loop iterations before forced termination",
     )
@@ -153,45 +134,45 @@ class EvaluatorSettings(BaseSettings):
     )
 
     model: str = Field(
-        default=DEFAULT_EVALUATOR_MODEL,
+        default="opus",
         description="Claude model identifier for evaluation scoring",
     )
     timeout_seconds: int = Field(
-        default=DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
+        default=120,
         ge=10,
         le=600,
         description="Timeout for evaluation operations in seconds",
     )
     temperature: float = Field(
-        default=DEFAULT_EVALUATOR_TEMPERATURE,
+        default=0.1,
         ge=0.0,
         le=1.0,
         description="LLM temperature for scoring (lower = more deterministic)",
     )
     max_turns: int = Field(
-        default=DEFAULT_EVALUATOR_MAX_TURNS,
+        default=50,
         ge=1,
         le=50,
         description="Maximum turns for reviewer queries",
     )
     enable_ast_parsing: bool = Field(
-        default=DEFAULT_EVALUATOR_ENABLE_AST,
+        default=True,
         description="Whether to use tree-sitter AST parsing",
     )
     task_completion_weight: float = Field(
-        default=DEFAULT_TASK_COMPLETION_WEIGHT,
+        default=0.5,
         ge=0.0,
         le=1.0,
         description="Weight for task completion score",
     )
     code_quality_weight: float = Field(
-        default=DEFAULT_CODE_QUALITY_WEIGHT,
+        default=0.3,
         ge=0.0,
         le=1.0,
         description="Weight for code quality score",
     )
     efficiency_weight: float = Field(
-        default=DEFAULT_EFFICIENCY_WEIGHT,
+        default=0.2,
         ge=0.0,
         le=1.0,
         description="Weight for efficiency score",
@@ -220,7 +201,7 @@ class WorkflowSettings(BaseSettings):
     )
 
     timeout_seconds: int = Field(
-        default=DEFAULT_EVALUATION_TIMEOUT_SECONDS,
+        default=300,
         ge=10,
         le=3600,
         description="Default timeout for evaluation execution in seconds",

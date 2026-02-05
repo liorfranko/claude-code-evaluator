@@ -19,12 +19,7 @@ from typing import Any
 from claude_agent_sdk import ClaudeSDKClient  # pyright: ignore[reportMissingImports]
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
-from claude_evaluator.config.defaults import (
-    DEFAULT_QUESTION_TIMEOUT_SECONDS,
-    DEFAULT_WORKER_MODEL,
-    QUESTION_TIMEOUT_MAX,
-    QUESTION_TIMEOUT_MIN,
-)
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents.worker.message_processor import MessageProcessor
 from claude_evaluator.core.agents.worker.permission_manager import PermissionManager
 from claude_evaluator.core.agents.worker.question_handler import QuestionHandler
@@ -44,11 +39,11 @@ from claude_evaluator.models.tool_invocation import ToolInvocation
 logger = get_logger(__name__)
 
 
-__all__ = ["WorkerAgent", "DEFAULT_MODEL"]
+__all__ = ["WorkerAgent"]
 
 
 # Re-export for backward compatibility
-DEFAULT_MODEL = DEFAULT_WORKER_MODEL
+# Note: Actual default comes from get_settings().worker.model at runtime
 
 
 class WorkerAgent(BaseSchema):
@@ -71,8 +66,11 @@ class WorkerAgent(BaseSchema):
         model: Model identifier to use for SDK execution.
         on_question_callback: Async callback invoked when Claude asks a question.
         on_progress_callback: Optional sync callback for progress events.
-        question_timeout_seconds: Timeout for question callbacks (1-300).
         tool_invocations: List of tool invocations tracked during current query.
+
+    Note:
+        Settings like question_timeout_seconds are read directly from
+        get_settings().worker at runtime.
 
     """
 
@@ -97,12 +95,6 @@ class WorkerAgent(BaseSchema):
         Callable[[str, list[dict[str, Any]]], Awaitable[str | None]] | None
     ) = None
     on_progress_callback: Callable[[ProgressEvent], None] | None = None
-    question_timeout_seconds: int = Field(
-        default=DEFAULT_QUESTION_TIMEOUT_SECONDS,
-        ge=QUESTION_TIMEOUT_MIN,
-        le=QUESTION_TIMEOUT_MAX,
-        description="Timeout in seconds for question callbacks",
-    )
     use_user_plugins: bool = False
     max_turns: int | None = None
     tool_invocations: list[ToolInvocation] = Field(default_factory=list)
@@ -142,7 +134,7 @@ class WorkerAgent(BaseSchema):
             question_callback=self.on_question_callback,
             implicit_question_callback=self.on_implicit_question_callback,
             progress_callback=self.on_progress_callback,
-            timeout_seconds=self.question_timeout_seconds,
+            timeout_seconds=get_settings().worker.question_timeout_seconds,
         )
         self._permission_handler = ToolPermissionHandler(
             permission_manager=self._permission_manager,

@@ -14,7 +14,6 @@ from claude_agent_sdk import (  # pyright: ignore[reportMissingImports]
     PermissionResultDeny,
 )
 
-from claude_evaluator.config.defaults import DEFAULT_WORKER_MODEL
 from claude_evaluator.config.settings import get_settings
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode
@@ -120,7 +119,7 @@ class SDKConfigBuilder:
             allowed_tools=self._allowed_tools if self._allowed_tools else [],
             max_turns=max_turns,
             max_budget_usd=self._max_budget_usd,
-            model=self._model or DEFAULT_WORKER_MODEL,
+            model=self._model or get_settings().worker.model,
             setting_sources=["user"] if self._use_user_plugins else None,
             can_use_tool=self._can_use_tool_handler,
         )

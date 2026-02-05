@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from claude_evaluator.config.defaults import DEFAULT_EVALUATION_TIMEOUT_SECONDS, DEFAULT_MAX_TURNS
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import apply_defaults, load_suite
 from claude_evaluator.config.models import (
@@ -636,11 +636,12 @@ class TestApplyDefaults:
         result = apply_defaults(suite)
 
         # Should return suite with mandatory values applied
+        settings = get_settings()
         assert result is suite
-        assert result.evaluations[0].max_turns == DEFAULT_MAX_TURNS  # Mandatory
+        assert result.evaluations[0].max_turns == settings.worker.max_turns  # Mandatory
         assert result.evaluations[0].max_budget_usd is None
         # timeout_seconds is mandatory and always set
-        assert result.evaluations[0].timeout_seconds == DEFAULT_EVALUATION_TIMEOUT_SECONDS
+        assert result.evaluations[0].timeout_seconds == settings.workflow.timeout_seconds
 
     def test_apply_defaults_with_empty_defaults(self) -> None:
         """Test that apply_defaults handles suite with empty defaults gracefully."""
@@ -661,10 +662,11 @@ class TestApplyDefaults:
         result = apply_defaults(suite)
 
         # max_budget_usd is optional, but max_turns and timeout are mandatory
-        assert result.evaluations[0].max_turns == DEFAULT_MAX_TURNS
+        settings = get_settings()
+        assert result.evaluations[0].max_turns == settings.worker.max_turns
         assert result.evaluations[0].max_budget_usd is None
         # timeout_seconds is mandatory and always set
-        assert result.evaluations[0].timeout_seconds == DEFAULT_EVALUATION_TIMEOUT_SECONDS
+        assert result.evaluations[0].timeout_seconds == settings.workflow.timeout_seconds
 
     def test_apply_defaults_multiple_evaluations(self) -> None:
         """Test that defaults are applied to all evaluations in the suite."""

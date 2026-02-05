@@ -14,16 +14,7 @@ from typing import Any, TypeAlias
 
 from pydantic import ConfigDict, Field, PrivateAttr
 
-from claude_evaluator.config.defaults import (
-    CONTEXT_WINDOW_MAX,
-    CONTEXT_WINDOW_MIN,
-    DEFAULT_CONTEXT_WINDOW_SIZE,
-    DEFAULT_MAX_ANSWER_RETRIES,
-    DEFAULT_MAX_ITERATIONS,
-    DEFAULT_QA_MODEL,
-    MAX_ANSWER_RETRIES_MAX,
-    MAX_ANSWER_RETRIES_MIN,
-)
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
@@ -107,11 +98,12 @@ class DeveloperAgent(BaseSchema):
         current_state: Current position in the workflow state machine.
         decisions_log: Log of autonomous decisions made during evaluation.
         fallback_responses: Predefined responses for common questions (optional).
-        max_iterations: Maximum loop iterations before forced termination.
-        developer_qa_model: Model identifier for Q&A (optional, uses DEFAULT_QA_MODEL if None).
-        context_window_size: Number of recent messages to include as context (1-100).
-        max_answer_retries: Maximum retries for rejected answers (0-5).
+        developer_qa_model: Model identifier for Q&A (optional, uses settings default if None).
         cwd: Working directory for SDK queries (optional, defaults to os.getcwd()).
+
+    Note:
+        Settings like max_iterations, context_window_size, and max_answer_retries
+        are read directly from get_settings().developer at runtime.
 
     """
 
@@ -125,19 +117,8 @@ class DeveloperAgent(BaseSchema):
     current_state: DeveloperState = Field(default=DeveloperState.initializing)
     decisions_log: list[Decision] = Field(default_factory=list)
     fallback_responses: dict[str, str] | None = Field(default=None)
-    max_iterations: int = Field(default=DEFAULT_MAX_ITERATIONS, ge=1)
     iteration_count: int = Field(default=0, init=False)
     developer_qa_model: str | None = Field(default=None)
-    context_window_size: int = Field(
-        default=DEFAULT_CONTEXT_WINDOW_SIZE,
-        ge=CONTEXT_WINDOW_MIN,
-        le=CONTEXT_WINDOW_MAX,
-    )
-    max_answer_retries: int = Field(
-        default=DEFAULT_MAX_ANSWER_RETRIES,
-        ge=MAX_ANSWER_RETRIES_MIN,
-        le=MAX_ANSWER_RETRIES_MAX,
-    )
     cwd: str | None = Field(default=None)
     _answer_retry_count: int = PrivateAttr(default=0)
 
@@ -230,9 +211,9 @@ class DeveloperAgent(BaseSchema):
 
         """
         self.iteration_count += 1
-        if self.iteration_count > self.max_iterations:
+        if self.iteration_count > get_settings().developer.max_iterations:
             self.log_decision(
-                context=f"Iteration count ({self.iteration_count}) exceeded max_iterations ({self.max_iterations})",
+                context=f"Iteration count ({self.iteration_count}) exceeded max_iterations ({get_settings().developer.max_iterations})",
                 action="Transitioning to failed state due to loop detection",
                 rationale="Preventing infinite loop by enforcing iteration limit",
             )
@@ -240,7 +221,7 @@ class DeveloperAgent(BaseSchema):
             self.current_state = DeveloperState.failed
             raise LoopDetectedError(
                 f"Loop detected: iteration count ({self.iteration_count}) exceeded "
-                f"max_iterations ({self.max_iterations})"
+                f"max_iterations ({get_settings().developer.max_iterations})"
             )
 
     def get_fallback_response(self, question: str) -> str | None:
@@ -557,7 +538,7 @@ class DeveloperAgent(BaseSchema):
             self.log_decision(
                 context="Loop detected during workflow",
                 action="Terminating with loop_detected outcome",
-                rationale=f"Exceeded {self.max_iterations} iterations",
+                rationale=f"Exceeded {get_settings().developer.max_iterations} iterations",
             )
             return Outcome.loop_detected, self.decisions_log
 
@@ -604,8 +585,8 @@ class DeveloperAgent(BaseSchema):
             context_strategy = "full history (retry)"
         else:
             # First attempt: use last N messages based on context_window_size
-            messages_to_use = context.conversation_history[-self.context_window_size :]
-            context_strategy = f"last {self.context_window_size} messages"
+            messages_to_use = context.conversation_history[-get_settings().developer.context_window_size :]
+            context_strategy = f"last {get_settings().developer.context_window_size} messages"
 
         # Build the prompt
         prompt = self._build_answer_prompt(
@@ -627,7 +608,7 @@ class DeveloperAgent(BaseSchema):
         )
         logger.info("developer_answer_question_starting", prompt=prompt)
         # Determine the model to use
-        model = self.developer_qa_model or DEFAULT_QA_MODEL
+        model = self.developer_qa_model or get_settings().developer.qa_model
 
         # Track generation time
         start_time = time.time()
@@ -697,7 +678,7 @@ class DeveloperAgent(BaseSchema):
                 "developer_sdk_query_failed",
                 duration_ms=generation_time_ms,
                 model=model,
-                cwd=working_dir,
+                cwd=self.cwd or os.getcwd(),
                 exception_type=type(e).__name__,
                 exception_message=str(e),
                 traceback=traceback.format_exc(),
@@ -1027,7 +1008,7 @@ Your response:"""
 
         try:
             # Determine the model to use
-            model = self.developer_qa_model or DEFAULT_QA_MODEL
+            model = self.developer_qa_model or get_settings().developer.qa_model
 
             # sdk_query returns an async generator, must consume fully to clean up
             # Use cwd if set, otherwise use current directory
@@ -1086,8 +1067,8 @@ Your response:"""
             # Detailed error logging for implicit question detection
             logger.error(
                 "developer_implicit_question_detection_failed",
-                model=model,
-                cwd=working_dir if "working_dir" in dir() else "not set",
+                model=self.developer_qa_model or get_settings().developer.qa_model,
+                cwd=self.cwd or os.getcwd(),
                 exception_type=type(e).__name__,
                 exception_message=str(e),
                 traceback=traceback.format_exc(),
