@@ -8,7 +8,8 @@ This module tests the Claude API client wrapper including:
 - Error handling and ClaudeAPIError raising
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel
@@ -451,13 +452,25 @@ class TestClaudeClientExtractText:
 
             return ClaudeClient()
 
+    def _make_query_result(
+        self,
+        result_message: Any = None,
+        assistant_content: Any = None,
+    ) -> MagicMock:
+        """Create a mock query result object."""
+        query_result = MagicMock()
+        query_result.result_message = result_message
+        query_result.assistant_content = assistant_content
+        return query_result
+
     def test_extract_text_from_result_attribute(self, mock_client: ClaudeClient) -> None:
         """Test extraction from result attribute."""
         msg = MagicMock()
         msg.result = "  Text from result  "
         msg.content = None
+        query_result = self._make_query_result(result_message=msg)
 
-        result = mock_client._extract_text(msg)
+        result = mock_client._extract_text(query_result)
 
         assert result == "Text from result"
 
@@ -466,8 +479,9 @@ class TestClaudeClientExtractText:
         msg = MagicMock()
         msg.result = None
         msg.content = "  Text from content  "
+        query_result = self._make_query_result(result_message=msg)
 
-        result = mock_client._extract_text(msg)
+        result = mock_client._extract_text(query_result)
 
         assert result == "Text from content"
 
@@ -482,8 +496,9 @@ class TestClaudeClientExtractText:
         block2 = MagicMock()
         block2.text = "Block 2"
         msg.content = [block1, block2]
+        query_result = self._make_query_result(result_message=msg)
 
-        result = mock_client._extract_text(msg)
+        result = mock_client._extract_text(query_result)
 
         assert result == "Block 1\nBlock 2"
 
@@ -494,23 +509,32 @@ class TestClaudeClientExtractText:
         msg = MagicMock()
         msg.result = None
         msg.content = [{"text": "Dict block 1"}, {"text": "Dict block 2"}]
+        query_result = self._make_query_result(result_message=msg)
 
-        result = mock_client._extract_text(msg)
+        result = mock_client._extract_text(query_result)
 
         assert result == "Dict block 1\nDict block 2"
 
-    def test_extract_text_raises_on_none(self, mock_client: ClaudeClient) -> None:
-        """Test that ValueError is raised for None message."""
+    def test_extract_text_raises_on_none_result_message(
+        self, mock_client: ClaudeClient
+    ) -> None:
+        """Test that ValueError is raised for None result message."""
+        query_result = self._make_query_result(result_message=None)
         with pytest.raises(ValueError, match="No result message received"):
-            mock_client._extract_text(None)
+            mock_client._extract_text(query_result)
 
-    def test_extract_text_fallback_to_string(self, mock_client: ClaudeClient) -> None:
-        """Test fallback to string conversion."""
+    def test_extract_text_from_assistant_content(
+        self, mock_client: ClaudeClient
+    ) -> None:
+        """Test extraction from assistant_content when result is empty."""
         msg = MagicMock()
         msg.result = None
         msg.content = None
-        msg.configure_mock(**{"__str__.return_value": "Fallback string"})
+        query_result = self._make_query_result(
+            result_message=msg,
+            assistant_content="Text from assistant content",
+        )
 
-        result = mock_client._extract_text(msg)
+        result = mock_client._extract_text(query_result)
 
-        assert result == "Fallback string"
+        assert result == "Text from assistant content"
