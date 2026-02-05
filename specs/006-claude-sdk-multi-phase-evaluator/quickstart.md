@@ -119,24 +119,42 @@ Output shows each reviewer phase executing:
 
 ### Reviewer Configuration
 
-Configure which reviewers to run and their thresholds via YAML:
+The multi-phase evaluator uses a system of reviewers that analyze different aspects of the code. You can configure which reviewers to run and customize their behavior via YAML.
+
+#### Available Reviewers
+
+| Reviewer | Focus Area | Default min_confidence |
+|----------|------------|------------------------|
+| `task_completion` | Whether the task requirements were met | 60 |
+| `code_quality` | Code structure, style, and maintainability | 60 |
+| `error_handling` | Exception handling and error recovery | 60 |
+
+#### YAML Configuration
+
+Create a configuration file to customize reviewer behavior:
 
 ```yaml
 # claude_evaluator.yaml
 evaluator:
   model: "claude-opus-4-5-20251101"
+  temperature: 0.1
   execution_mode: "sequential"
 
   reviewers:
     task_completion:
       enabled: true
       min_confidence: 70
+      timeout_seconds: 60
+
     code_quality:
       enabled: true
       min_confidence: 60
+      timeout_seconds: 90
+
     error_handling:
-      enabled: true
+      enabled: false  # Disable this reviewer
       min_confidence: 65
+      timeout_seconds: 60
 ```
 
 Pass the config file:
@@ -144,6 +162,66 @@ Pass the config file:
 ```bash
 claude-evaluator score evaluation.json --config claude_evaluator.yaml
 ```
+
+#### Enabling and Disabling Reviewers
+
+Each reviewer can be enabled or disabled independently:
+
+```yaml
+evaluator:
+  reviewers:
+    task_completion:
+      enabled: true   # Will run (default behavior)
+    code_quality:
+      enabled: true   # Will run
+    error_handling:
+      enabled: false  # Will be skipped
+```
+
+When a reviewer is disabled, it will be skipped during evaluation and its output will indicate:
+```json
+{
+  "reviewer_name": "error_handling",
+  "skipped": true,
+  "skip_reason": "Reviewer is disabled via configuration"
+}
+```
+
+#### Configuring min_confidence
+
+The `min_confidence` setting controls which issues are included in the final report. Issues with confidence scores below this threshold are filtered out.
+
+```yaml
+evaluator:
+  reviewers:
+    task_completion:
+      min_confidence: 70  # Only issues with >= 70% confidence
+    code_quality:
+      min_confidence: 50  # Include more uncertain issues
+    error_handling:
+      min_confidence: 80  # Only high-confidence issues
+```
+
+**Guidance for setting min_confidence:**
+- **50-60**: Include more issues, may have more false positives
+- **60-70**: Balanced setting (recommended for most cases)
+- **70-80**: Focus on higher-confidence issues
+- **80-100**: Very strict, only highly certain issues
+
+#### Execution Modes
+
+The evaluator supports two execution modes:
+
+```yaml
+evaluator:
+  execution_mode: "sequential"  # Default, runs one reviewer at a time
+  # OR
+  execution_mode: "parallel"    # Run reviewers concurrently (faster)
+  max_workers: 4                # Max parallel reviewers (for parallel mode)
+```
+
+- **sequential**: Runs reviewers one at a time. Safer for rate limit management.
+- **parallel**: Runs multiple reviewers concurrently. Faster but may hit rate limits.
 
 ## Understanding the Output
 
@@ -178,6 +256,78 @@ claude-evaluator score evaluation.json --config claude_evaluator.yaml
     "issues_found": [...],
     "quality_summary": "..."
   }
+}
+```
+
+### Reviewer Output Format
+
+Each reviewer produces structured output with issues and strengths:
+
+```json
+{
+  "reviewer_name": "code_quality",
+  "confidence_score": 85,
+  "issues": [
+    {
+      "severity": "high",
+      "file_path": "src/auth/handler.py",
+      "line_number": 42,
+      "message": "Hardcoded secret key detected",
+      "suggestion": "Use environment variable for secret key",
+      "confidence": 95
+    },
+    {
+      "severity": "medium",
+      "file_path": "src/routes/users.py",
+      "line_number": 15,
+      "message": "Missing input validation",
+      "suggestion": "Add Pydantic model for request validation",
+      "confidence": 80
+    }
+  ],
+  "strengths": [
+    "Good separation of concerns",
+    "Consistent error handling patterns",
+    "Comprehensive docstrings"
+  ],
+  "execution_time_ms": 1250,
+  "skipped": false,
+  "skip_reason": null
+}
+```
+
+#### Issue Severity Levels
+
+| Severity | Description |
+|----------|-------------|
+| `critical` | Severe issue that must be fixed immediately (security, data loss) |
+| `high` | Important issue that should be addressed |
+| `medium` | Moderate issue worth considering |
+| `low` | Minor issue or stylistic preference |
+
+### Aggregated Results
+
+When all reviewers complete, results are aggregated:
+
+```json
+{
+  "total_issues": 5,
+  "issues_by_severity": {
+    "critical": 0,
+    "high": 2,
+    "medium": 2,
+    "low": 1
+  },
+  "all_issues": [...],
+  "all_strengths": [
+    "[task_completion] Requirements fully implemented",
+    "[code_quality] Good separation of concerns",
+    "[error_handling] Comprehensive try-catch blocks"
+  ],
+  "average_confidence": 82.5,
+  "total_execution_time_ms": 3750,
+  "reviewer_count": 3,
+  "skipped_count": 0
 }
 ```
 
