@@ -238,7 +238,7 @@ def _parse_evaluation(
             workflow_type = WorkflowType(workflow_type_str)
         except ValueError:
             valid_types = [wt.value for wt in WorkflowType]
-            raise ConfigurationError(  # noqa: B904
+            raise ConfigurationError(
                 f"Invalid workflow_type '{workflow_type_str}' in {context}. "
                 f"Valid values: {valid_types}"
             )

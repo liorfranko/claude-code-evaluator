@@ -11,10 +11,9 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from pydantic import ValidationError
 
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents import DeveloperAgent
-from claude_evaluator.core.agents.developer import DEFAULT_QA_MODEL
 from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.enums import DeveloperState
 from claude_evaluator.models.question import (
@@ -31,20 +30,13 @@ from claude_evaluator.models.question import (
 @pytest.fixture
 def base_developer_agent() -> DeveloperAgent:
     """Create a base DeveloperAgent for testing."""
-    return DeveloperAgent(
-        max_iterations=100,
-        context_window_size=10,
-        max_answer_retries=1,
-    )
+    return DeveloperAgent()
 
 
 @pytest.fixture
 def agent_with_custom_model() -> DeveloperAgent:
     """Create a DeveloperAgent with a custom developer_qa_model."""
     return DeveloperAgent(
-        max_iterations=100,
-        context_window_size=10,
-        max_answer_retries=2,
         developer_qa_model="claude-sonnet-4-5@20251001",
     )
 
@@ -204,48 +196,45 @@ class TestAnswerQuestionGeneratesResponse:
         long_conversation_history: list[dict[str, Any]],
     ) -> None:
         """Test that answer_question respects context_window_size for first attempt."""
-        agent = DeveloperAgent(
-            max_iterations=100,
-            context_window_size=5,  # Only use last 5 messages
-            max_answer_retries=1,
-        )
+        with patch.object(get_settings().developer, "context_window_size", 5):
+            agent = DeveloperAgent()
 
-        question_context = QuestionContext(
-            questions=[QuestionItem(question="What approach should I take?")],
-            conversation_history=long_conversation_history,  # 40 messages
-            session_id="test-session",
-            attempt_number=1,
-        )
+            question_context = QuestionContext(
+                questions=[QuestionItem(question="What approach should I take?")],
+                conversation_history=long_conversation_history,  # 40 messages
+                session_id="test-session",
+                attempt_number=1,
+            )
 
-        captured_prompts: list[str] = []
+            captured_prompts: list[str] = []
 
-        def capture_prompt(**kwargs):
-            captured_prompts.append(kwargs.get("prompt", ""))
-            return create_async_generator(ResultMessage(result="Answer"))
+            def capture_prompt(**kwargs):
+                captured_prompts.append(kwargs.get("prompt", ""))
+                return create_async_generator(ResultMessage(result="Answer"))
 
-        with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
-            side_effect=capture_prompt,
-        ):
-                agent.transition_to(DeveloperState.prompting)
-                agent.transition_to(DeveloperState.awaiting_response)
+            with patch(
+                "claude_evaluator.core.agents.developer.sdk_query",
+                side_effect=capture_prompt,
+            ):
+                    agent.transition_to(DeveloperState.prompting)
+                    agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await agent.answer_question(question_context)
+                    result = await agent.answer_question(question_context)
 
-                # Context size should be the window size (5 messages)
-                assert result.context_size == 5
+                    # Context size should be the window size (5 messages)
+                    assert result.context_size == 5
 
-                # Verify the prompt content - early messages should NOT be included
-                assert len(captured_prompts) == 1
-                prompt = captured_prompts[0]
-                # Only last 5 messages should be included, not early ones
-                assert "USER_MSG_INDEX_0_CONTENT" not in prompt
-                assert "USER_MSG_INDEX_1_CONTENT" not in prompt
-                # Later messages should be present
-                assert (
-                    "USER_MSG_INDEX_19_CONTENT" in prompt
-                    or "ASST_MSG_INDEX_19_CONTENT" in prompt
-                )
+                    # Verify the prompt content - early messages should NOT be included
+                    assert len(captured_prompts) == 1
+                    prompt = captured_prompts[0]
+                    # Only last 5 messages should be included, not early ones
+                    assert "USER_MSG_INDEX_0_CONTENT" not in prompt
+                    assert "USER_MSG_INDEX_1_CONTENT" not in prompt
+                    # Later messages should be present
+                    assert (
+                        "USER_MSG_INDEX_19_CONTENT" in prompt
+                        or "ASST_MSG_INDEX_19_CONTENT" in prompt
+                    )
 
     @pytest.mark.asyncio
     async def test_answer_question_logs_decision(
@@ -344,7 +333,7 @@ class TestDeveloperQAModelSelection:
         base_developer_agent: DeveloperAgent,
         sample_question_context: QuestionContext,
     ) -> None:
-        """Test that DEFAULT_QA_MODEL is used when developer_qa_model is None."""
+        """Test that get_settings().developer.qa_model is used when developer_qa_model is None."""
         captured_options: list[Any] = []
 
         def capture_model(**kwargs):
@@ -363,8 +352,8 @@ class TestDeveloperQAModelSelection:
                 )
 
                 assert len(captured_options) == 1
-                assert captured_options[0].model == DEFAULT_QA_MODEL
-                assert result.model_used == DEFAULT_QA_MODEL
+                assert captured_options[0].model == get_settings().developer.qa_model
+                assert result.model_used == get_settings().developer.qa_model
 
     @pytest.mark.asyncio
     async def test_model_used_recorded_in_result(
@@ -447,41 +436,38 @@ class TestRetryUsesFullHistory:
         self, long_conversation_history: list[dict[str, Any]]
     ) -> None:
         """Test that attempt_number=1 uses only context_window_size messages."""
-        agent = DeveloperAgent(
-            max_iterations=100,
-            context_window_size=5,
-            max_answer_retries=1,
-        )
+        with patch.object(get_settings().developer, "context_window_size", 5):
+            agent = DeveloperAgent()
 
-        question_context = QuestionContext(
-            questions=[QuestionItem(question="First attempt question?")],
-            conversation_history=long_conversation_history,  # 40 messages
-            session_id="test-session",
-            attempt_number=1,
-        )
+            question_context = QuestionContext(
+                questions=[QuestionItem(question="First attempt question?")],
+                conversation_history=long_conversation_history,  # 40 messages
+                session_id="test-session",
+                attempt_number=1,
+            )
 
-        captured_prompts: list[str] = []
+            captured_prompts: list[str] = []
 
-        def capture_prompt(**kwargs):
-            captured_prompts.append(kwargs.get("prompt", ""))
-            return create_async_generator(ResultMessage(result="First attempt answer"))
+            def capture_prompt(**kwargs):
+                captured_prompts.append(kwargs.get("prompt", ""))
+                return create_async_generator(ResultMessage(result="First attempt answer"))
 
-        with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
-            side_effect=capture_prompt,
-        ):
-                agent.transition_to(DeveloperState.prompting)
-                agent.transition_to(DeveloperState.awaiting_response)
+            with patch(
+                "claude_evaluator.core.agents.developer.sdk_query",
+                side_effect=capture_prompt,
+            ):
+                    agent.transition_to(DeveloperState.prompting)
+                    agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await agent.answer_question(question_context)
+                    result = await agent.answer_question(question_context)
 
-                assert result.context_size == 5
-                assert result.attempt_number == 1
+                    assert result.context_size == 5
+                    assert result.attempt_number == 1
 
-                # Verify early messages are NOT in prompt
-                assert len(captured_prompts) == 1
-                prompt = captured_prompts[0]
-                assert "USER_MSG_INDEX_0_CONTENT" not in prompt
+                    # Verify early messages are NOT in prompt
+                    assert len(captured_prompts) == 1
+                    prompt = captured_prompts[0]
+                    assert "USER_MSG_INDEX_0_CONTENT" not in prompt
 
     @pytest.mark.asyncio
     async def test_retry_logs_full_history_strategy(
@@ -540,29 +526,14 @@ class TestRetryUsesFullHistory:
 class TestMaxRetriesExceeded:
     """Tests for max retries exceeded failing evaluation (T418)."""
 
-    def test_max_answer_retries_validation_valid_values(self) -> None:
-        """Test that valid max_answer_retries values are accepted."""
-        # Minimum valid (0)
-        agent_min = DeveloperAgent(max_answer_retries=0)
-        assert agent_min.max_answer_retries == 0
+    def test_max_answer_retries_read_from_settings(self) -> None:
+        """Test that max_answer_retries is read from settings at runtime."""
+        # Default value from settings
+        assert get_settings().developer.max_answer_retries == 1
 
-        # Maximum valid (5)
-        agent_max = DeveloperAgent(max_answer_retries=5)
-        assert agent_max.max_answer_retries == 5
-
-        # Default value
-        agent_default = DeveloperAgent()
-        assert agent_default.max_answer_retries == 1
-
-    def test_max_answer_retries_validation_rejects_negative(self) -> None:
-        """Test that negative max_answer_retries is rejected."""
-        with pytest.raises(ValidationError, match="greater_than_equal"):
-            DeveloperAgent(max_answer_retries=-1)
-
-    def test_max_answer_retries_validation_rejects_over_max(self) -> None:
-        """Test that max_answer_retries over 5 is rejected."""
-        with pytest.raises(ValidationError, match="less_than_equal"):
-            DeveloperAgent(max_answer_retries=6)
+        # Settings can be patched to a custom value
+        with patch.object(get_settings().developer, "max_answer_retries", 3):
+            assert get_settings().developer.max_answer_retries == 3
 
     @pytest.mark.asyncio
     async def test_sdk_failure_transitions_to_failed_state(
@@ -845,22 +816,14 @@ class TestAnswerGenerationHelpers:
 
         assert "empty response" in str(exc_info.value)
 
-    def test_context_window_size_validation(self) -> None:
-        """Test that context_window_size is validated on agent creation."""
-        # Valid values
-        agent_min = DeveloperAgent(context_window_size=1)
-        assert agent_min.context_window_size == 1
+    def test_context_window_size_read_from_settings(self) -> None:
+        """Test that context_window_size is read from settings at runtime."""
+        # Default value from settings
+        assert get_settings().developer.context_window_size == 10
 
-        agent_max = DeveloperAgent(context_window_size=100)
-        assert agent_max.context_window_size == 100
-
-        # Invalid: below minimum
-        with pytest.raises(ValidationError, match="greater_than_equal"):
-            DeveloperAgent(context_window_size=0)
-
-        # Invalid: above maximum
-        with pytest.raises(ValidationError, match="less_than_equal"):
-            DeveloperAgent(context_window_size=101)
+        # Settings can be patched to a custom value
+        with patch.object(get_settings().developer, "context_window_size", 25):
+            assert get_settings().developer.context_window_size == 25
 
     def test_reset_clears_answer_retry_count(self) -> None:
         """Test that reset() clears the internal answer retry counter."""
@@ -920,7 +883,7 @@ class TestAnswerGenerationIntegration:
 
                 # Verify complete result
                 assert result.answer == "Use async for better concurrency."
-                assert result.model_used == DEFAULT_QA_MODEL
+                assert result.model_used == get_settings().developer.qa_model
                 assert result.attempt_number == 1
                 assert result.context_size == 2
                 assert result.generation_time_ms >= 0
@@ -933,16 +896,12 @@ class TestAnswerGenerationIntegration:
 
                 # Verify SDK was called correctly
                 assert len(captured_options) == 1
-                assert captured_options[0].model == DEFAULT_QA_MODEL
+                assert captured_options[0].model == get_settings().developer.qa_model
 
     @pytest.mark.asyncio
     async def test_full_answer_flow_retry_attempt(self) -> None:
         """Test complete answer flow for retry attempt with full history."""
-        agent = DeveloperAgent(
-            max_iterations=100,
-            context_window_size=5,  # Small window to verify full history is used
-            max_answer_retries=2,
-        )
+        agent = DeveloperAgent()
 
         # Create a longer conversation history with distinct markers
         history = [

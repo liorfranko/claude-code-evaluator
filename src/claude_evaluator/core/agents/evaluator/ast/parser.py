@@ -5,6 +5,7 @@ into abstract syntax trees using tree-sitter grammars.
 """
 
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -37,7 +38,7 @@ class ParseResult:
 
     def __init__(
         self,
-        tree,  # noqa: ANN001
+        tree,
         language: Language,
         source_bytes: bytes,
         success: bool = True,
@@ -60,7 +61,7 @@ class ParseResult:
         self.error = error
 
     @property
-    def root_node(self):  # noqa: ANN201
+    def root_node(self):
         """Get the root node of the parse tree."""
         return self.tree.root_node if self.tree else None
 
@@ -75,9 +76,9 @@ class ASTParser:
 
     def __init__(self) -> None:
         """Initialize the parser."""
-        self._parsers: dict[Language, object] = {}
+        self._parsers: dict[Language, Any] = {}
 
-    def _get_parser(self, language: Language):  # noqa: ANN201
+    def _get_parser(self, language: Language) -> Any:
         """Get or create a parser for the given language.
 
         Args:

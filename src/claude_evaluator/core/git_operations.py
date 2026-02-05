@@ -373,6 +373,13 @@ class GitStatusError(Exception):
     """Raised when git status command fails."""
 
     def __init__(self, workspace_path: Path, error_message: str) -> None:
+        """Initialize with the workspace path and error details.
+
+        Args:
+            workspace_path: Path to the git workspace where the error occurred.
+            error_message: The error message from the git status command.
+
+        """
         self.workspace_path = workspace_path
         self.error_message = error_message
         super().__init__(f"git status failed in {workspace_path}: {error_message}")

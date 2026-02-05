@@ -53,16 +53,6 @@ class HardcodedSecretsCheck(ASTCheck):
         re.compile(r"(?i)(credential|cred)"),
     ]
 
-    # Patterns for actual secret values
-    SECRET_VALUE_PATTERNS: ClassVar[list[re.Pattern]] = [
-        # AWS-style keys
-        re.compile(r"AKIA[0-9A-Z]{16}"),
-        # Generic long alphanumeric strings that look like secrets
-        re.compile(r"^[a-zA-Z0-9+/]{32,}={0,2}$"),
-        # Hex strings (potential keys)
-        re.compile(r"^[a-fA-F0-9]{32,}$"),
-    ]
-
     # Node types for assignments per language
     ASSIGNMENT_TYPES: ClassVar[dict[Language, set[str]]] = {
         Language.python: {"assignment", "augmented_assignment"},
@@ -136,7 +126,7 @@ class HardcodedSecretsCheck(ASTCheck):
 
     def _find_secret_assignments(
         self,
-        node,  # noqa: ANN001
+        node,
         assignment_types: set[str],
         string_types: set[str],
         source_code: str,
@@ -155,7 +145,7 @@ class HardcodedSecretsCheck(ASTCheck):
         """
         findings: list[tuple[str, str, int]] = []
 
-        def traverse(n) -> None:  # noqa: ANN001
+        def traverse(n) -> None:
             if n.type in assignment_types:
                 var_name, value, line_num = self._extract_assignment(
                     n, string_types, source_code
@@ -177,7 +167,7 @@ class HardcodedSecretsCheck(ASTCheck):
 
     def _extract_assignment(
         self,
-        node,  # noqa: ANN001
+        node,
         string_types: set[str],
         source_code: str,
     ) -> tuple[str | None, str | None, int]:
@@ -232,19 +222,6 @@ class SQLInjectionCheck(ASTCheck):
         "EXEC",
         "EXECUTE",
     ]
-
-    # String concatenation node types
-    CONCAT_TYPES: ClassVar[dict[Language, set[str]]] = {
-        Language.python: {
-            "binary_operator",
-            "concatenated_string",
-            "call",  # f-strings become calls
-        },
-        Language.javascript: {"binary_expression", "template_string"},
-        Language.typescript: {"binary_expression", "template_string"},
-        Language.go: {"binary_expression"},
-        Language.java: {"binary_expression"},
-    }
 
     def run(
         self,
@@ -409,7 +386,7 @@ class EvalExecCheck(ASTCheck):
 
     def _find_function_calls(
         self,
-        node,  # noqa: ANN001
+        node,
         source_code: str,
     ) -> list[tuple[str, int]]:
         """Find all function calls in the AST.
@@ -424,7 +401,7 @@ class EvalExecCheck(ASTCheck):
         """
         calls: list[tuple[str, int]] = []
 
-        def traverse(n) -> None:  # noqa: ANN001
+        def traverse(n) -> None:
             if n.type in {"call", "call_expression"}:
                 # Get function name from first child
                 for child in n.children:
@@ -519,7 +496,7 @@ class InsecureRandomCheck(ASTCheck):
             return results
 
         # Also check for random module import
-        if lang == Language.python:  # noqa: SIM102
+        if lang == Language.python:
             if "import random" in source_code or "from random import" in source_code:
                 # Find random function calls
                 lines = source_code.split("\n")

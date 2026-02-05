@@ -149,7 +149,7 @@ IMPORT_NODE_TYPES: dict[Language, set[str]] = {
 }
 
 
-def _traverse_tree(node, node_types: set[str]) -> int:  # noqa: ANN001
+def _traverse_tree(node, node_types: set[str]) -> int:
     """Traverse AST and count nodes of specified types.
 
     Args:
@@ -171,7 +171,7 @@ def _traverse_tree(node, node_types: set[str]) -> int:  # noqa: ANN001
     return count
 
 
-def _calculate_max_depth(node, current_depth: int = 0) -> int:  # noqa: ANN001
+def _calculate_max_depth(node, current_depth: int = 0) -> int:
     """Calculate maximum nesting depth from a node.
 
     Args:
@@ -423,7 +423,7 @@ def calculate_max_cyclomatic_complexity(parse_result: ParseResult) -> int:
     function_types = FUNCTION_NODE_TYPES.get(parse_result.language, set())
     decision_types = DECISION_NODE_TYPES.get(parse_result.language, set())
 
-    def find_functions(node) -> list:  # noqa: ANN001
+    def find_functions(node) -> list:
         """Find all function nodes."""
         functions = []
         if node.type in function_types:

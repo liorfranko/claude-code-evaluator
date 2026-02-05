@@ -6,6 +6,7 @@ for Claude Code execution.
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import (  # pyright: ignore[reportMissingImports]
@@ -112,10 +113,16 @@ class SDKConfigBuilder:
             source=source,
         )
 
+        # Build the additional dirs list with the correct union type
+        add_dirs: list[str | Path] = list(self._additional_dirs) if self._additional_dirs else []
+
+        # Map internal permission mode to SDK permission mode literal
+        sdk_permission_mode = permission_map.get(self._permission_mode, "plan")
+
         return ClaudeAgentOptions(
             cwd=self._project_directory,
-            add_dirs=self._additional_dirs if self._additional_dirs else [],
-            permission_mode=permission_map.get(self._permission_mode, "plan"),
+            add_dirs=add_dirs,
+            permission_mode=sdk_permission_mode,  # type: ignore[arg-type]
             allowed_tools=self._allowed_tools if self._allowed_tools else [],
             max_turns=max_turns,
             max_budget_usd=self._max_budget_usd,
@@ -194,7 +201,7 @@ class ToolPermissionHandler:
         self,
         tool_name: str,
         input_data: dict[str, Any],
-        context: Any,  # noqa: ARG002
+        context: Any,
     ) -> Any:
         """Handle tool permission requests.
 
