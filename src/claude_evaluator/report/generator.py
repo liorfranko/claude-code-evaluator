@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Any
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, Outcome
 from claude_evaluator.models.metrics import Metrics
+from claude_evaluator.models.report import ChangeSummary, EvaluationReport
 from claude_evaluator.models.timeline_event import TimelineEvent
 from claude_evaluator.report.exceptions import ReportGenerationError
-from claude_evaluator.models.report import ChangeSummary, EvaluationReport
 
 if TYPE_CHECKING:
     from claude_evaluator.core import Evaluation

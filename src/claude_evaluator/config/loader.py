@@ -22,8 +22,8 @@ from claude_evaluator.config.models import (
 )
 from claude_evaluator.config.settings import get_settings
 from claude_evaluator.config.validators import FieldValidator
-from claude_evaluator.models.reviewer import ReviewerConfig
 from claude_evaluator.models.enums import PermissionMode, WorkflowType
+from claude_evaluator.models.reviewer import ReviewerConfig
 
 __all__ = ["load_suite", "apply_defaults", "load_reviewer_configs"]
 

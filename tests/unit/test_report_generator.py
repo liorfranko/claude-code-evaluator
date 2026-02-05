@@ -10,9 +10,9 @@ import pytest
 from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, Outcome, WorkflowType
 from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.report.generator import ReportGenerationError, ReportGenerator
 from claude_evaluator.models.report import EvaluationReport
 from claude_evaluator.models.timeline_event import TimelineEvent
+from claude_evaluator.report.generator import ReportGenerationError, ReportGenerator
 
 
 class TestReportGeneratorGenerate:

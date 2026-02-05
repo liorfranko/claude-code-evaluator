@@ -29,7 +29,6 @@ from claude_evaluator.core.agents.evaluator.exceptions import (
     EvaluatorError,
     ParsingError,
 )
-from claude_evaluator.models.reviewer import ReviewContext, ReviewerOutput
 from claude_evaluator.core.agents.evaluator.reviewers.code_quality import (
     CodeQualityReviewer,
 )
@@ -40,13 +39,14 @@ from claude_evaluator.core.agents.evaluator.reviewers.registry import ReviewerRe
 from claude_evaluator.core.agents.evaluator.reviewers.task_completion import (
     TaskCompletionReviewer,
 )
+from claude_evaluator.models.report import EvaluationReport
+from claude_evaluator.models.reviewer import ReviewContext, ReviewerOutput
 from claude_evaluator.models.score_report import (
     CodeAnalysis,
     DimensionScore,
     DimensionType,
     ScoreReport,
 )
-from claude_evaluator.models.report import EvaluationReport
 
 __all__ = [
     "EvaluatorAgent",

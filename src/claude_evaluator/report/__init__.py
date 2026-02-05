@@ -6,8 +6,8 @@ This module provides report generation functionality:
 - ReportGenerationError: Exception for report generation failures
 """
 
-from claude_evaluator.report.generator import ReportGenerationError, ReportGenerator
 from claude_evaluator.models.report import EvaluationReport
+from claude_evaluator.report.generator import ReportGenerationError, ReportGenerator
 
 __all__ = [
     "EvaluationReport",

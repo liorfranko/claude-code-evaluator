@@ -328,8 +328,8 @@ class TestBrownfieldReportFields:
         """JSON serialization includes brownfield fields."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
         from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.report.generator import ReportGenerator
         from claude_evaluator.models.report import ChangeSummary, EvaluationReport
+        from claude_evaluator.report.generator import ReportGenerator
 
         change_summary = ChangeSummary(
             files_modified=["main.py"],
