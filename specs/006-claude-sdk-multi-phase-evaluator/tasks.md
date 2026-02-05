@@ -149,12 +149,12 @@ Story: As a developer, I want to see detailed results from each evaluation phase
 ## Phase 7: Validation
 
 ### Success Criteria Verification
-- [ ] T600 Validate SC-001: Run correlation test with baseline evaluations
-- [ ] T601 Validate SC-002: Benchmark evaluation time < 3 minutes
-- [ ] T602 Validate SC-003: Measure API cost per evaluation < $0.50
+- [x] T600 Validate SC-001: Run correlation test with baseline evaluations
+- [x] T601 Validate SC-002: Benchmark evaluation time < 3 minutes
+- [x] T602 Validate SC-003: Measure API cost per evaluation < $0.50
 
 ### Documentation
-- [ ] T610 Update quickstart.md with new reviewer usage (specs/006-claude-sdk-multi-phase-evaluator/quickstart.md)
+- [x] T610 Update quickstart.md with new reviewer usage (specs/006-claude-sdk-multi-phase-evaluator/quickstart.md)
 
 ---
 
