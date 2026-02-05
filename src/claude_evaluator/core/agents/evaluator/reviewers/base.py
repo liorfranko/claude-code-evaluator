@@ -269,3 +269,31 @@ Also list any positive aspects or strengths you observe in the code.
 """
 
         return prompt
+
+    def filter_by_confidence(self, output: ReviewerOutput) -> ReviewerOutput:
+        """Filter issues below the minimum confidence threshold.
+
+        Returns a new ReviewerOutput with only issues that meet or exceed
+        the reviewer's min_confidence threshold.
+
+        Args:
+            output: The original ReviewerOutput to filter.
+
+        Returns:
+            A new ReviewerOutput with low-confidence issues removed.
+
+        """
+        filtered_issues = [
+            issue for issue in output.issues
+            if issue.confidence >= self.min_confidence
+        ]
+
+        return ReviewerOutput(
+            reviewer_name=output.reviewer_name,
+            confidence_score=output.confidence_score,
+            issues=filtered_issues,
+            strengths=output.strengths,
+            execution_time_ms=output.execution_time_ms,
+            skipped=output.skipped,
+            skip_reason=output.skip_reason,
+        )
