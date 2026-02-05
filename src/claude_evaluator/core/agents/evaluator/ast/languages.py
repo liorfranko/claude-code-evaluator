@@ -105,7 +105,7 @@ def detect_language(file_path: str | Path) -> Language:
     return language
 
 
-def get_grammar(language: Language):  # noqa: ANN201
+def get_grammar(language: Language):
     """Load tree-sitter grammar for a language.
 
     Args:

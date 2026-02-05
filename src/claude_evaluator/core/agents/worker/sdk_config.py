@@ -194,7 +194,7 @@ class ToolPermissionHandler:
         self,
         tool_name: str,
         input_data: dict[str, Any],
-        context: Any,  # noqa: ARG002
+        context: Any,
     ) -> Any:
         """Handle tool permission requests.
 

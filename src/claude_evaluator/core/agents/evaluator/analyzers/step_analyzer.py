@@ -35,7 +35,7 @@ class Pattern:
         name: str,
         description: str,
         severity: str = "warning",
-        matcher: callable = None,  # noqa: ANN001
+        matcher: callable = None,
     ) -> None:
         """Initialize a pattern.
 

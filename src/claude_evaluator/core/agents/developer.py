@@ -34,8 +34,8 @@ ReceiveResponseCallback: TypeAlias = Callable[[], dict[str, Any]]
 logger = get_logger(__name__)
 
 # SDK imports for LLM-powered answer generation
-from claude_agent_sdk import ClaudeAgentOptions  # noqa: E402
-from claude_agent_sdk import query as sdk_query  # noqa: E402
+from claude_agent_sdk import ClaudeAgentOptions
+from claude_agent_sdk import query as sdk_query
 
 __all__ = ["DeveloperAgent"]
 
@@ -897,7 +897,7 @@ Your response:"""
         formatter = QuestionFormatter(max_questions=3, max_length=50)
         return formatter.summarize(questions)
 
-    def _extract_answer_from_response(self, response: Any) -> str:  # noqa: ANN401
+    def _extract_answer_from_response(self, response: Any) -> str:
         """Extract the answer text from an SDK query response.
 
         Args:

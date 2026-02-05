@@ -37,7 +37,7 @@ class ParseResult:
 
     def __init__(
         self,
-        tree,  # noqa: ANN001
+        tree,
         language: Language,
         source_bytes: bytes,
         success: bool = True,
@@ -60,7 +60,7 @@ class ParseResult:
         self.error = error
 
     @property
-    def root_node(self):  # noqa: ANN201
+    def root_node(self):
         """Get the root node of the parse tree."""
         return self.tree.root_node if self.tree else None
 
@@ -77,7 +77,7 @@ class ASTParser:
         """Initialize the parser."""
         self._parsers: dict[Language, object] = {}
 
-    def _get_parser(self, language: Language):  # noqa: ANN201
+    def _get_parser(self, language: Language):
         """Get or create a parser for the given language.
 
         Args:

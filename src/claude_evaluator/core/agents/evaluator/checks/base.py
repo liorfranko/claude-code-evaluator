@@ -168,7 +168,7 @@ class ASTCheck(CheckStrategy):
 
     """
 
-    def _get_line_number(self, node) -> int:  # noqa: ANN001
+    def _get_line_number(self, node) -> int:
         """Get line number from an AST node.
 
         Args:
@@ -182,7 +182,7 @@ class ASTCheck(CheckStrategy):
             return node.start_point[0] + 1
         return 1
 
-    def _get_node_text(self, node, source_code: str) -> str:  # noqa: ANN001
+    def _get_node_text(self, node, source_code: str) -> str:
         """Extract text content of an AST node.
 
         Args:
@@ -197,7 +197,7 @@ class ASTCheck(CheckStrategy):
             return source_code[node.start_byte : node.end_byte]
         return ""
 
-    def _extract_function_name(self, node) -> str:  # noqa: ANN001
+    def _extract_function_name(self, node) -> str:
         """Extract function name from a function AST node.
 
         Args:
@@ -222,7 +222,7 @@ class LLMCheck(CheckStrategy):
 
     """
 
-    def __init__(self, client) -> None:  # noqa: ANN001
+    def __init__(self, client) -> None:
         """Initialize with a Claude client.
 
         Args:

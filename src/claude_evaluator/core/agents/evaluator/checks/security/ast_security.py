@@ -136,7 +136,7 @@ class HardcodedSecretsCheck(ASTCheck):
 
     def _find_secret_assignments(
         self,
-        node,  # noqa: ANN001
+        node,
         assignment_types: set[str],
         string_types: set[str],
         source_code: str,
@@ -155,7 +155,7 @@ class HardcodedSecretsCheck(ASTCheck):
         """
         findings: list[tuple[str, str, int]] = []
 
-        def traverse(n) -> None:  # noqa: ANN001
+        def traverse(n) -> None:
             if n.type in assignment_types:
                 var_name, value, line_num = self._extract_assignment(
                     n, string_types, source_code
@@ -177,7 +177,7 @@ class HardcodedSecretsCheck(ASTCheck):
 
     def _extract_assignment(
         self,
-        node,  # noqa: ANN001
+        node,
         string_types: set[str],
         source_code: str,
     ) -> tuple[str | None, str | None, int]:
@@ -409,7 +409,7 @@ class EvalExecCheck(ASTCheck):
 
     def _find_function_calls(
         self,
-        node,  # noqa: ANN001
+        node,
         source_code: str,
     ) -> list[tuple[str, int]]:
         """Find all function calls in the AST.
@@ -424,7 +424,7 @@ class EvalExecCheck(ASTCheck):
         """
         calls: list[tuple[str, int]] = []
 
-        def traverse(n) -> None:  # noqa: ANN001
+        def traverse(n) -> None:
             if n.type in {"call", "call_expression"}:
                 # Get function name from first child
                 for child in n.children:
@@ -519,7 +519,7 @@ class InsecureRandomCheck(ASTCheck):
             return results
 
         # Also check for random module import
-        if lang == Language.python:  # noqa: SIM102
+        if lang == Language.python:
             if "import random" in source_code or "from random import" in source_code:
                 # Find random function calls
                 lines = source_code.split("\n")

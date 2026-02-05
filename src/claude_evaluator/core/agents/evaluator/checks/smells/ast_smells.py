@@ -70,7 +70,7 @@ class LongFunctionCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,  # noqa: ARG002
+        source_code: str,
     ) -> list[CheckResult]:
         """Scan for long functions.
 
@@ -124,7 +124,7 @@ class LongFunctionCheck(ASTCheck):
 
     def _find_functions(
         self,
-        node,  # noqa: ANN001
+        node,
         function_types: set[str],
     ) -> list[tuple[str, int, int, int]]:
         """Find all functions and their metrics.
@@ -139,7 +139,7 @@ class LongFunctionCheck(ASTCheck):
         """
         functions: list[tuple[str, int, int, int]] = []
 
-        def traverse(n) -> None:  # noqa: ANN001
+        def traverse(n) -> None:
             if n.type in function_types:
                 name = self._extract_function_name(n)
                 start_line = self._get_line_number(n)
@@ -154,7 +154,7 @@ class LongFunctionCheck(ASTCheck):
         traverse(node)
         return functions
 
-    def _extract_function_name(self, node) -> str:  # noqa: ANN001
+    def _extract_function_name(self, node) -> str:
         """Extract function name from function node.
 
         Args:
@@ -172,7 +172,7 @@ class LongFunctionCheck(ASTCheck):
 
         return "<anonymous>"
 
-    def _count_statements(self, node) -> int:  # noqa: ANN001
+    def _count_statements(self, node) -> int:
         """Count statements in a function body.
 
         Args:
@@ -196,7 +196,7 @@ class LongFunctionCheck(ASTCheck):
 
         count = 0
 
-        def traverse(n) -> None:  # noqa: ANN001
+        def traverse(n) -> None:
             nonlocal count
             if n.type in statement_types:
                 count += 1
@@ -227,7 +227,7 @@ class LongParameterListCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,  # noqa: ARG002
+        source_code: str,
     ) -> list[CheckResult]:
         """Scan for functions with too many parameters.
 
@@ -276,7 +276,7 @@ class LongParameterListCheck(ASTCheck):
 
     def _find_functions_with_params(
         self,
-        node,  # noqa: ANN001
+        node,
         function_types: set[str],
     ) -> list[tuple[str, int, int]]:
         """Find functions and their parameter counts.
@@ -291,7 +291,7 @@ class LongParameterListCheck(ASTCheck):
         """
         functions: list[tuple[str, int, int]] = []
 
-        def traverse(n) -> None:  # noqa: ANN001
+        def traverse(n) -> None:
             if n.type in function_types:
                 name = self._extract_function_name(n)
                 param_count = self._count_parameters(n)
@@ -305,7 +305,7 @@ class LongParameterListCheck(ASTCheck):
         traverse(node)
         return functions
 
-    def _extract_function_name(self, node) -> str:  # noqa: ANN001
+    def _extract_function_name(self, node) -> str:
         """Extract function name from function node.
 
         Args:
@@ -321,7 +321,7 @@ class LongParameterListCheck(ASTCheck):
 
         return "<anonymous>"
 
-    def _count_parameters(self, node) -> int:  # noqa: ANN001
+    def _count_parameters(self, node) -> int:
         """Count parameters in a function.
 
         Args:
@@ -411,7 +411,7 @@ class DeadCodeCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,  # noqa: ARG002
+        source_code: str,
     ) -> list[CheckResult]:
         """Scan for dead code.
 
@@ -456,7 +456,7 @@ class DeadCodeCheck(ASTCheck):
 
     def _find_dead_code(
         self,
-        node,  # noqa: ANN001
+        node,
         exit_types: set[str],
     ) -> list[int]:
         """Find unreachable code locations.
@@ -471,7 +471,7 @@ class DeadCodeCheck(ASTCheck):
         """
         dead_locations: list[int] = []
 
-        def check_block(n) -> None:  # noqa: ANN001
+        def check_block(n) -> None:
             """Check a block for dead code after exit statements."""
             block_types = {"block", "statement_block", "compound_statement"}
 
@@ -574,7 +574,7 @@ class MagicNumberCheck(ASTCheck):
 
     def _find_magic_numbers(
         self,
-        node,  # noqa: ANN001
+        node,
         source_code: str,
     ) -> list[tuple[str, int]]:
         """Find magic numbers in code.
@@ -591,7 +591,7 @@ class MagicNumberCheck(ASTCheck):
 
         number_types = {"integer", "float", "number"}
 
-        def traverse(n, in_allowed_context: bool = False) -> None:  # noqa: ANN001
+        def traverse(n, in_allowed_context: bool = False) -> None:
             # Check if we're in an allowed context
             allowed = in_allowed_context or n.type in {
                 "subscript",

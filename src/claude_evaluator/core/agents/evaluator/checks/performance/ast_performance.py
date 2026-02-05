@@ -77,7 +77,7 @@ class NestedLoopsCheck(ASTCheck):
         self,
         parse_result: ParseResult,
         file_path: str,
-        source_code: str,  # noqa: ARG002
+        source_code: str,
     ) -> list[CheckResult]:
         """Scan for deeply nested loops.
 
@@ -125,7 +125,7 @@ class NestedLoopsCheck(ASTCheck):
 
     def _find_nested_loops(
         self,
-        node,  # noqa: ANN001
+        node,
         loop_types: set[str],
         current_depth: int,
     ) -> list[tuple[int, int]]:
@@ -183,7 +183,7 @@ class LargeFileReadCheck(ASTCheck):
 
     def run(
         self,
-        parse_result: ParseResult,  # noqa: ARG002
+        parse_result: ParseResult,
         file_path: str,
         source_code: str,
     ) -> list[CheckResult]:
@@ -318,7 +318,7 @@ class IneffectiveLoopCheck(ASTCheck):
 
     def _find_ineffective_patterns(
         self,
-        node,  # noqa: ANN001
+        node,
         loop_types: set[str],
         source_code: str,
     ) -> list[tuple[str, int]]:
@@ -335,7 +335,7 @@ class IneffectiveLoopCheck(ASTCheck):
         """
         findings: list[tuple[str, int]] = []
 
-        def traverse_loop_body(n, in_loop: bool = False) -> None:  # noqa: ANN001
+        def traverse_loop_body(n, in_loop: bool = False) -> None:
             is_loop = n.type in loop_types
             current_in_loop = in_loop or is_loop
 
@@ -349,7 +349,7 @@ class IneffectiveLoopCheck(ASTCheck):
 
                 if self.APPEND_IN_LOOP_PATTERN.search(text):
                     findings.append(("append", line_num))
-                elif self.STRING_CONCAT_PATTERN.search(text):  # noqa: SIM102
+                elif self.STRING_CONCAT_PATTERN.search(text):
                     # Only flag if it looks like string concatenation
                     if "+" in text and ("'" in text or '"' in text):
                         findings.append(("string_concat", line_num))

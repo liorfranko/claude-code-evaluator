@@ -12,8 +12,8 @@ from typing import Any, TypeVar
 import structlog
 
 # SDK imports for Claude interaction
-from claude_agent_sdk import ClaudeAgentOptions  # noqa: E402
-from claude_agent_sdk import query as sdk_query  # noqa: E402
+from claude_agent_sdk import ClaudeAgentOptions
+from claude_agent_sdk import query as sdk_query
 from pydantic import BaseModel
 
 from claude_evaluator.config.settings import get_settings

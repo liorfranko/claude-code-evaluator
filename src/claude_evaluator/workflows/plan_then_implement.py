@@ -221,7 +221,7 @@ class PlanThenImplementWorkflow(BaseWorkflow):
         # Collect metrics from the planning phase
         self.metrics_collector.add_query_metrics(query_metrics)
 
-    async def _execute_implementation_phase(self, evaluation: "Evaluation") -> None:  # noqa: ARG002
+    async def _execute_implementation_phase(self, evaluation: "Evaluation") -> None:
         """Execute the implementation phase.
 
         Switches the Worker to acceptEdits mode and sends the implementation
