@@ -105,7 +105,9 @@ class FieldValidator:
         *,
         default: T,
         transform: Any | None = None,
-    ) -> T: ...
+    ) -> T:
+        """Validate and extract an optional field with a non-None default."""
+        ...
 
     @overload
     def optional(
@@ -115,7 +117,9 @@ class FieldValidator:
         *,
         default: None = None,
         transform: Any | None = None,
-    ) -> T | None: ...
+    ) -> T | None:
+        """Validate and extract an optional field with a None default."""
+        ...
 
     def optional(
         self,

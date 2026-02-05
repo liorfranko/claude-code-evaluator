@@ -5,6 +5,8 @@ redundant operations, inefficiencies, and strategy patterns.
 """
 
 import re
+from collections.abc import Callable
+from typing import Any
 
 import structlog
 
@@ -35,7 +37,7 @@ class Pattern:
         name: str,
         description: str,
         severity: str = "warning",
-        matcher: callable = None,  # noqa: ANN001
+        matcher: Callable[[dict[str, Any]], bool] | None = None,
     ) -> None:
         """Initialize a pattern.
 

@@ -5,7 +5,6 @@ configurations from YAML files, as well as loaders for YAML suite files.
 It also provides centralized settings via pydantic-settings.
 """
 
-from claude_evaluator.config import defaults
 from claude_evaluator.config.loader import (
     apply_defaults,
     load_reviewer_configs,
@@ -28,7 +27,6 @@ from claude_evaluator.config.settings import (
 
 __all__ = [
     "apply_defaults",
-    "defaults",
     "DeveloperSettings",
     "EvalDefaults",
     "EvaluationConfig",

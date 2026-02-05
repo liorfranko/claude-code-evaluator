@@ -464,13 +464,13 @@ class BaseWorkflow(ABC):
         # Configure DeveloperAgent with Q&A settings
         if self._developer_qa_model is not None:
             developer.developer_qa_model = self._developer_qa_model
-        developer.context_window_size = self._context_window_size
+        # Note: context_window_size is read from get_settings().developer at runtime
         developer.cwd = worker.project_directory
 
         # Create and set the question callback on WorkerAgent
         callback = self.create_question_callback(developer)
         worker.on_question_callback = callback
-        worker.question_timeout_seconds = self._question_timeout_seconds
+        # Note: question_timeout_seconds is read from get_settings().worker at runtime
 
         # Create and set the implicit question callback for detecting
         # questions asked in plain text without using AskUserQuestion tool

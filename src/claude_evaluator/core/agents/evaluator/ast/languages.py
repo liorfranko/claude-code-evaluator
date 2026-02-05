@@ -105,7 +105,7 @@ def detect_language(file_path: str | Path) -> Language:
     return language
 
 
-def get_grammar(language: Language):  # noqa: ANN201
+def get_grammar(language: Language):
     """Load tree-sitter grammar for a language.
 
     Args:
@@ -139,7 +139,7 @@ def get_grammar(language: Language):  # noqa: ANN201
             # TypeScript uses JavaScript grammar for basic parsing
             # or requires tree-sitter-typescript which may not be installed
             try:
-                import tree_sitter_typescript as ts_typescript
+                import tree_sitter_typescript as ts_typescript  # pyright: ignore[reportMissingImports]
 
                 capsule = ts_typescript.language_typescript()
             except ImportError:

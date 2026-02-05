@@ -6,10 +6,11 @@ fallback response handling, and workflow execution.
 """
 
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
 
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents import DeveloperAgent
 from claude_evaluator.core.agents.exceptions import (
     InvalidStateTransitionError,
@@ -30,14 +31,14 @@ class TestDeveloperAgentInitialization:
         assert agent.current_state == DeveloperState.initializing
         assert agent.decisions_log == []
         assert agent.fallback_responses is None
-        assert agent.max_iterations == 100
         assert agent.iteration_count == 0
 
-    def test_custom_max_iterations(self) -> None:
-        """Test that max_iterations can be customized."""
-        agent = DeveloperAgent(max_iterations=50)
-
-        assert agent.max_iterations == 50
+    def test_max_iterations_read_from_settings(self) -> None:
+        """Test that max_iterations is read from settings at runtime."""
+        with patch.object(get_settings().developer, "max_iterations", 50):
+            agent = DeveloperAgent()
+            # Agent reads max_iterations from settings during _increment_iteration
+            assert get_settings().developer.max_iterations == 50
 
     def test_custom_fallback_responses(self) -> None:
         """Test that fallback_responses can be provided."""
@@ -51,14 +52,6 @@ class TestDeveloperAgentInitialization:
         agent = DeveloperAgent(current_state=DeveloperState.prompting)
 
         assert agent.current_state == DeveloperState.prompting
-
-    def test_invalid_max_iterations_raises_error(self) -> None:
-        """Test that max_iterations less than 1 raises ValidationError."""
-        with pytest.raises(ValidationError, match="greater_than_equal"):
-            DeveloperAgent(max_iterations=0)
-
-        with pytest.raises(ValidationError, match="greater_than_equal"):
-            DeveloperAgent(max_iterations=-1)
 
     def test_role_is_immutable(self) -> None:
         """Test that role field is not settable via init."""
@@ -404,56 +397,56 @@ class TestLoopDetection:
 
     def test_loop_detected_when_max_iterations_exceeded(self) -> None:
         """Test that LoopDetectedError is raised when max_iterations exceeded."""
-        agent = DeveloperAgent(
-            max_iterations=2,
-            current_state=DeveloperState.awaiting_response,
-        )
+        with patch.object(get_settings().developer, "max_iterations", 2):
+            agent = DeveloperAgent(
+                current_state=DeveloperState.awaiting_response,
+            )
 
-        # First two iterations should succeed
-        agent.handle_response({}, is_complete=False)
-        agent.current_state = DeveloperState.awaiting_response  # Reset for next call
-
-        agent.handle_response({}, is_complete=False)
-        agent.current_state = DeveloperState.awaiting_response  # Reset for next call
-
-        # Third iteration should raise LoopDetectedError
-        with pytest.raises(LoopDetectedError) as exc_info:
+            # First two iterations should succeed
             agent.handle_response({}, is_complete=False)
+            agent.current_state = DeveloperState.awaiting_response  # Reset for next call
 
-        assert "exceeded max_iterations" in str(exc_info.value)
-        assert agent.current_state == DeveloperState.failed
+            agent.handle_response({}, is_complete=False)
+            agent.current_state = DeveloperState.awaiting_response  # Reset for next call
+
+            # Third iteration should raise LoopDetectedError
+            with pytest.raises(LoopDetectedError) as exc_info:
+                agent.handle_response({}, is_complete=False)
+
+            assert "exceeded max_iterations" in str(exc_info.value)
+            assert agent.current_state == DeveloperState.failed
 
     def test_loop_detected_logs_decision(self) -> None:
         """Test that loop detection logs a decision before raising."""
-        agent = DeveloperAgent(
-            max_iterations=1,
-            current_state=DeveloperState.awaiting_response,
-        )
+        with patch.object(get_settings().developer, "max_iterations", 1):
+            agent = DeveloperAgent(
+                current_state=DeveloperState.awaiting_response,
+            )
 
-        agent.handle_response({}, is_complete=True)
-        agent.current_state = DeveloperState.awaiting_response
-
-        with pytest.raises(LoopDetectedError):
             agent.handle_response({}, is_complete=True)
+            agent.current_state = DeveloperState.awaiting_response
 
-        # Should have logged loop detection decision
-        loop_decisions = [d for d in agent.decisions_log if "loop" in d.action.lower()]
-        assert len(loop_decisions) >= 1
+            with pytest.raises(LoopDetectedError):
+                agent.handle_response({}, is_complete=True)
+
+            # Should have logged loop detection decision
+            loop_decisions = [d for d in agent.decisions_log if "loop" in d.action.lower()]
+            assert len(loop_decisions) >= 1
 
     def test_loop_detected_transitions_to_failed(self) -> None:
         """Test that loop detection transitions agent to failed state."""
-        agent = DeveloperAgent(
-            max_iterations=1,
-            current_state=DeveloperState.awaiting_response,
-        )
+        with patch.object(get_settings().developer, "max_iterations", 1):
+            agent = DeveloperAgent(
+                current_state=DeveloperState.awaiting_response,
+            )
 
-        agent.handle_response({}, is_complete=True)
-        agent.current_state = DeveloperState.awaiting_response
-
-        with pytest.raises(LoopDetectedError):
             agent.handle_response({}, is_complete=True)
+            agent.current_state = DeveloperState.awaiting_response
 
-        assert agent.current_state == DeveloperState.failed
+            with pytest.raises(LoopDetectedError):
+                agent.handle_response({}, is_complete=True)
+
+            assert agent.current_state == DeveloperState.failed
 
 
 class TestIsTerminal:
@@ -752,13 +745,14 @@ class TestRunWorkflow:
 
     def test_run_workflow_loop_detection(self) -> None:
         """Test run_workflow returns loop_detected outcome when max_iterations exceeded."""
-        agent = DeveloperAgent(max_iterations=2)
+        with patch.object(get_settings().developer, "max_iterations", 2):
+            agent = DeveloperAgent()
 
-        # With very low max_iterations, workflow should hit loop detection
-        outcome, decisions = agent.run_workflow("Test prompt")
+            # With very low max_iterations, workflow should hit loop detection
+            outcome, decisions = agent.run_workflow("Test prompt")
 
-        assert outcome == Outcome.loop_detected
-        assert agent.current_state == DeveloperState.failed
+            assert outcome == Outcome.loop_detected
+            assert agent.current_state == DeveloperState.failed
 
     def test_run_workflow_resets_iteration_count(self) -> None:
         """Test run_workflow resets iteration count at start."""
@@ -837,15 +831,6 @@ class TestReset:
 
         assert agent.fallback_responses == fallbacks
 
-    def test_reset_preserves_max_iterations(self) -> None:
-        """Test reset preserves max_iterations setting."""
-        agent = DeveloperAgent(max_iterations=50)
-        agent.current_state = DeveloperState.failed
-
-        agent.reset()
-
-        assert agent.max_iterations == 50
-
     def test_reset_allows_reuse(self) -> None:
         """Test that reset allows agent to be reused for new workflow."""
         agent = DeveloperAgent()
@@ -877,21 +862,21 @@ class TestExceptionClasses:
 
     def test_loop_detected_error_message(self) -> None:
         """Test LoopDetectedError includes iteration information."""
-        agent = DeveloperAgent(
-            max_iterations=1,
-            current_state=DeveloperState.awaiting_response,
-        )
+        with patch.object(get_settings().developer, "max_iterations", 1):
+            agent = DeveloperAgent(
+                current_state=DeveloperState.awaiting_response,
+            )
 
-        agent.handle_response({}, is_complete=True)
-        agent.current_state = DeveloperState.awaiting_response
-
-        with pytest.raises(LoopDetectedError) as exc_info:
             agent.handle_response({}, is_complete=True)
+            agent.current_state = DeveloperState.awaiting_response
 
-        error_message = str(exc_info.value)
-        assert "max_iterations" in error_message
-        assert "2" in error_message  # iteration count
-        assert "1" in error_message  # max_iterations
+            with pytest.raises(LoopDetectedError) as exc_info:
+                agent.handle_response({}, is_complete=True)
+
+            error_message = str(exc_info.value)
+            assert "max_iterations" in error_message
+            assert "2" in error_message  # iteration count
+            assert "1" in error_message  # max_iterations
 
 
 class TestWorkflowWithCallbacks:
