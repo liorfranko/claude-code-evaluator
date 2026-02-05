@@ -8,7 +8,7 @@ comprehensive validation.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 import yaml
 
@@ -26,208 +26,10 @@ from claude_evaluator.config.models import (
     Phase,
     RepositorySource,
 )
+from claude_evaluator.config.validators import FieldValidator
 from claude_evaluator.models.enums import PermissionMode, WorkflowType
 
-# Type alias for unvalidated data from YAML parsing
-UnvalidatedData: TypeAlias = Any
-
 __all__ = ["load_suite", "apply_defaults"]
-
-
-# =============================================================================
-# Validation Helpers
-# =============================================================================
-
-
-def _require_string(data: dict[str, Any], field: str, context: str) -> str:
-    """Validate and extract a required non-empty string field.
-
-    Args:
-        data: Dictionary containing the field.
-        field: Name of the field to validate.
-        context: Context string for error messages.
-
-    Returns:
-        The stripped string value.
-
-    Raises:
-        ConfigurationError: If field is missing or not a non-empty string.
-
-    """
-    if field not in data:
-        raise ConfigurationError(f"Missing required field '{field}' in {context}")
-    value = data[field]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigurationError(
-            f"Invalid '{field}': must be a non-empty string in {context}"
-        )
-    return value.strip()
-
-
-def _optional_int(data: dict[str, Any], field: str, context: str) -> int | None:
-    """Validate and extract an optional integer field.
-
-    Args:
-        data: Dictionary containing the field.
-        field: Name of the field to validate.
-        context: Context string for error messages.
-
-    Returns:
-        The integer value or None if not present.
-
-    Raises:
-        ConfigurationError: If field is present but not an integer.
-
-    """
-    value = data.get(field)
-    if value is not None and not isinstance(value, int):
-        raise ConfigurationError(f"Invalid '{field}': expected integer in {context}")
-    return value
-
-
-def _optional_number(data: dict[str, Any], field: str, context: str) -> float | None:
-    """Validate and extract an optional number (int or float) field.
-
-    Args:
-        data: Dictionary containing the field.
-        field: Name of the field to validate.
-        context: Context string for error messages.
-
-    Returns:
-        The float value or None if not present.
-
-    Raises:
-        ConfigurationError: If field is present but not a number.
-
-    """
-    value = data.get(field)
-    if value is not None and not isinstance(value, (int, float)):
-        raise ConfigurationError(f"Invalid '{field}': expected number in {context}")
-    return float(value) if value is not None else None
-
-
-def _optional_string(data: dict[str, Any], field: str, context: str) -> str | None:
-    """Validate and extract an optional string field.
-
-    Args:
-        data: Dictionary containing the field.
-        field: Name of the field to validate.
-        context: Context string for error messages.
-
-    Returns:
-        The string value or None if not present.
-
-    Raises:
-        ConfigurationError: If field is present but not a string.
-
-    """
-    value = data.get(field)
-    if value is not None and not isinstance(value, str):
-        raise ConfigurationError(f"Invalid '{field}': expected string in {context}")
-    return value
-
-
-def _optional_bool(
-    data: dict[str, Any], field: str, context: str, default: bool = True
-) -> bool:
-    """Validate and extract an optional boolean field with default.
-
-    Args:
-        data: Dictionary containing the field.
-        field: Name of the field to validate.
-        context: Context string for error messages.
-        default: Default value if field is not present.
-
-    Returns:
-        The boolean value or default if not present.
-
-    Raises:
-        ConfigurationError: If field is present but not a boolean.
-
-    """
-    value = data.get(field, default)
-    if not isinstance(value, bool):
-        raise ConfigurationError(f"Invalid '{field}': expected boolean in {context}")
-    return value
-
-
-def _optional_string_list(
-    data: dict[str, Any], field: str, context: str
-) -> list[str] | None:
-    """Validate and extract an optional list of strings field.
-
-    Args:
-        data: Dictionary containing the field.
-        field: Name of the field to validate.
-        context: Context string for error messages.
-
-    Returns:
-        The list of strings or None if not present.
-
-    Raises:
-        ConfigurationError: If field is not a list or contains non-strings.
-
-    """
-    value = data.get(field)
-    if value is None:
-        return None
-    if not isinstance(value, list):
-        raise ConfigurationError(f"Invalid '{field}': expected list in {context}")
-    if not all(isinstance(item, str) for item in value):
-        raise ConfigurationError(
-            f"Invalid '{field}': all items must be strings in {context}"
-        )
-    return value
-
-
-def _require_non_empty_list(
-    data: dict[str, Any], field: str, context: str
-) -> list[Any]:
-    """Validate and extract a required non-empty list field.
-
-    Args:
-        data: Dictionary containing the field.
-        field: Name of the field to validate.
-        context: Context string for error messages.
-
-    Returns:
-        The list value.
-
-    Raises:
-        ConfigurationError: If field is missing, not a list, or empty.
-
-    """
-    if field not in data:
-        raise ConfigurationError(f"Missing required field '{field}' in {context}")
-    value = data[field]
-    if not isinstance(value, list):
-        raise ConfigurationError(
-            f"Invalid '{field}': expected list, got {type(value).__name__} in {context}"
-        )
-    if not value:
-        raise ConfigurationError(f"Empty '{field}' list in {context}")
-    return value
-
-
-def _require_mapping(data: UnvalidatedData, context: str) -> dict[str, Any]:
-    """Validate that data is a dictionary/mapping.
-
-    Args:
-        data: The value to validate.
-        context: Context string for error messages.
-
-    Returns:
-        The data if it's a dict.
-
-    Raises:
-        ConfigurationError: If data is not a dict.
-
-    """
-    if not isinstance(data, dict):
-        raise ConfigurationError(
-            f"Invalid structure: expected mapping, got {type(data).__name__} in {context}"
-        )
-    return data
 
 
 def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
@@ -350,10 +152,11 @@ def _parse_suite(data: dict[str, Any], source_path: Path) -> EvaluationSuite:
 
     """
     context = f"suite: {source_path}"
+    v = FieldValidator(data, context)
 
-    # Validate required fields using helpers
-    name = _require_string(data, "name", context)
-    evaluations_data = _require_non_empty_list(data, "evaluations", context)
+    # Validate required fields
+    name = v.require("name", str, transform=str.strip, empty_check=True)
+    evaluations_data = v.require_list("evaluations")
 
     # Parse optional defaults
     defaults = None
@@ -369,8 +172,8 @@ def _parse_suite(data: dict[str, Any], source_path: Path) -> EvaluationSuite:
     return EvaluationSuite(
         name=name,
         evaluations=evaluations,
-        description=data.get("description"),
-        version=data.get("version"),
+        description=v.optional("description", str),
+        version=v.optional("version", str),
         defaults=defaults,
     )
 
@@ -390,27 +193,22 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> EvalDefaults:
 
     """
     context = f"defaults in {source_path}"
-    _require_mapping(data, context)
-
-    # Parse question_timeout_seconds with default
-    question_timeout = _optional_int(data, "question_timeout_seconds", context)
-    if question_timeout is None:
-        question_timeout = DEFAULT_QUESTION_TIMEOUT_SECONDS
-
-    # Parse context_window_size with default
-    context_window = _optional_int(data, "context_window_size", context)
-    if context_window is None:
-        context_window = DEFAULT_CONTEXT_WINDOW_SIZE
+    v = FieldValidator(data, context)
+    v.require_mapping()
 
     return EvalDefaults(
-        max_turns=_optional_int(data, "max_turns", context),
-        max_budget_usd=_optional_number(data, "max_budget_usd", context),
-        allowed_tools=_optional_string_list(data, "allowed_tools", context),
-        model=_optional_string(data, "model", context),
-        timeout_seconds=_optional_int(data, "timeout_seconds", context),
-        developer_qa_model=_optional_string(data, "developer_qa_model", context),
-        question_timeout_seconds=question_timeout,
-        context_window_size=context_window,
+        max_turns=v.optional("max_turns", int),
+        max_budget_usd=v.optional_number("max_budget_usd"),
+        allowed_tools=v.optional_list("allowed_tools", str),
+        model=v.optional("model", str),
+        timeout_seconds=v.optional("timeout_seconds", int),
+        developer_qa_model=v.optional("developer_qa_model", str),
+        question_timeout_seconds=v.optional(
+            "question_timeout_seconds", int, default=DEFAULT_QUESTION_TIMEOUT_SECONDS
+        ),
+        context_window_size=v.optional(
+            "context_window_size", int, default=DEFAULT_CONTEXT_WINDOW_SIZE
+        ),
     )
 
 
@@ -432,16 +230,17 @@ def _parse_evaluation(
 
     """
     context = f"evaluation[{index}] in {source_path}"
-    _require_mapping(data, context)
+    v = FieldValidator(data, context)
+    v.require_mapping()
 
-    # Validate required fields using helpers
-    eval_id = _require_string(data, "id", context)
-    name = _require_string(data, "name", context)
-    task = _require_string(data, "task", context)
+    # Validate required fields
+    eval_id = v.require("id", str, transform=str.strip, empty_check=True)
+    name = v.require("name", str, transform=str.strip, empty_check=True)
+    task = v.require("task", str, transform=str.strip, empty_check=True)
 
     # Parse optional workflow_type
     workflow_type: WorkflowType | None = None
-    workflow_type_str = _optional_string(data, "workflow_type", context)
+    workflow_type_str = v.optional("workflow_type", str)
     if workflow_type_str:
         try:
             workflow_type = WorkflowType(workflow_type_str)
@@ -483,14 +282,14 @@ def _parse_evaluation(
         task=task,
         phases=phases,
         workflow_type=workflow_type,
-        description=data.get("description"),
-        tags=_optional_string_list(data, "tags", context),
-        enabled=_optional_bool(data, "enabled", context, default=True),
-        max_turns=_optional_int(data, "max_turns", context),
-        max_budget_usd=_optional_number(data, "max_budget_usd", context),
-        timeout_seconds=_optional_int(data, "timeout_seconds", context),
-        model=_optional_string(data, "model", context),
-        developer_qa_model=_optional_string(data, "developer_qa_model", context),
+        description=v.optional("description", str),
+        tags=v.optional_list("tags", str),
+        enabled=v.optional("enabled", bool, default=True),
+        max_turns=v.optional("max_turns", int),
+        max_budget_usd=v.optional_number("max_budget_usd"),
+        timeout_seconds=v.optional("timeout_seconds", int),
+        model=v.optional("model", str),
+        developer_qa_model=v.optional("developer_qa_model", str),
         repository_source=repository_source,
     )
 
@@ -520,18 +319,21 @@ def _parse_repository_source(
             f"Invalid 'repository_source': expected mapping in {context}"
         )
 
-    url = _require_string(repo_data, "url", f"repository_source in {context}")
-    ref = _optional_string(repo_data, "ref", f"repository_source in {context}")
+    repo_context = f"repository_source in {context}"
+    v = FieldValidator(repo_data, repo_context)
+
+    url = v.require("url", str, transform=str.strip, empty_check=True)
+    ref = v.optional("ref", str)
 
     # Parse depth - can be int or "full"
     depth = repo_data.get("depth", 1)
     if not isinstance(depth, (int, str)):
         raise ConfigurationError(
-            f"Invalid 'depth': expected integer or 'full' in repository_source in {context}"
+            f"Invalid 'depth': expected integer or 'full' in {repo_context}"
         )
     if isinstance(depth, str) and depth != "full":
         raise ConfigurationError(
-            f"Invalid 'depth': string value must be 'full' in repository_source in {context}"
+            f"Invalid 'depth': string value must be 'full' in {repo_context}"
         )
 
     return RepositorySource(url=url, ref=ref, depth=depth)
@@ -553,11 +355,14 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
 
     """
     context = f"phase[{index}] in {parent_context}"
-    _require_mapping(data, context)
+    v = FieldValidator(data, context)
+    v.require_mapping()
 
     # Validate required fields
-    name = _require_string(data, "name", context)
-    permission_mode_str = _require_string(data, "permission_mode", context)
+    name = v.require("name", str, transform=str.strip, empty_check=True)
+    permission_mode_str = v.require(
+        "permission_mode", str, transform=str.strip, empty_check=True
+    )
 
     # Convert to PermissionMode enum
     try:
@@ -572,11 +377,9 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
     return Phase(
         name=name,
         permission_mode=permission_mode,
-        prompt=_optional_string(data, "prompt", context),
-        prompt_template=_optional_string(data, "prompt_template", context),
-        allowed_tools=_optional_string_list(data, "allowed_tools", context),
-        max_turns=_optional_int(data, "max_turns", context),
-        continue_session=_optional_bool(
-            data, "continue_session", context, default=True
-        ),
+        prompt=v.optional("prompt", str),
+        prompt_template=v.optional("prompt_template", str),
+        allowed_tools=v.optional_list("allowed_tools", str),
+        max_turns=v.optional("max_turns", int),
+        continue_session=v.optional("continue_session", bool, default=True),
     )

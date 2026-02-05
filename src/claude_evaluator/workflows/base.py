@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from claude_evaluator.core.agents.developer import DeveloperAgent
 from claude_evaluator.core.agents.worker_agent import WorkerAgent
+from claude_evaluator.core.formatters import QuestionFormatter
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.progress import ProgressEvent
@@ -84,6 +85,7 @@ class BaseWorkflow(ABC):
         model: str | None = None,
         max_turns: int | None = None,
         on_progress_callback: Callable[[ProgressEvent], None] | None = None,
+        enable_question_handling: bool = True,
     ) -> None:
         """Initialize the workflow with a metrics collector and optional defaults.
 
@@ -96,6 +98,9 @@ class BaseWorkflow(ABC):
             model: Model identifier for the WorkerAgent (optional).
             max_turns: Maximum conversation turns per query. Overrides defaults.
             on_progress_callback: Optional callback for progress events (verbose output).
+            enable_question_handling: Whether to configure the WorkerAgent
+                with a question callback. Set to False for tests or when
+                questions are not expected. Defaults to True.
 
         """
         self._metrics_collector = metrics_collector
@@ -107,6 +112,7 @@ class BaseWorkflow(ABC):
         self._on_progress_callback: Callable[[ProgressEvent], None] | None = (
             on_progress_callback
         )
+        self._enable_question_handling = enable_question_handling
 
         # Agents created per-execution
         self._developer: DeveloperAgent | None = None
@@ -178,6 +184,11 @@ class BaseWorkflow(ABC):
         return self._developer_qa_model
 
     @property
+    def enable_question_handling(self) -> bool:
+        """Whether question handling is enabled."""
+        return self._enable_question_handling
+
+    @property
     def metrics_collector(self) -> "MetricsCollector":
         """Get the metrics collector instance.
 
@@ -187,13 +198,17 @@ class BaseWorkflow(ABC):
         """
         return self._metrics_collector
 
-    @abstractmethod
     async def execute(self, evaluation: "Evaluation") -> "Metrics":
         """Execute the workflow for the given evaluation.
 
-        This is the main entry point for running a workflow. Implementations
-        should orchestrate the evaluation process, coordinating between agents
-        and collecting metrics.
+        This is the main entry point for running a workflow. It provides the
+        common lifecycle for all workflows:
+        1. Start execution and create agents
+        2. Configure question handling if enabled
+        3. Execute workflow-specific logic via _execute_workflow()
+        4. Handle errors and cleanup
+
+        Subclasses should override _execute_workflow() instead of this method.
 
         Args:
             evaluation: The Evaluation instance containing the task description and state.
@@ -203,9 +218,41 @@ class BaseWorkflow(ABC):
 
         Raises:
             Exception: If the workflow execution fails.
+            QuestionHandlingError: If question handling fails during execution.
 
         """
-        pass
+        self.on_execution_start(evaluation)
+        self._create_agents(evaluation)
+
+        try:
+            if self._enable_question_handling:
+                self.configure_worker_for_questions()
+            return await self._execute_workflow(evaluation)
+        except Exception as e:
+            self.on_execution_error(evaluation, e)
+            raise
+        finally:
+            await self.cleanup_worker(evaluation)
+
+    @abstractmethod
+    async def _execute_workflow(self, evaluation: "Evaluation") -> "Metrics":
+        """Execute the workflow-specific logic.
+
+        This method must be implemented by subclasses to define the actual
+        workflow execution. It is called after agents are created and question
+        handling is configured. The method should:
+        1. Execute the workflow phases/steps
+        2. Collect metrics via metrics_collector
+        3. Call on_execution_complete() and return the result
+
+        Args:
+            evaluation: The Evaluation instance containing the task description and state.
+
+        Returns:
+            A Metrics object by calling self.on_execution_complete(evaluation).
+
+        """
+        ...
 
     def on_execution_start(self, evaluation: "Evaluation") -> None:
         """Handle workflow execution start.
@@ -485,20 +532,8 @@ class BaseWorkflow(ABC):
             A truncated string representation of the questions.
 
         """
-        if not context.questions:
-            return "(no questions)"
-
-        summaries = []
-        for q in context.questions[:3]:  # Limit to first 3 questions
-            q_text = q.question
-            if len(q_text) > 80:
-                q_text = q_text[:77] + "..."
-            summaries.append(q_text)
-
-        result = "; ".join(summaries)
-        if len(context.questions) > 3:
-            result += f" (and {len(context.questions) - 3} more)"
-        return result
+        formatter = QuestionFormatter(max_questions=3, max_length=80)
+        return formatter.summarize(context.questions)
 
     async def cleanup_worker(self, evaluation: "Evaluation") -> None:
         """Clean up WorkerAgent resources and copy decisions to evaluation.

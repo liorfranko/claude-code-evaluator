@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.progress import ProgressEvent
+from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
@@ -76,6 +76,7 @@ class MultiCommandWorkflow(BaseWorkflow):
         model: str | None = None,
         max_turns: int | None = None,
         on_progress_callback: Callable[[ProgressEvent], None] | None = None,
+        enable_question_handling: bool = True,
     ) -> None:
         """Initialize the workflow with phases to execute.
 
@@ -86,9 +87,18 @@ class MultiCommandWorkflow(BaseWorkflow):
             model: Model identifier for the WorkerAgent (optional).
             max_turns: Maximum conversation turns per query. Overrides defaults.
             on_progress_callback: Optional callback for progress events (verbose output).
+            enable_question_handling: Whether to configure the WorkerAgent
+                with a question callback. Defaults to True.
 
         """
-        super().__init__(metrics_collector, defaults=defaults, model=model, max_turns=max_turns, on_progress_callback=on_progress_callback)
+        super().__init__(
+            metrics_collector,
+            defaults=defaults,
+            model=model,
+            max_turns=max_turns,
+            on_progress_callback=on_progress_callback,
+            enable_question_handling=enable_question_handling,
+        )
         self._phases = phases
         self._phase_results: dict[str, str] = {}
         self._current_phase_index: int = 0
@@ -120,7 +130,7 @@ class MultiCommandWorkflow(BaseWorkflow):
         """
         return self._phase_results.get(phase_name)
 
-    async def execute(self, evaluation: "Evaluation") -> "Metrics":
+    async def _execute_workflow(self, evaluation: "Evaluation") -> "Metrics":
         """Execute all phases sequentially.
 
         Performs execution by iterating through each configured phase,
@@ -133,40 +143,28 @@ class MultiCommandWorkflow(BaseWorkflow):
         Returns:
             A Metrics object containing all collected metrics from all phases.
 
-        Raises:
-            Exception: If any phase execution fails.
-
         """
-        self.on_execution_start(evaluation)
         logger.info(
             "execution_started",
             evaluation_id=str(evaluation.id),
             workflow_type=str(evaluation.workflow_type.value),
         )
-        # Create agents for this execution
-        self._create_agents(evaluation)
         logger.info("agents_created")
-        try:
-            previous_result: str | None = None
-            logger.info("phase_execution_starting", total_phases=len(self._phases))
-            for i, phase in enumerate(self._phases):
-                self._current_phase_index = i
-                previous_result = await self._execute_phase(
-                    evaluation=evaluation,
-                    phase=phase,
-                    previous_result=previous_result,
-                )
-                self._phase_results[phase.name] = previous_result or ""
 
-            # Complete and return aggregated metrics
-            return self.on_execution_complete(evaluation)
+        previous_result: str | None = None
+        logger.info("phase_execution_starting", total_phases=len(self._phases))
 
-        except Exception as e:
-            self.on_execution_error(evaluation, e)
-            raise
-        finally:
-            # Ensure cleanup happens even on error
-            await self.cleanup_worker(evaluation)
+        for i, phase in enumerate(self._phases):
+            self._current_phase_index = i
+            previous_result = await self._execute_phase(
+                evaluation=evaluation,
+                phase=phase,
+                previous_result=previous_result,
+            )
+            self._phase_results[phase.name] = previous_result or ""
+
+        # Complete and return aggregated metrics
+        return self.on_execution_complete(evaluation)
 
     async def _execute_phase(
         self,
@@ -203,9 +201,8 @@ class MultiCommandWorkflow(BaseWorkflow):
         if phase.max_turns is not None:
             worker.set_max_turns(phase.max_turns)
         logger.info("max_turns_configured", max_turns=worker.max_turns, phase=phase.name)
-        # Emit phase start event for verbose output
-        from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 
+        # Emit phase start event for verbose output
         worker._emit_progress(
             ProgressEvent(
                 event_type=ProgressEventType.PHASE_START,
@@ -226,6 +223,7 @@ class MultiCommandWorkflow(BaseWorkflow):
             allowed_tools=phase.allowed_tools,
             phase=phase.name,
         )
+
         # Build the prompt for this phase
         prompt = self._build_prompt(
             phase=phase,
@@ -233,6 +231,7 @@ class MultiCommandWorkflow(BaseWorkflow):
             previous_result=previous_result,
         )
         logger.info("prompt_built", phase=phase.name, prompt_length=len(prompt))
+
         # Execute the phase query
         # Resume session if continue_session is True and not the first phase
         should_resume = phase.continue_session and self._current_phase_index > 0
@@ -276,6 +275,7 @@ class MultiCommandWorkflow(BaseWorkflow):
         )
         continuation_count = 0
         developer = self._developer
+
         # Only invoke developer continuation if developer exists, has answer_question capability,
         # and there's a response to analyze
         while (
