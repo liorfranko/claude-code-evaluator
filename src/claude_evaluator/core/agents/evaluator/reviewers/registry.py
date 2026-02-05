@@ -13,7 +13,10 @@ import structlog
 from pydantic import Field
 
 from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
+from typing import Any
+
 from claude_evaluator.core.agents.evaluator.reviewers.base import (
+    IssueSeverity,
     ReviewContext,
     ReviewerBase,
     ReviewerOutput,
@@ -305,3 +308,87 @@ class ReviewerRegistry:
         )
 
         return outputs
+
+    def aggregate_outputs(self, outputs: list[ReviewerOutput]) -> dict[str, Any]:
+        """Aggregate results from all reviewer outputs.
+
+        Combines issues by severity, collects all strengths, and computes
+        summary statistics across all reviewer outputs.
+
+        Args:
+            outputs: List of ReviewerOutput from all reviewers.
+
+        Returns:
+            Aggregated dictionary with:
+                - total_issues: Total count of all issues
+                - issues_by_severity: Dict mapping severity to issue count
+                - all_issues: List of all issues from all reviewers
+                - all_strengths: List of all strengths from all reviewers
+                - average_confidence: Average confidence score (non-skipped only)
+                - total_execution_time_ms: Sum of all execution times
+                - reviewer_count: Total number of reviewers
+                - skipped_count: Number of skipped reviewers
+
+        """
+        all_issues: list[dict[str, Any]] = []
+        all_strengths: list[str] = []
+        issues_by_severity: dict[str, int] = {
+            severity.value: 0 for severity in IssueSeverity
+        }
+
+        total_confidence = 0
+        confidence_count = 0
+        total_execution_time_ms = 0
+        skipped_count = 0
+
+        for output in outputs:
+            if output.skipped:
+                skipped_count += 1
+                continue
+
+            # Aggregate issues
+            for issue in output.issues:
+                all_issues.append({
+                    "reviewer": output.reviewer_name,
+                    "severity": issue.severity.value,
+                    "file_path": issue.file_path,
+                    "line_number": issue.line_number,
+                    "message": issue.message,
+                    "suggestion": issue.suggestion,
+                    "confidence": issue.confidence,
+                })
+                issues_by_severity[issue.severity.value] += 1
+
+            # Aggregate strengths
+            for strength in output.strengths:
+                all_strengths.append(f"[{output.reviewer_name}] {strength}")
+
+            # Accumulate statistics
+            total_confidence += output.confidence_score
+            confidence_count += 1
+            total_execution_time_ms += output.execution_time_ms
+
+        # Calculate average confidence
+        average_confidence = (
+            total_confidence / confidence_count if confidence_count > 0 else 0
+        )
+
+        aggregated = {
+            "total_issues": len(all_issues),
+            "issues_by_severity": issues_by_severity,
+            "all_issues": all_issues,
+            "all_strengths": all_strengths,
+            "average_confidence": round(average_confidence, 2),
+            "total_execution_time_ms": total_execution_time_ms,
+            "reviewer_count": len(outputs),
+            "skipped_count": skipped_count,
+        }
+
+        logger.info(
+            "outputs_aggregated",
+            total_issues=len(all_issues),
+            average_confidence=average_confidence,
+            skipped_count=skipped_count,
+        )
+
+        return aggregated
