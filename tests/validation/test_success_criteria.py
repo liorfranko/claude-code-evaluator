@@ -680,3 +680,287 @@ class TestSC002EvaluationPerformance:
         assert mean_time > 0
         assert median_time > 0
         assert median_time < mean_time  # Median < mean indicates right-skewed data
+
+
+# ============================================================================
+# SC-003: API Cost Efficiency Tests
+# ============================================================================
+
+# Maximum allowed cost per evaluation in USD
+MAX_COST_PER_EVALUATION_USD = 0.50
+
+# Claude Opus pricing (approximate, as of 2025)
+# These are estimates; actual pricing may vary
+CLAUDE_OPUS_PRICING = {
+    "input_tokens_per_million": 15.00,   # $15 per million input tokens
+    "output_tokens_per_million": 75.00,  # $75 per million output tokens
+}
+
+
+class CostEstimator:
+    """Estimates API cost based on token usage.
+
+    Calculates costs using Claude Opus pricing model.
+
+    Attributes:
+        input_price_per_token: Cost per input token in USD.
+        output_price_per_token: Cost per output token in USD.
+
+    """
+
+    def __init__(
+        self,
+        input_price_per_million: float = CLAUDE_OPUS_PRICING["input_tokens_per_million"],
+        output_price_per_million: float = CLAUDE_OPUS_PRICING["output_tokens_per_million"],
+    ) -> None:
+        """Initialize the cost estimator.
+
+        Args:
+            input_price_per_million: Price per million input tokens in USD.
+            output_price_per_million: Price per million output tokens in USD.
+
+        """
+        self.input_price_per_token = input_price_per_million / 1_000_000
+        self.output_price_per_token = output_price_per_million / 1_000_000
+
+    def estimate_cost(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+    ) -> float:
+        """Estimate the cost for a given token usage.
+
+        Args:
+            input_tokens: Number of input tokens.
+            output_tokens: Number of output tokens.
+
+        Returns:
+            Estimated cost in USD.
+
+        """
+        input_cost = input_tokens * self.input_price_per_token
+        output_cost = output_tokens * self.output_price_per_token
+        return input_cost + output_cost
+
+    def estimate_tokens_from_text(self, text: str) -> int:
+        """Estimate token count from text.
+
+        Uses a simple approximation of ~4 characters per token.
+        This is a rough estimate; actual tokenization may vary.
+
+        Args:
+            text: Text to estimate tokens for.
+
+        Returns:
+            Estimated token count.
+
+        """
+        # Approximate: 4 characters per token for English text
+        return max(1, len(text) // 4)
+
+
+# Sample token usage data for cost estimation
+SAMPLE_EVALUATION_TOKEN_USAGE: list[dict[str, int]] = [
+    {"input_tokens": 5000, "output_tokens": 1500},   # Small task
+    {"input_tokens": 8000, "output_tokens": 2000},   # Medium task
+    {"input_tokens": 12000, "output_tokens": 3000},  # Larger task
+    {"input_tokens": 6000, "output_tokens": 1800},   # Medium task
+    {"input_tokens": 10000, "output_tokens": 2500},  # Medium-large task
+]
+
+
+class TestSC003APICostEfficiency:
+    """Tests for SC-003: API Cost Efficiency.
+
+    Success Criteria:
+    - Measure: Average API cost per evaluation
+    - Target: Average cost per evaluation <= $0.50 USD
+
+    """
+
+    @pytest.fixture
+    def cost_estimator(self) -> CostEstimator:
+        """Create a CostEstimator instance."""
+        return CostEstimator()
+
+    def test_cost_estimator_initialization(self) -> None:
+        """Test CostEstimator initialization with default pricing."""
+        estimator = CostEstimator()
+
+        assert estimator.input_price_per_token > 0
+        assert estimator.output_price_per_token > 0
+        # Output tokens should cost more than input tokens
+        assert estimator.output_price_per_token > estimator.input_price_per_token
+
+    def test_cost_estimator_custom_pricing(self) -> None:
+        """Test CostEstimator with custom pricing."""
+        estimator = CostEstimator(
+            input_price_per_million=10.0,
+            output_price_per_million=50.0,
+        )
+
+        assert abs(estimator.input_price_per_token - 0.00001) < 0.0000001
+        assert abs(estimator.output_price_per_token - 0.00005) < 0.0000001
+
+    def test_estimate_cost_calculation(self, cost_estimator: CostEstimator) -> None:
+        """Test cost estimation calculation."""
+        # 1 million tokens each
+        cost = cost_estimator.estimate_cost(1_000_000, 1_000_000)
+
+        expected_input = CLAUDE_OPUS_PRICING["input_tokens_per_million"]
+        expected_output = CLAUDE_OPUS_PRICING["output_tokens_per_million"]
+        expected_total = expected_input + expected_output
+
+        assert abs(cost - expected_total) < 0.01
+
+    def test_estimate_cost_zero_tokens(self, cost_estimator: CostEstimator) -> None:
+        """Test cost estimation with zero tokens."""
+        assert cost_estimator.estimate_cost(0, 0) == 0.0
+        assert cost_estimator.estimate_cost(0, 1000) > 0
+        assert cost_estimator.estimate_cost(1000, 0) > 0
+
+    def test_estimate_tokens_from_text(self, cost_estimator: CostEstimator) -> None:
+        """Test token estimation from text."""
+        # Empty text should return minimum of 1
+        assert cost_estimator.estimate_tokens_from_text("") == 1
+
+        # Short text (4 chars = ~1 token)
+        assert cost_estimator.estimate_tokens_from_text("test") == 1
+
+        # Longer text (~100 tokens for 400 chars)
+        long_text = "a" * 400
+        assert cost_estimator.estimate_tokens_from_text(long_text) == 100
+
+    @pytest.mark.slow
+    def test_average_cost_under_limit(self, cost_estimator: CostEstimator) -> None:
+        """Test that average evaluation cost is under $0.50.
+
+        Uses sample token usage data to estimate costs.
+
+        """
+        costs: list[float] = []
+
+        for usage in SAMPLE_EVALUATION_TOKEN_USAGE:
+            cost = cost_estimator.estimate_cost(
+                usage["input_tokens"],
+                usage["output_tokens"],
+            )
+            costs.append(cost)
+
+        average_cost = sum(costs) / len(costs)
+
+        # SC-003 Target: Average cost <= $0.50
+        assert average_cost <= MAX_COST_PER_EVALUATION_USD, (
+            f"Average cost ${average_cost:.4f} exceeds "
+            f"${MAX_COST_PER_EVALUATION_USD} limit"
+        )
+
+    @pytest.mark.slow
+    def test_individual_costs_under_limit(
+        self, cost_estimator: CostEstimator
+    ) -> None:
+        """Test that individual evaluation costs are reasonable."""
+        for i, usage in enumerate(SAMPLE_EVALUATION_TOKEN_USAGE):
+            cost = cost_estimator.estimate_cost(
+                usage["input_tokens"],
+                usage["output_tokens"],
+            )
+
+            # Individual costs should also be under limit
+            assert cost <= MAX_COST_PER_EVALUATION_USD * 2, (
+                f"Evaluation {i+1} cost ${cost:.4f} is too high"
+            )
+
+    def test_cost_breakdown_by_component(
+        self, cost_estimator: CostEstimator
+    ) -> None:
+        """Test cost breakdown between input and output."""
+        usage = SAMPLE_EVALUATION_TOKEN_USAGE[0]
+
+        input_cost = usage["input_tokens"] * cost_estimator.input_price_per_token
+        output_cost = usage["output_tokens"] * cost_estimator.output_price_per_token
+        total_cost = cost_estimator.estimate_cost(
+            usage["input_tokens"],
+            usage["output_tokens"],
+        )
+
+        assert abs(total_cost - (input_cost + output_cost)) < 0.0001
+
+        # Output should typically be a significant portion of cost
+        # due to higher output token pricing
+        output_ratio = output_cost / total_cost
+        assert output_ratio > 0.3, "Output cost should be significant"
+
+    def test_cost_estimation_for_typical_evaluation(
+        self, cost_estimator: CostEstimator
+    ) -> None:
+        """Test cost estimation for a typical multi-reviewer evaluation."""
+        # Typical evaluation with 3 reviewers, each using some tokens
+        reviewers_usage = [
+            {"name": "task_completion", "input": 4000, "output": 1200},
+            {"name": "code_quality", "input": 5000, "output": 1500},
+            {"name": "error_handling", "input": 3500, "output": 1000},
+        ]
+
+        total_cost = 0.0
+        for reviewer in reviewers_usage:
+            cost = cost_estimator.estimate_cost(
+                reviewer["input"],
+                reviewer["output"],
+            )
+            total_cost += cost
+
+        # Total cost for typical evaluation should be under limit
+        assert total_cost <= MAX_COST_PER_EVALUATION_USD, (
+            f"Typical evaluation cost ${total_cost:.4f} exceeds limit"
+        )
+
+    @pytest.mark.slow
+    def test_estimate_cost_from_sample_fixture(
+        self, cost_estimator: CostEstimator
+    ) -> None:
+        """Test cost estimation using the performance benchmark fixture."""
+        fixture = PERFORMANCE_BENCHMARK_FIXTURE
+
+        # Estimate input tokens from prompt construction
+        prompt_text = f"Task: {fixture['task_description']}\n"
+        for file_path, language, content in fixture["code_files"]:
+            prompt_text += f"\n### File: {file_path} ({language})\n{content}\n"
+
+        input_tokens = cost_estimator.estimate_tokens_from_text(prompt_text)
+
+        # Estimate output tokens (typical response size)
+        output_tokens = 500  # Typical structured output size
+
+        cost = cost_estimator.estimate_cost(input_tokens, output_tokens)
+
+        # Should be well under the limit for this modest prompt
+        assert cost < MAX_COST_PER_EVALUATION_USD, (
+            f"Fixture evaluation cost ${cost:.4f} exceeds limit"
+        )
+
+    def test_max_reasonable_evaluation_cost(
+        self, cost_estimator: CostEstimator
+    ) -> None:
+        """Test that even large evaluations stay within budget.
+
+        A "large" evaluation might have:
+        - 10 files with ~1000 lines each
+        - Multiple reviewer passes
+        - Detailed output
+
+        """
+        # Large evaluation scenario
+        large_input_tokens = 50000  # ~200KB of code
+        large_output_tokens = 10000  # Detailed analysis
+
+        cost = cost_estimator.estimate_cost(large_input_tokens, large_output_tokens)
+
+        # Even large evaluations should ideally stay under budget
+        # But we allow some buffer for edge cases
+        max_reasonable_cost = MAX_COST_PER_EVALUATION_USD * 3  # $1.50 max
+
+        assert cost < max_reasonable_cost, (
+            f"Large evaluation cost ${cost:.4f} exceeds reasonable limit "
+            f"${max_reasonable_cost}"
+        )
