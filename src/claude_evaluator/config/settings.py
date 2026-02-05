@@ -12,7 +12,7 @@ Environment Variables:
     CLAUDE_DEVELOPER_CONTEXT_WINDOW_SIZE: Conversation context size
     CLAUDE_DEVELOPER_MAX_ANSWER_RETRIES: Maximum answer retry attempts
     CLAUDE_DEVELOPER_MAX_ITERATIONS: Maximum loop iterations
-    CLAUDE_EVALUATOR_MODEL: Gemini model for evaluation scoring
+    CLAUDE_EVALUATOR_MODEL: Claude model for evaluation scoring
     CLAUDE_EVALUATOR_TIMEOUT_SECONDS: Evaluation operation timeout
     CLAUDE_EVALUATOR_TEMPERATURE: LLM temperature for scoring
     CLAUDE_EVALUATOR_ENABLE_AST_PARSING: Enable tree-sitter AST parsing
@@ -29,12 +29,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from claude_evaluator.config.defaults import (
     CONTEXT_WINDOW_MAX,
     CONTEXT_WINDOW_MIN,
+    DEFAULT_CLAUDE_EVALUATOR_MODEL,
     DEFAULT_CODE_QUALITY_WEIGHT,
     DEFAULT_CONTEXT_WINDOW_SIZE,
     DEFAULT_EFFICIENCY_WEIGHT,
     DEFAULT_EVALUATION_TIMEOUT_SECONDS,
     DEFAULT_EVALUATOR_ENABLE_AST,
-    DEFAULT_EVALUATOR_MODEL,
     DEFAULT_EVALUATOR_TEMPERATURE,
     DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
     DEFAULT_MAX_ANSWER_RETRIES,
@@ -135,7 +135,7 @@ class EvaluatorSettings(BaseSettings):
     """Settings for the EvaluatorAgent.
 
     Attributes:
-        model: Gemini model identifier for evaluation scoring.
+        model: Claude model identifier for evaluation scoring.
         timeout_seconds: Timeout for evaluation operations.
         temperature: LLM temperature for scoring (lower = more deterministic).
         enable_ast_parsing: Whether to use tree-sitter AST parsing.
@@ -151,8 +151,8 @@ class EvaluatorSettings(BaseSettings):
     )
 
     model: str = Field(
-        default=DEFAULT_EVALUATOR_MODEL,
-        description="Gemini model identifier for evaluation scoring",
+        default=DEFAULT_CLAUDE_EVALUATOR_MODEL,
+        description="Claude model identifier for evaluation scoring",
     )
     timeout_seconds: int = Field(
         default=DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
