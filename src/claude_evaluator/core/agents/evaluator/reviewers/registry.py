@@ -310,6 +310,63 @@ class ReviewerRegistry:
         )
         return disabled
 
+    def get_effective_min_confidence(self, reviewer: ReviewerBase) -> int:
+        """Get the effective min_confidence for a reviewer.
+
+        Returns the config override if set, otherwise the reviewer's default.
+        This allows per-reviewer min_confidence customization via configuration.
+
+        Args:
+            reviewer: The reviewer to get min_confidence for.
+
+        Returns:
+            The effective min_confidence threshold (0-100).
+
+        Example:
+            >>> # Config sets min_confidence=75 for task_completion
+            >>> confidence = registry.get_effective_min_confidence(task_reviewer)
+            >>> print(confidence)
+            75
+
+        """
+        config = self.configs.get(reviewer.reviewer_id)
+        if config is not None and config.min_confidence is not None:
+            return config.min_confidence
+        return reviewer.min_confidence
+
+    def _filter_by_configured_confidence(
+        self, reviewer: ReviewerBase, output: ReviewerOutput
+    ) -> ReviewerOutput:
+        """Filter issues using configured min_confidence threshold.
+
+        Returns a new ReviewerOutput with only issues that meet or exceed
+        the effective min_confidence threshold (from config or reviewer default).
+
+        Args:
+            reviewer: The reviewer that produced the output.
+            output: The original ReviewerOutput to filter.
+
+        Returns:
+            A new ReviewerOutput with low-confidence issues removed.
+
+        """
+        effective_min_confidence = self.get_effective_min_confidence(reviewer)
+
+        filtered_issues = [
+            issue for issue in output.issues
+            if issue.confidence >= effective_min_confidence
+        ]
+
+        return ReviewerOutput(
+            reviewer_name=output.reviewer_name,
+            confidence_score=output.confidence_score,
+            issues=filtered_issues,
+            strengths=output.strengths,
+            execution_time_ms=output.execution_time_ms,
+            skipped=output.skipped,
+            skip_reason=output.skip_reason,
+        )
+
     async def run_all(self, context: ReviewContext) -> list[ReviewerOutput]:
         """Execute all enabled reviewers on the provided context.
 
@@ -359,8 +416,9 @@ class ReviewerRegistry:
 
                 output = await reviewer.review(context)
 
-                # Apply confidence filtering
-                filtered_output = reviewer.filter_by_confidence(output)
+                # Apply confidence filtering with config override support
+                effective_min_confidence = self.get_effective_min_confidence(reviewer)
+                filtered_output = self._filter_by_configured_confidence(reviewer, output)
                 outputs.append(filtered_output)
 
                 logger.debug(
@@ -368,6 +426,7 @@ class ReviewerRegistry:
                     reviewer_id=reviewer.reviewer_id,
                     issue_count=len(filtered_output.issues),
                     execution_time_ms=filtered_output.execution_time_ms,
+                    effective_min_confidence=effective_min_confidence,
                 )
 
             except Exception as e:
