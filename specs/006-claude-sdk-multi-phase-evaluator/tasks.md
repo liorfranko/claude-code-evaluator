@@ -81,10 +81,10 @@ Story: As a developer, I want to evaluate a completed coding task using multiple
 - [x] T205 [US1] Add error handling prompt template (src/claude_evaluator/core/agents/evaluator/prompts.py)
 
 ### EvaluatorAgent Integration
-- [ ] T210 [US1] Refactor EvaluatorAgent to use ClaudeClient (src/claude_evaluator/core/agents/evaluator/agent.py)
-- [ ] T211 [US1] Integrate ReviewerRegistry into EvaluatorAgent (src/claude_evaluator/core/agents/evaluator/agent.py)
-- [ ] T212 [US1] Implement evaluation flow executing all reviewers (src/claude_evaluator/core/agents/evaluator/agent.py)
-- [ ] T213 [US1] Create EvaluationReport aggregation from ReviewerOutputs (src/claude_evaluator/core/agents/evaluator/agent.py)
+- [x] T210 [US1] Refactor EvaluatorAgent to use ClaudeClient (src/claude_evaluator/core/agents/evaluator/agent.py)
+- [x] T211 [US1] Integrate ReviewerRegistry into EvaluatorAgent (src/claude_evaluator/core/agents/evaluator/agent.py)
+- [x] T212 [US1] Implement evaluation flow executing all reviewers (src/claude_evaluator/core/agents/evaluator/agent.py)
+- [x] T213 [US1] Create EvaluationReport aggregation from ReviewerOutputs (src/claude_evaluator/core/agents/evaluator/agent.py)
 
 ### Unit Tests for Reviewers
 - [ ] T220 [P] [US1] Write unit tests for TaskCompletionReviewer (tests/unit/evaluator/reviewers/test_task_completion.py)
