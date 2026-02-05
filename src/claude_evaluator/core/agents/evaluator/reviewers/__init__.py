@@ -1,29 +1,26 @@
 """Phase reviewers for multi-phase evaluation.
 
 This module provides auto-registration of phase reviewer implementations.
-Each reviewer module in this package should define a REVIEWER variable
-that implements the BasePhaseReviewer protocol.
+Each reviewer module in this package should define a class that inherits
+from ReviewerBase in the base module.
 
 The auto-registration system:
 1. Discovers all Python modules in the reviewers/ directory
-2. Imports modules that define a REVIEWER variable
-3. Collects reviewers into the REVIEWERS dictionary keyed by phase name
+2. Imports modules that contain ReviewerBase subclasses
+3. Collects reviewers into the REVIEWERS dictionary keyed by reviewer_id
 """
 
 import importlib
 import pkgutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict
+from typing import Any, Dict
 
 import structlog
 
-if TYPE_CHECKING:
-    from claude_evaluator.core.agents.evaluator.protocols import BasePhaseReviewer
-
 logger = structlog.get_logger()
 
-# Dictionary to store registered reviewers
-REVIEWERS: Dict[str, "BasePhaseReviewer"] = {}
+# Dictionary to store registered reviewers (populated after base.py is created)
+REVIEWERS: Dict[str, Any] = {}
 
 
 def _discover_reviewers() -> None:
