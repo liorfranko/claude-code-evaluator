@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from claude_evaluator.core.agents.evaluator.reviewers.base import (
+    ReviewerIssue,
     ReviewerOutput,
 )
 
@@ -63,6 +64,44 @@ class ReviewerOutputFormatter:
         return "\n".join(lines)
 
     @staticmethod
+    def format_issue(issue: ReviewerIssue) -> str:
+        """Format an issue with severity and confidence.
+
+        Creates a boxed display for an issue showing severity level
+        and confidence score in the header.
+
+        Args:
+            issue: The ReviewerIssue to format.
+
+        Returns:
+            Formatted issue string with severity and confidence.
+
+        """
+        # Format severity as uppercase for display
+        severity = issue.severity.value.upper()
+
+        # Build header line with severity and confidence
+        header = f"[{severity}] (confidence: {issue.confidence}%)"
+
+        # Box drawing characters
+        box_top = "\u250c\u2500"  # corner + horizontal line
+        box_mid = "\u2502"  # vertical line
+        box_bottom = "\u2514" + "\u2500" * 57  # bottom corner + horizontal line
+
+        lines = [
+            f"  {box_top}{header}",
+            f"  {box_mid} {issue.message}",
+        ]
+
+        # Add suggestion if present
+        if issue.suggestion:
+            lines.append(f"  {box_mid} Suggestion: {issue.suggestion}")
+
+        lines.append(f"  {box_bottom}")
+
+        return "\n".join(lines)
+
+    @staticmethod
     def format_output(output: ReviewerOutput) -> str:
         """Format complete ReviewerOutput for display.
 
@@ -76,7 +115,16 @@ class ReviewerOutputFormatter:
             Complete formatted output string.
 
         """
-        return ReviewerOutputFormatter.format_phase_header(output)
+        sections = [ReviewerOutputFormatter.format_phase_header(output)]
+
+        # Add issues section if there are any
+        if output.issues:
+            issue_count = len(output.issues)
+            sections.append(f"\nISSUES ({issue_count} found):")
+            for issue in output.issues:
+                sections.append(ReviewerOutputFormatter.format_issue(issue))
+
+        return "\n".join(sections)
 
 
 def format_reviewer_outputs(outputs: list[ReviewerOutput]) -> str:
