@@ -87,12 +87,12 @@ Story: As a developer, I want to evaluate a completed coding task using multiple
 - [x] T213 [US1] Create EvaluationReport aggregation from ReviewerOutputs (src/claude_evaluator/core/agents/evaluator/agent.py)
 
 ### Unit Tests for Reviewers
-- [ ] T220 [P] [US1] Write unit tests for TaskCompletionReviewer (tests/unit/evaluator/reviewers/test_task_completion.py)
-- [ ] T221 [P] [US1] Write unit tests for CodeQualityReviewer (tests/unit/evaluator/reviewers/test_code_quality.py)
-- [ ] T222 [P] [US1] Write unit tests for ErrorHandlingReviewer (tests/unit/evaluator/reviewers/test_error_handling.py)
+- [x] T220 [P] [US1] Write unit tests for TaskCompletionReviewer (tests/unit/evaluator/reviewers/test_task_completion.py)
+- [x] T221 [P] [US1] Write unit tests for CodeQualityReviewer (tests/unit/evaluator/reviewers/test_code_quality.py)
+- [x] T222 [P] [US1] Write unit tests for ErrorHandlingReviewer (tests/unit/evaluator/reviewers/test_error_handling.py)
 
 ### Checkpoint
-- [ ] T229 [US1] CHECKPOINT: Verify multi-phase evaluation executes all reviewers and produces aggregated report
+- [x] T229 [US1] CHECKPOINT: Verify multi-phase evaluation executes all reviewers and produces aggregated report
 
 ---
 
