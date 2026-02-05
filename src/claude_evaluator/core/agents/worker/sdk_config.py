@@ -29,8 +29,6 @@ __all__ = ["SDKConfigBuilder"]
 logger = get_logger(__name__)
 
 
-
-
 class SDKConfigBuilder:
     """Builds SDK configuration options for Claude Code execution.
 

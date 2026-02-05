@@ -129,7 +129,9 @@ class BaseWorkflow(ABC):
             if self._model is None:
                 self._model = defaults.model
 
-    def _create_agents(self, evaluation: "Evaluation") -> tuple[DeveloperAgent, WorkerAgent]:
+    def _create_agents(
+        self, evaluation: "Evaluation"
+    ) -> tuple[DeveloperAgent, WorkerAgent]:
         """Create agents for this workflow execution.
 
         Creates DeveloperAgent and WorkerAgent configured for the evaluation.

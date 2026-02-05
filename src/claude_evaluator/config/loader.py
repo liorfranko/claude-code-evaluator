@@ -516,20 +516,18 @@ def _parse_single_reviewer_config(
     timeout_seconds = v.optional("timeout_seconds", int)
 
     # Validate min_confidence range if provided
-    if min_confidence is not None:
-        if not 0 <= min_confidence <= 100:
-            raise ConfigurationError(
-                f"Invalid 'min_confidence' in {context}: must be between 0 and 100, "
-                f"got {min_confidence}"
-            )
+    if min_confidence is not None and not 0 <= min_confidence <= 100:
+        raise ConfigurationError(
+            f"Invalid 'min_confidence' in {context}: must be between 0 and 100, "
+            f"got {min_confidence}"
+        )
 
     # Validate timeout_seconds if provided
-    if timeout_seconds is not None:
-        if timeout_seconds < 1:
-            raise ConfigurationError(
-                f"Invalid 'timeout_seconds' in {context}: must be >= 1, "
-                f"got {timeout_seconds}"
-            )
+    if timeout_seconds is not None and timeout_seconds < 1:
+        raise ConfigurationError(
+            f"Invalid 'timeout_seconds' in {context}: must be >= 1, "
+            f"got {timeout_seconds}"
+        )
 
     return ReviewerConfig(
         reviewer_id=reviewer_id,

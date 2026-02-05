@@ -160,7 +160,9 @@ class RunEvaluationCommand(BaseCommand):
             print(f"model: {model}")
         try:
             # Execute workflow
-            workflow = self._create_workflow(workflow_type, collector, phases, model, verbose, max_turns)
+            workflow = self._create_workflow(
+                workflow_type, collector, phases, model, verbose, max_turns
+            )
             await workflow.execute_with_timeout(evaluation, effective_timeout)
 
             if verbose:
@@ -244,9 +246,19 @@ class RunEvaluationCommand(BaseCommand):
         progress_callback = create_progress_callback() if verbose else None
 
         if workflow_type == WorkflowType.direct:
-            return DirectWorkflow(collector, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
+            return DirectWorkflow(
+                collector,
+                max_turns=max_turns,
+                model=model,
+                on_progress_callback=progress_callback,
+            )
         elif workflow_type == WorkflowType.plan_then_implement:
-            return PlanThenImplementWorkflow(collector, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
+            return PlanThenImplementWorkflow(
+                collector,
+                max_turns=max_turns,
+                model=model,
+                on_progress_callback=progress_callback,
+            )
         elif workflow_type == WorkflowType.multi_command:
             if phases is None:
                 phases = [
@@ -256,7 +268,13 @@ class RunEvaluationCommand(BaseCommand):
                         prompt_template="{task}",
                     ),
                 ]
-            return MultiCommandWorkflow(collector, phases, max_turns=max_turns, model=model, on_progress_callback=progress_callback)
+            return MultiCommandWorkflow(
+                collector,
+                phases,
+                max_turns=max_turns,
+                model=model,
+                on_progress_callback=progress_callback,
+            )
         else:
             raise ValueError(f"Unknown workflow type: {workflow_type}")
 

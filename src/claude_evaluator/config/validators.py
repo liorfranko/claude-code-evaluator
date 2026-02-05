@@ -225,7 +225,9 @@ class FieldValidator:
         if non_empty and not value:
             raise ConfigurationError(f"Empty '{field}' list in {self._context}")
 
-        if item_type is not None and not all(isinstance(item, item_type) for item in value):
+        if item_type is not None and not all(
+            isinstance(item, item_type) for item in value
+        ):
             raise ConfigurationError(
                 f"Invalid '{field}': all items must be {item_type.__name__} in {self._context}"
             )
@@ -261,7 +263,9 @@ class FieldValidator:
                 f"Invalid '{field}': expected list in {self._context}"
             )
 
-        if item_type is not None and not all(isinstance(item, item_type) for item in value):
+        if item_type is not None and not all(
+            isinstance(item, item_type) for item in value
+        ):
             raise ConfigurationError(
                 f"Invalid '{field}': all items must be {item_type.__name__} in {self._context}"
             )
