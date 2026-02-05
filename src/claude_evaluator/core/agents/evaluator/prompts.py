@@ -9,6 +9,9 @@ __all__ = [
     "TASK_COMPLETION_PROMPT_TEMPLATE",
     "CODE_QUALITY_SYSTEM_PROMPT",
     "CODE_QUALITY_PROMPT_TEMPLATE",
+    "TASK_COMPLETION_REVIEW_PROMPT",
+    "CODE_QUALITY_REVIEW_PROMPT",
+    "ERROR_HANDLING_REVIEW_PROMPT",
 ]
 
 # Task Completion Scoring Prompts
@@ -117,3 +120,109 @@ Provide a quality assessment with:
 4. A concise rationale for your scores
 
 Focus on objective quality metrics and avoid subjective opinions about style preferences unless they violate conventions."""
+
+# Phase Reviewer Prompts - Task Completion
+TASK_COMPLETION_REVIEW_PROMPT = """You are reviewing code to determine whether the task requirements were fully satisfied.
+
+## Task Description
+{task_description}
+
+## Code Files
+{code_files}
+
+## Additional Context
+{evaluation_context}
+
+## Your Task
+Analyze whether the code fully satisfies the task requirements. Consider:
+1. Are all stated requirements addressed in the implementation?
+2. Does the code correctly implement the requested functionality?
+3. Are there any missing features or incomplete implementations?
+4. Does the implementation match the intent of the task description?
+
+## Response Format
+Provide your analysis as a structured review with:
+- **confidence_score** (0-100): Your confidence in the review findings
+- **issues**: List of issues where task requirements are not met, each with:
+  - severity (critical, high, medium, low)
+  - file_path: The file containing the issue
+  - line_number: Line number if applicable (null otherwise)
+  - message: Description of the missing or incorrect requirement
+  - suggestion: How to address the issue
+  - confidence (0-100): Confidence in this specific issue
+- **strengths**: List of positive findings where requirements are well-addressed
+
+Focus on whether the code accomplishes what was asked, not on code style or quality."""
+
+# Phase Reviewer Prompts - Code Quality
+CODE_QUALITY_REVIEW_PROMPT = """You are reviewing code for quality, maintainability, and adherence to best practices.
+
+## Task Description
+{task_description}
+
+## Code Files
+{code_files}
+
+## Additional Context
+{evaluation_context}
+
+## Your Task
+Analyze the code quality focusing on:
+1. **Code Structure**: Is the code well-organized with proper separation of concerns?
+2. **Naming Conventions**: Are names clear, descriptive, and following language conventions?
+3. **Design Patterns**: Are appropriate patterns used? Is there unnecessary complexity?
+4. **Maintainability**: How easy would it be to modify or extend this code?
+5. **Documentation**: Are there adequate comments and docstrings where needed?
+6. **DRY Principle**: Is there code duplication that should be refactored?
+7. **SOLID Principles**: Does the code follow good object-oriented design principles?
+
+## Response Format
+Provide your analysis as a structured review with:
+- **confidence_score** (0-100): Your confidence in the review findings
+- **issues**: List of code quality issues, each with:
+  - severity (critical, high, medium, low)
+  - file_path: The file containing the issue
+  - line_number: Line number if applicable (null otherwise)
+  - message: Description of the quality issue
+  - suggestion: Recommended improvement
+  - confidence (0-100): Confidence in this specific issue
+- **strengths**: List of positive findings demonstrating good code quality
+
+Focus on code quality and maintainability, not whether the code works correctly."""
+
+# Phase Reviewer Prompts - Error Handling
+ERROR_HANDLING_REVIEW_PROMPT = """You are reviewing code for error handling, edge cases, and robustness.
+
+## Task Description
+{task_description}
+
+## Code Files
+{code_files}
+
+## Additional Context
+{evaluation_context}
+
+## Your Task
+Analyze the code's error handling and robustness focusing on:
+1. **Exception Handling**: Are exceptions caught and handled appropriately?
+2. **Input Validation**: Are inputs validated before use?
+3. **Edge Cases**: Are boundary conditions and edge cases handled?
+4. **Null/None Checks**: Are null/undefined values handled properly?
+5. **Resource Management**: Are resources (files, connections) properly closed/released?
+6. **Error Messages**: Are error messages informative and useful for debugging?
+7. **Defensive Coding**: Does the code fail gracefully under unexpected conditions?
+8. **Recovery Logic**: Does the code attempt recovery where appropriate?
+
+## Response Format
+Provide your analysis as a structured review with:
+- **confidence_score** (0-100): Your confidence in the review findings
+- **issues**: List of error handling issues, each with:
+  - severity (critical, high, medium, low)
+  - file_path: The file containing the issue
+  - line_number: Line number if applicable (null otherwise)
+  - message: Description of the missing or inadequate error handling
+  - suggestion: Recommended improvement for robustness
+  - confidence (0-100): Confidence in this specific issue
+- **strengths**: List of positive findings demonstrating good error handling
+
+Focus on robustness and defensive coding, not code style or whether requirements are met."""

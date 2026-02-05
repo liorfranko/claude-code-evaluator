@@ -1,0 +1,119 @@
+{
+  "evaluation_id": "eval-partial-001",
+  "task_description": "Refactor the payment processing module to support multiple payment gateways. Add support for Stripe, PayPal, and Square. Include proper abstraction layer and comprehensive unit tests.",
+  "workflow_type": "multi_command",
+  "outcome": "partial",
+  "metrics": {
+    "total_runtime_ms": 180000,
+    "total_tokens": 85000,
+    "input_tokens": 52000,
+    "output_tokens": 33000,
+    "total_cost_usd": 0.1725,
+    "prompt_count": 15,
+    "turn_count": 22,
+    "tokens_by_phase": {
+      "planning": 12000,
+      "refactoring": 45000,
+      "implementation": 28000
+    },
+    "tool_counts": {
+      "Read": 18,
+      "Write": 10,
+      "Bash": 8,
+      "Glob": 5,
+      "Grep": 6
+    },
+    "queries": []
+  },
+  "timeline": [
+    {
+      "timestamp": "2024-12-15T09:00:00Z",
+      "event_type": "state_change",
+      "actor": "developer",
+      "summary": "Evaluation started",
+      "details": {
+        "workflow_type": "multi_command"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T09:00:30Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Read existing payment module",
+      "details": {
+        "tool_name": "Read",
+        "file_path": "src/payments/processor.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T09:02:00Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Create payment gateway interface",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "src/payments/gateway_interface.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T09:05:00Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Implement Stripe gateway",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "src/payments/gateways/stripe_gateway.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T09:08:00Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Implement PayPal gateway",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "src/payments/gateways/paypal_gateway.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T09:12:00Z",
+      "event_type": "state_change",
+      "actor": "developer",
+      "summary": "Task partially completed",
+      "details": {
+        "completed": ["gateway_interface", "stripe_gateway", "paypal_gateway"],
+        "incomplete": ["square_gateway", "unit_tests"]
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "dec-001",
+      "decision_type": "architecture",
+      "description": "Used abstract factory pattern for gateway creation",
+      "rationale": "Provides clean abstraction and easy extensibility",
+      "timestamp": "2024-12-15T09:01:30Z"
+    },
+    {
+      "decision_id": "dec-002",
+      "decision_type": "prioritization",
+      "description": "Prioritized Stripe and PayPal over Square",
+      "rationale": "These are the most commonly used payment gateways",
+      "timestamp": "2024-12-15T09:03:00Z"
+    }
+  ],
+  "generated_at": "2024-12-15T09:12:30Z",
+  "errors": [],
+  "workspace_path": "/tmp/eval-workspace-partial-001",
+  "change_summary": {
+    "files_modified": ["src/payments/processor.py"],
+    "files_added": [
+      "src/payments/gateway_interface.py",
+      "src/payments/gateways/__init__.py",
+      "src/payments/gateways/stripe_gateway.py",
+      "src/payments/gateways/paypal_gateway.py"
+    ],
+    "files_deleted": [],
+    "total_changes": 5
+  }
+}

@@ -200,7 +200,9 @@ class MultiCommandWorkflow(BaseWorkflow):
         # Configure max_turns if specified for this phase
         if phase.max_turns is not None:
             worker.set_max_turns(phase.max_turns)
-        logger.info("max_turns_configured", max_turns=worker.max_turns, phase=phase.name)
+        logger.info(
+            "max_turns_configured", max_turns=worker.max_turns, phase=phase.name
+        )
 
         # Emit phase start event for verbose output
         worker._emit_progress(
@@ -250,7 +252,10 @@ class MultiCommandWorkflow(BaseWorkflow):
         # Log warning if response is None and we may have hit max_turns
         if response is None:
             effective_max_turns = phase.max_turns or self._max_turns
-            if effective_max_turns is not None and query_metrics.num_turns >= effective_max_turns:
+            if (
+                effective_max_turns is not None
+                and query_metrics.num_turns >= effective_max_turns
+            ):
                 logger.warning(
                     "max_turns_limit_reached",
                     phase=phase.name,

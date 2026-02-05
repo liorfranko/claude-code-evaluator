@@ -1,0 +1,170 @@
+{
+  "evaluation_id": "eval-sample-001",
+  "task_description": "Implement a RESTful API endpoint for user authentication with JWT tokens. The endpoint should accept POST requests with username and password, validate credentials against a database, and return a signed JWT token on success. Include proper error handling for invalid credentials and malformed requests.",
+  "workflow_type": "direct",
+  "outcome": "success",
+  "metrics": {
+    "total_runtime_ms": 125000,
+    "total_tokens": 45000,
+    "input_tokens": 28000,
+    "output_tokens": 17000,
+    "cache_read_tokens": 5000,
+    "cache_creation_tokens": 2000,
+    "total_cost_usd": 0.0892,
+    "prompt_count": 8,
+    "turn_count": 12,
+    "tokens_by_phase": {
+      "planning": 8000,
+      "implementation": 32000,
+      "testing": 5000
+    },
+    "tool_counts": {
+      "Read": 8,
+      "Write": 5,
+      "Bash": 4,
+      "Glob": 3,
+      "Grep": 2
+    },
+    "queries": []
+  },
+  "timeline": [
+    {
+      "timestamp": "2024-12-15T14:30:00Z",
+      "event_type": "state_change",
+      "actor": "developer",
+      "summary": "Evaluation started",
+      "details": {
+        "workflow_type": "direct"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:30:05Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Read project configuration",
+      "details": {
+        "tool_name": "Read",
+        "file_path": "pyproject.toml"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:30:15Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Search for existing auth code",
+      "details": {
+        "tool_name": "Grep",
+        "pattern": "authentication|login|jwt"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:30:30Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Read existing user model",
+      "details": {
+        "tool_name": "Read",
+        "file_path": "src/models/user.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:31:00Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Create authentication handler module",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "src/auth/handler.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:31:30Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Create JWT utility module",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "src/auth/jwt_utils.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:32:00Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Create auth routes",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "src/routes/auth.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:32:30Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Update main application",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "src/main.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:33:00Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Create test file for auth",
+      "details": {
+        "tool_name": "Write",
+        "file_path": "tests/test_auth.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:33:30Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Run pytest to verify implementation",
+      "details": {
+        "tool_name": "Bash",
+        "command": "pytest tests/test_auth.py -v"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T14:34:00Z",
+      "event_type": "state_change",
+      "actor": "developer",
+      "summary": "Task completed successfully",
+      "details": {
+        "test_passed": true
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "dec-001",
+      "decision_type": "implementation_approach",
+      "description": "Chose to use PyJWT library for token generation",
+      "rationale": "PyJWT is well-maintained and widely used in production",
+      "timestamp": "2024-12-15T14:30:45Z"
+    },
+    {
+      "decision_id": "dec-002",
+      "decision_type": "architecture",
+      "description": "Separated authentication logic into handler and jwt_utils modules",
+      "rationale": "Follows single responsibility principle and improves testability",
+      "timestamp": "2024-12-15T14:31:15Z"
+    }
+  ],
+  "generated_at": "2024-12-15T14:35:00Z",
+  "errors": [],
+  "workspace_path": "/tmp/eval-workspace-sample-001",
+  "change_summary": {
+    "files_modified": ["src/main.py"],
+    "files_added": [
+      "src/auth/handler.py",
+      "src/auth/jwt_utils.py",
+      "src/routes/auth.py",
+      "tests/test_auth.py"
+    ],
+    "files_deleted": [],
+    "total_changes": 5
+  }
+}

@@ -8,7 +8,7 @@ __all__ = [
     "EvaluatorError",
     "ScoringError",
     "ParsingError",
-    "GeminiAPIError",
+    "ClaudeAPIError",
     "ASTParsingError",
 ]
 
@@ -54,8 +54,8 @@ class ParsingError(EvaluatorError):
     pass
 
 
-class GeminiAPIError(EvaluatorError):
-    """Error communicating with the Gemini API.
+class ClaudeAPIError(EvaluatorError):
+    """Error communicating with the Claude API.
 
     Raised when API calls fail due to network issues, authentication
     problems, or rate limiting.

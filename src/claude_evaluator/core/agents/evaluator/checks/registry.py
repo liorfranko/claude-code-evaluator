@@ -19,7 +19,7 @@ from claude_evaluator.core.agents.evaluator.checks.base import (
 
 if TYPE_CHECKING:
     from claude_evaluator.core.agents.evaluator.ast.parser import ParseResult
-    from claude_evaluator.core.agents.evaluator.gemini_client import GeminiClient
+    from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 
 __all__ = [
     "CheckRegistry",
@@ -38,17 +38,17 @@ class CheckRegistry:
 
     def __init__(
         self,
-        gemini_client: "GeminiClient | None" = None,
+        claude_client: "ClaudeClient | None" = None,
         max_workers: int = 4,
     ) -> None:
         """Initialize the check registry.
 
         Args:
-            gemini_client: Optional Gemini client for LLM checks.
+            claude_client: Optional Claude client for LLM checks.
             max_workers: Maximum parallel workers for check execution.
 
         """
-        self.gemini_client = gemini_client
+        self.claude_client = claude_client
         self.max_workers = max_workers
         self._checks: list[CheckStrategy] = []
 

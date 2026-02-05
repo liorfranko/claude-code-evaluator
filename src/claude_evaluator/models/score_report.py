@@ -431,7 +431,7 @@ class ScoreReport(BaseSchema):
         step_analysis: Analysis of each execution step.
         code_analysis: Analysis of generated code (optional).
         generated_at: ISO 8601 timestamp of score generation.
-        evaluator_model: Gemini model used for evaluation.
+        evaluator_model: Model used for evaluation.
         evaluation_duration_ms: Time taken to generate the score report.
 
     """
@@ -473,10 +473,22 @@ class ScoreReport(BaseSchema):
     evaluator_model: str = Field(
         ...,
         min_length=1,
-        description="Gemini model used for evaluation",
+        description="Model used for evaluation",
     )
     evaluation_duration_ms: int = Field(
         ...,
         ge=0,
         description="Time taken to generate the score report in milliseconds",
+    )
+    task_description: str = Field(
+        default="",
+        description="Original task description being evaluated",
+    )
+    reviewer_outputs: list[dict] | None = Field(
+        default=None,
+        description="Raw outputs from phase reviewers (optional)",
+    )
+    reviewer_summary: dict | None = Field(
+        default=None,
+        description="Aggregated summary from all reviewers (optional)",
     )

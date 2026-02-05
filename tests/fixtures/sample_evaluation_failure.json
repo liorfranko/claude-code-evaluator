@@ -1,0 +1,83 @@
+{
+  "evaluation_id": "eval-failure-001",
+  "task_description": "Debug and fix the database connection timeout issue in the user service. The service is experiencing intermittent connection failures under high load.",
+  "workflow_type": "plan_then_implement",
+  "outcome": "failure",
+  "metrics": {
+    "total_runtime_ms": 300000,
+    "total_tokens": 120000,
+    "input_tokens": 75000,
+    "output_tokens": 45000,
+    "total_cost_usd": 0.2450,
+    "prompt_count": 25,
+    "turn_count": 35,
+    "tokens_by_phase": {
+      "planning": 15000,
+      "implementation": 80000,
+      "debugging": 25000
+    },
+    "tool_counts": {
+      "Read": 25,
+      "Write": 12,
+      "Bash": 18,
+      "Glob": 8,
+      "Grep": 15
+    },
+    "queries": []
+  },
+  "timeline": [
+    {
+      "timestamp": "2024-12-15T10:00:00Z",
+      "event_type": "state_change",
+      "actor": "developer",
+      "summary": "Evaluation started",
+      "details": {
+        "workflow_type": "plan_then_implement"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T10:00:30Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Read database configuration",
+      "details": {
+        "tool_name": "Read",
+        "file_path": "config/database.py"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T10:02:00Z",
+      "event_type": "tool_call",
+      "actor": "worker",
+      "summary": "Search for connection pool settings",
+      "details": {
+        "tool_name": "Grep",
+        "pattern": "pool_size|max_connections"
+      }
+    },
+    {
+      "timestamp": "2024-12-15T10:05:00Z",
+      "event_type": "state_change",
+      "actor": "developer",
+      "summary": "Task failed - unable to resolve connection issues",
+      "details": {
+        "error": "Tests still failing after multiple attempts"
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "dec-001",
+      "decision_type": "debugging_approach",
+      "description": "Attempted to increase connection pool size",
+      "rationale": "Initial hypothesis was pool exhaustion",
+      "timestamp": "2024-12-15T10:01:30Z"
+    }
+  ],
+  "generated_at": "2024-12-15T10:05:30Z",
+  "errors": [
+    "Connection pool configuration changes did not resolve timeout issues",
+    "Unable to reproduce issue consistently in test environment"
+  ],
+  "workspace_path": "/tmp/eval-workspace-failure-001"
+}
