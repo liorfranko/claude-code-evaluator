@@ -8,7 +8,6 @@ __all__ = [
     "EvaluatorError",
     "ScoringError",
     "ParsingError",
-    "GeminiAPIError",
     "ClaudeAPIError",
     "ASTParsingError",
 ]
@@ -53,38 +52,6 @@ class ParsingError(EvaluatorError):
     """
 
     pass
-
-
-class GeminiAPIError(EvaluatorError):
-    """Error communicating with the Gemini API.
-
-    Raised when API calls fail due to network issues, authentication
-    problems, or rate limiting.
-
-    Attributes:
-        message: Human-readable error description.
-        status_code: HTTP status code if available.
-        retry_after: Seconds to wait before retrying if rate limited.
-
-    """
-
-    def __init__(
-        self,
-        message: str,
-        status_code: int | None = None,
-        retry_after: int | None = None,
-    ) -> None:
-        """Initialize the exception.
-
-        Args:
-            message: Human-readable error description.
-            status_code: HTTP status code if available.
-            retry_after: Seconds to wait before retrying if rate limited.
-
-        """
-        self.status_code = status_code
-        self.retry_after = retry_after
-        super().__init__(message)
 
 
 class ClaudeAPIError(EvaluatorError):

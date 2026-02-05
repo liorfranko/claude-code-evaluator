@@ -12,7 +12,7 @@ from claude_evaluator.core.agents.evaluator.checks.best_practices.llm_practices 
 )
 
 if TYPE_CHECKING:
-    from claude_evaluator.core.agents.evaluator.gemini_client import GeminiClient
+    from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 
 __all__ = [
     "BestPracticesCheck",
@@ -21,12 +21,12 @@ __all__ = [
 
 
 def get_all_best_practices_checks(
-    client: "GeminiClient | None" = None,
+    client: "ClaudeClient | None" = None,
 ) -> list[LLMCheck]:
     """Get all best practices check instances.
 
     Args:
-        client: Gemini client for LLM checks.
+        client: Claude client for LLM checks.
 
     Returns:
         List of best practices check instances.

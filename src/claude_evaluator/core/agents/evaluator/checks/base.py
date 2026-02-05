@@ -223,10 +223,10 @@ class LLMCheck(CheckStrategy):
     """
 
     def __init__(self, client) -> None:  # noqa: ANN001
-        """Initialize with a Gemini client.
+        """Initialize with a Claude client.
 
         Args:
-            client: GeminiClient instance for LLM calls.
+            client: ClaudeClient instance for LLM calls.
 
         """
         self.client = client
