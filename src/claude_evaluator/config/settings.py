@@ -12,7 +12,7 @@ Environment Variables:
     CLAUDE_DEVELOPER_CONTEXT_WINDOW_SIZE: Conversation context size
     CLAUDE_DEVELOPER_MAX_ANSWER_RETRIES: Maximum answer retry attempts
     CLAUDE_DEVELOPER_MAX_ITERATIONS: Maximum loop iterations
-    CLAUDE_EVALUATOR_MODEL: Claude model for evaluation scoring
+    CLAUDE_EVALUATOR_MODEL: Gemini model for evaluation scoring
     CLAUDE_EVALUATOR_TIMEOUT_SECONDS: Evaluation operation timeout
     CLAUDE_EVALUATOR_TEMPERATURE: LLM temperature for scoring
     CLAUDE_EVALUATOR_ENABLE_AST_PARSING: Enable tree-sitter AST parsing
@@ -136,7 +136,7 @@ class EvaluatorSettings(BaseSettings):
     """Settings for the EvaluatorAgent.
 
     Attributes:
-        model: Claude model identifier for evaluation scoring.
+        model: Gemini model identifier for evaluation scoring.
         timeout_seconds: Timeout for evaluation operations.
         temperature: LLM temperature for scoring (lower = more deterministic).
         max_turns: Maximum turns for reviewer queries.
