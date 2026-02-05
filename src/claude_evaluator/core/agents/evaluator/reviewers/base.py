@@ -18,7 +18,12 @@ __all__ = [
     "IssueSeverity",
     "ReviewerIssue",
     "ReviewerOutput",
+    "ReviewContext",
 ]
+
+
+# Type alias for code file tuple: (file_path, language, content)
+CodeFile = tuple[str, str, str]
 
 
 class IssueSeverity(str, Enum):
@@ -127,4 +132,32 @@ class ReviewerOutput(BaseSchema):
     skip_reason: str | None = Field(
         default=None,
         description="Reason for skipping (if skipped is true)",
+    )
+
+
+class ReviewContext(BaseSchema):
+    """Input context provided to reviewers for evaluation.
+
+    Contains all necessary information for a reviewer to analyze code
+    and produce a ReviewerOutput.
+
+    Attributes:
+        task_description: The original task being evaluated.
+        code_files: List of code files as tuples (file_path, language, content).
+        evaluation_context: Additional context for the evaluation.
+
+    """
+
+    task_description: str = Field(
+        ...,
+        min_length=1,
+        description="The original task being evaluated",
+    )
+    code_files: list[CodeFile] = Field(
+        default_factory=list,
+        description="List of code files as tuples (file_path, language, content)",
+    )
+    evaluation_context: str = Field(
+        default="",
+        description="Additional context for the evaluation",
     )
