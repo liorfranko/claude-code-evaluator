@@ -65,23 +65,28 @@ class ReviewerOutputFormatter:
 
     @staticmethod
     def format_issue(issue: ReviewerIssue) -> str:
-        """Format an issue with severity and confidence.
+        """Format an issue with severity, confidence, file, and line.
 
-        Creates a boxed display for an issue showing severity level
-        and confidence score in the header.
+        Creates a boxed display for an issue showing severity level,
+        file location (with optional line number), and confidence score.
 
         Args:
             issue: The ReviewerIssue to format.
 
         Returns:
-            Formatted issue string with severity and confidence.
+            Formatted issue string with severity, file, line, and confidence.
 
         """
         # Format severity as uppercase for display
         severity = issue.severity.value.upper()
 
-        # Build header line with severity and confidence
-        header = f"[{severity}] (confidence: {issue.confidence}%)"
+        # Build file location with optional line number
+        file_location = issue.file_path
+        if issue.line_number is not None:
+            file_location = f"{issue.file_path}:{issue.line_number}"
+
+        # Build header line with severity, file location, and confidence
+        header = f"[{severity}] {file_location} (confidence: {issue.confidence}%)"
 
         # Box drawing characters
         box_top = "\u250c\u2500"  # corner + horizontal line
