@@ -38,11 +38,11 @@ Source: plan.md, spec.md, data-model.md, research.md
 ## Phase 2: Foundational
 
 ### ClaudeClient Implementation (FR-001)
-- [ ] T100 Define ClaudeClient class with model/temperature attributes (src/claude_evaluator/core/agents/evaluator/claude_client.py)
-- [ ] T101 Implement ClaudeClient.generate() using sdk_query (src/claude_evaluator/core/agents/evaluator/claude_client.py)
-- [ ] T102 Implement ClaudeClient.generate_structured() with JSON parsing (src/claude_evaluator/core/agents/evaluator/claude_client.py)
-- [ ] T103 Add retry logic with exponential backoff to ClaudeClient (src/claude_evaluator/core/agents/evaluator/claude_client.py)
-- [ ] T104 Add ClaudeAPIError exception class (src/claude_evaluator/core/agents/evaluator/exceptions.py)
+- [x] T100 Define ClaudeClient class with model/temperature attributes (src/claude_evaluator/core/agents/evaluator/claude_client.py)
+- [x] T101 Implement ClaudeClient.generate() using sdk_query (src/claude_evaluator/core/agents/evaluator/claude_client.py)
+- [x] T102 Implement ClaudeClient.generate_structured() with JSON parsing (src/claude_evaluator/core/agents/evaluator/claude_client.py)
+- [x] T103 Add retry logic with exponential backoff to ClaudeClient (src/claude_evaluator/core/agents/evaluator/claude_client.py)
+- [x] T104 Add ClaudeAPIError exception class (src/claude_evaluator/core/agents/evaluator/exceptions.py)
 
 ### Reviewer Base Classes (FR-002, FR-004)
 - [ ] T110 Define IssueSeverity enum (src/claude_evaluator/core/agents/evaluator/reviewers/base.py)
