@@ -13,7 +13,11 @@ import structlog
 from pydantic import Field
 
 from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from claude_evaluator.core.agents.evaluator.reviewers.base import ReviewerBase
+from claude_evaluator.core.agents.evaluator.reviewers.base import (
+    ReviewContext,
+    ReviewerBase,
+    ReviewerOutput,
+)
 from claude_evaluator.models.base import BaseSchema
 
 __all__ = [
@@ -199,3 +203,105 @@ class ReviewerRegistry:
             focus_area=reviewer.focus_area,
             has_config=config is not None,
         )
+
+    def _is_reviewer_enabled(self, reviewer: ReviewerBase) -> bool:
+        """Check if a reviewer is enabled based on its configuration.
+
+        Args:
+            reviewer: The reviewer to check.
+
+        Returns:
+            True if the reviewer is enabled, False otherwise.
+
+        """
+        config = self.configs.get(reviewer.reviewer_id)
+        if config is not None:
+            return config.enabled
+        return True
+
+    async def run_all(self, context: ReviewContext) -> list[ReviewerOutput]:
+        """Execute all enabled reviewers on the provided context.
+
+        Runs reviewers in sequential mode, processing one at a time in order.
+        Disabled reviewers are skipped with a skip reason in the output.
+
+        Args:
+            context: Review context containing task and code information.
+
+        Returns:
+            List of ReviewerOutput from all reviewers (including skipped ones).
+
+        """
+        outputs: list[ReviewerOutput] = []
+
+        logger.info(
+            "run_all_started",
+            reviewer_count=len(self.reviewers),
+            execution_mode=self.execution_mode.value,
+        )
+
+        for reviewer in self.reviewers:
+            if not self._is_reviewer_enabled(reviewer):
+                # Create skipped output for disabled reviewer
+                skipped_output = ReviewerOutput(
+                    reviewer_name=reviewer.reviewer_id,
+                    confidence_score=0,
+                    issues=[],
+                    strengths=[],
+                    execution_time_ms=0,
+                    skipped=True,
+                    skip_reason="Reviewer is disabled via configuration",
+                )
+                outputs.append(skipped_output)
+                logger.debug(
+                    "reviewer_skipped",
+                    reviewer_id=reviewer.reviewer_id,
+                    reason="disabled",
+                )
+                continue
+
+            try:
+                logger.debug(
+                    "reviewer_execution_started",
+                    reviewer_id=reviewer.reviewer_id,
+                )
+
+                output = await reviewer.review(context)
+
+                # Apply confidence filtering
+                filtered_output = reviewer.filter_by_confidence(output)
+                outputs.append(filtered_output)
+
+                logger.debug(
+                    "reviewer_execution_completed",
+                    reviewer_id=reviewer.reviewer_id,
+                    issue_count=len(filtered_output.issues),
+                    execution_time_ms=filtered_output.execution_time_ms,
+                )
+
+            except Exception as e:
+                # Create error output for failed reviewer
+                error_output = ReviewerOutput(
+                    reviewer_name=reviewer.reviewer_id,
+                    confidence_score=0,
+                    issues=[],
+                    strengths=[],
+                    execution_time_ms=0,
+                    skipped=True,
+                    skip_reason=f"Execution failed: {e!s}",
+                )
+                outputs.append(error_output)
+                logger.error(
+                    "reviewer_execution_failed",
+                    reviewer_id=reviewer.reviewer_id,
+                    error=str(e),
+                )
+
+        logger.info(
+            "run_all_completed",
+            total_reviewers=len(self.reviewers),
+            successful_count=len([o for o in outputs if not o.skipped]),
+            skipped_count=len([o for o in outputs if o.skipped]),
+        )
+
+        return outputs
