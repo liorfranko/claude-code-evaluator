@@ -35,6 +35,7 @@ from claude_evaluator.config.defaults import (
     DEFAULT_EFFICIENCY_WEIGHT,
     DEFAULT_EVALUATION_TIMEOUT_SECONDS,
     DEFAULT_EVALUATOR_ENABLE_AST,
+    DEFAULT_EVALUATOR_MAX_TURNS,
     DEFAULT_EVALUATOR_TEMPERATURE,
     DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
     DEFAULT_MAX_ANSWER_RETRIES,
@@ -138,6 +139,7 @@ class EvaluatorSettings(BaseSettings):
         model: Claude model identifier for evaluation scoring.
         timeout_seconds: Timeout for evaluation operations.
         temperature: LLM temperature for scoring (lower = more deterministic).
+        max_turns: Maximum turns for reviewer queries.
         enable_ast_parsing: Whether to use tree-sitter AST parsing.
         task_completion_weight: Weight for task completion score.
         code_quality_weight: Weight for code quality score.
@@ -165,6 +167,12 @@ class EvaluatorSettings(BaseSettings):
         ge=0.0,
         le=1.0,
         description="LLM temperature for scoring (lower = more deterministic)",
+    )
+    max_turns: int = Field(
+        default=DEFAULT_EVALUATOR_MAX_TURNS,
+        ge=1,
+        le=50,
+        description="Maximum turns for reviewer queries",
     )
     enable_ast_parsing: bool = Field(
         default=DEFAULT_EVALUATOR_ENABLE_AST,

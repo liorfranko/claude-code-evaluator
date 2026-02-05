@@ -338,8 +338,10 @@ class TestClaudeClientRetryLogic:
             sleep_calls.append(delay)
 
         async def mock_sdk_query(*args, **kwargs):
-            """Mock SDK query that always fails."""
+            """Mock SDK query that always fails with retryable error."""
             raise ConnectionError("Permanent failure")
+            # Yield is needed to make this an async generator, but we never reach it
+            yield  # pragma: no cover
 
         with (
             patch(
@@ -369,10 +371,12 @@ class TestClaudeClientRetryLogic:
         call_count = 0
 
         async def mock_sdk_query(*args, **kwargs):
-            """Mock SDK query that always fails."""
+            """Mock SDK query that always fails with a retryable error."""
             nonlocal call_count
             call_count += 1
             raise ConnectionError("Permanent failure")
+            # Yield is needed to make this an async generator, but we never reach it
+            yield  # pragma: no cover
 
         with patch(
             "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
@@ -388,11 +392,13 @@ class TestClaudeClientRetryLogic:
     async def test_error_includes_original_error_message(
         self, mock_client: ClaudeClient
     ) -> None:
-        """Test that ClaudeAPIError includes the original error message."""
+        """Test that ClaudeAPIError includes the original error message for unexpected errors."""
 
         async def mock_sdk_query(*args, **kwargs):
-            """Mock SDK query that fails with specific error."""
+            """Mock SDK query that fails with non-retryable error (unexpected)."""
             raise ValueError("Specific error message")
+            # Yield is needed to make this an async generator, but we never reach it
+            yield  # pragma: no cover
 
         with patch(
             "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
@@ -401,6 +407,8 @@ class TestClaudeClientRetryLogic:
             with pytest.raises(ClaudeAPIError) as exc_info:
                 await mock_client.generate("Test prompt")
 
+            # Unexpected errors now fail fast with "Unexpected error" prefix
+            assert "Unexpected error" in str(exc_info.value)
             assert "Specific error message" in str(exc_info.value)
 
     @pytest.mark.asyncio

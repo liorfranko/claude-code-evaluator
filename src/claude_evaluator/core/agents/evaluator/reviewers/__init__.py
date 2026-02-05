@@ -13,14 +13,15 @@ The auto-registration system:
 import importlib
 import pkgutil
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 
 logger = structlog.get_logger()
 
-# Dictionary to store registered reviewers (populated after base.py is created)
-REVIEWERS: Dict[str, Any] = {}
+# Dictionary to store registered reviewers by phase name
+# Note: Type is Any until ReviewerBase can be imported without circular deps
+REVIEWERS: dict[str, Any] = {}
 
 
 def _discover_reviewers() -> None:
@@ -49,7 +50,7 @@ def _discover_reviewers() -> None:
 
             # Check if it has a REVIEWER variable
             if hasattr(module, "REVIEWER"):
-                reviewer = getattr(module, "REVIEWER")
+                reviewer = module.REVIEWER
 
                 # Register the reviewer by its phase name
                 if hasattr(reviewer, "phase_name"):

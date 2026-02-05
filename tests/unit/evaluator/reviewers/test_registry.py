@@ -487,7 +487,7 @@ class TestReviewerRegistryRunAll:
 
         assert len(outputs) == 1
         assert outputs[0].skipped is True
-        assert "Execution failed" in outputs[0].skip_reason
+        assert "[FAILED]" in outputs[0].skip_reason
         assert "Reviewer execution failed" in outputs[0].skip_reason
 
     @pytest.mark.asyncio

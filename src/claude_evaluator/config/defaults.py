@@ -32,10 +32,13 @@ MAX_ANSWER_RETRIES_MAX = 5
 
 # Evaluator defaults
 DEFAULT_EVALUATOR_MODEL = "gemini-2.0-flash"
-DEFAULT_CLAUDE_EVALUATOR_MODEL = "claude-opus-4-5-20251101"
+# Note: SDK query() function requires short model names (opus, sonnet, haiku)
+# not full identifiers like "claude-opus-4-5-20251101"
+DEFAULT_CLAUDE_EVALUATOR_MODEL = "opus"
 DEFAULT_EVALUATOR_TIMEOUT_SECONDS = 120
 DEFAULT_EVALUATOR_TEMPERATURE = 0.1  # Used for Claude evaluator (deterministic)
 DEFAULT_EVALUATOR_ENABLE_AST = True
+DEFAULT_EVALUATOR_MAX_TURNS = 10  # Max turns for reviewer queries
 
 # Evaluator scoring weights
 DEFAULT_TASK_COMPLETION_WEIGHT = 0.5

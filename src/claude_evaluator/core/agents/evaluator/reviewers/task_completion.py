@@ -60,20 +60,9 @@ class TaskCompletionReviewer(ReviewerBase):
             Formatted prompt string for the LLM.
 
         """
-        # Build code files section
-        code_sections: list[str] = []
-        for file_path, language, content in context.code_files:
-            code_sections.append(
-                f"### File: {file_path} ({language})\n```{language}\n{content}\n```"
-            )
-
-        code_files_text = (
-            "\n\n".join(code_sections) if code_sections else "No code files provided."
-        )
-
         return TASK_COMPLETION_REVIEW_PROMPT.format(
             task_description=context.task_description,
-            code_files=code_files_text,
+            code_files=self._format_code_files(context),
             evaluation_context=context.evaluation_context or "None provided.",
         )
 
@@ -96,14 +85,8 @@ class TaskCompletionReviewer(ReviewerBase):
         prompt = self.build_prompt(context)
         output = await self.client.generate_structured(prompt, ReviewerOutput)
 
-        execution_time_ms = int((time.time() - start_time) * 1000)
+        # Update timing and reviewer name in place
+        output.execution_time_ms = int((time.time() - start_time) * 1000)
+        output.reviewer_name = self.reviewer_id
 
-        result = ReviewerOutput(
-            reviewer_name=self.reviewer_id,
-            confidence_score=output.confidence_score,
-            issues=output.issues,
-            strengths=output.strengths,
-            execution_time_ms=execution_time_ms,
-        )
-
-        return self.filter_by_confidence(result)
+        return self.filter_by_confidence(output)

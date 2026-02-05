@@ -5,16 +5,18 @@ with built-in retry logic, error handling, and structured output support.
 """
 
 import asyncio
+import re
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 import structlog
-from pydantic import BaseModel
-
-from claude_evaluator.config.settings import get_settings
 
 # SDK imports for Claude interaction
 from claude_agent_sdk import ClaudeAgentOptions  # noqa: E402
 from claude_agent_sdk import query as sdk_query  # noqa: E402
+from pydantic import BaseModel
+
+from claude_evaluator.config.settings import get_settings
 
 __all__ = [
     "ClaudeClient",
@@ -23,6 +25,14 @@ __all__ = [
 logger = structlog.get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+
+@dataclass
+class QueryResult:
+    """Container for SDK query results."""
+
+    result_message: Any
+    assistant_content: Any
 
 
 class ClaudeClient:
@@ -39,6 +49,7 @@ class ClaudeClient:
         temperature: float | None = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
+        max_turns: int | None = None,
     ) -> None:
         """Initialize the Claude client.
 
@@ -47,6 +58,7 @@ class ClaudeClient:
             temperature: Temperature for generation (default from settings).
             max_retries: Maximum number of retry attempts.
             retry_delay: Base delay between retries in seconds.
+            max_turns: Maximum turns for queries (default from settings).
 
         """
         settings = get_settings().evaluator
@@ -56,24 +68,26 @@ class ClaudeClient:
         )
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        self.max_turns = max_turns if max_turns is not None else settings.max_turns
 
         logger.debug(
             "claude_client_initialized",
             model=self.model,
             temperature=self.temperature,
+            max_turns=self.max_turns,
         )
 
     async def _query_with_retry(
         self,
         prompt: str,
-    ) -> Any:
+    ) -> QueryResult:
         """Execute SDK query with exponential backoff retry logic.
 
         Args:
             prompt: The prompt to send to Claude.
 
         Returns:
-            The ResultMessage from the SDK.
+            QueryResult containing ResultMessage and assistant content.
 
         Raises:
             ClaudeAPIError: If all retry attempts fail.
@@ -90,18 +104,26 @@ class ClaudeClient:
                     attempt=attempt + 1,
                     max_retries=self.max_retries,
                     model=self.model,
+                    max_turns=self.max_turns,
                 )
 
                 result_message = None
+                assistant_content: Any = None
+
                 async for message in sdk_query(
                     prompt=prompt,
                     options=ClaudeAgentOptions(
                         model=self.model,
-                        max_turns=1,
+                        max_turns=self.max_turns,
                         permission_mode="plan",
                     ),
                 ):
-                    if type(message).__name__ == "ResultMessage":
+                    msg_type = type(message).__name__
+                    if msg_type == "AssistantMessage":
+                        # Capture assistant message content for text extraction
+                        if hasattr(message, "content"):
+                            assistant_content = message.content
+                    elif msg_type == "ResultMessage":
                         result_message = message
 
                 if result_message is None:
@@ -111,12 +133,16 @@ class ClaudeClient:
                     "claude_query_success",
                     attempt=attempt + 1,
                 )
-                return result_message
+                return QueryResult(
+                    result_message=result_message,
+                    assistant_content=assistant_content,
+                )
 
-            except Exception as e:
+            except (asyncio.TimeoutError, ConnectionError, OSError) as e:
+                # Network/API errors - retry these
                 last_error = e
                 logger.warning(
-                    "claude_api_error",
+                    "claude_api_error_retryable",
                     attempt=attempt + 1,
                     max_retries=self.max_retries,
                     error=str(e),
@@ -140,6 +166,21 @@ class ClaudeClient:
                         final_error=str(last_error),
                     )
 
+            except Exception as e:
+                # Unexpected error - fail fast, don't retry programmer errors
+                logger.error(
+                    "claude_api_error_unexpected",
+                    attempt=attempt + 1,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                from claude_evaluator.core.agents.evaluator.exceptions import (
+                    ClaudeAPIError,
+                )
+
+                raise ClaudeAPIError(f"Unexpected error in Claude API call: {e}") from e
+
+        # Only reached if all retryable errors exhausted
         raise ClaudeAPIError(
             f"Claude API call failed after {self.max_retries} attempts: {last_error}"
         )
@@ -157,14 +198,14 @@ class ClaudeClient:
             ClaudeAPIError: If the API call fails after retries.
 
         """
-        result_message = await self._query_with_retry(prompt)
-        return self._extract_text(result_message)
+        query_result = await self._query_with_retry(prompt)
+        return self._extract_text(query_result)
 
-    def _extract_text(self, result_message: Any) -> str:
-        """Extract text from a ResultMessage.
+    def _extract_text(self, query_result: QueryResult) -> str:
+        """Extract text from a QueryResult.
 
         Args:
-            result_message: The ResultMessage from SDK.
+            query_result: The QueryResult containing SDK response.
 
         Returns:
             Extracted text content.
@@ -173,36 +214,95 @@ class ClaudeClient:
             ValueError: If no text could be extracted.
 
         """
+        result_message = query_result.result_message
+
         if result_message is None:
             raise ValueError("No result message received from Claude SDK")
 
-        # Handle ResultMessage object
+        # First try: ResultMessage.result field
         if hasattr(result_message, "result") and result_message.result:
-            if isinstance(result_message.result, str):
-                return result_message.result.strip()
+            result = result_message.result
+            if isinstance(result, str) and not result.startswith("ResultMessage("):
+                return result.strip()
 
-        # Handle content attribute
+        # Second try: Assistant content from streaming
+        assistant_content = query_result.assistant_content
+        if assistant_content:
+            text = self._extract_from_content(assistant_content)
+            if text:
+                return text
+
+        # Third try: ResultMessage content attribute
         if hasattr(result_message, "content"):
-            content = result_message.content
-            if isinstance(content, str):
-                return content.strip()
-            elif isinstance(content, list):
-                # Extract text from content blocks
-                texts = []
-                for block in content:
-                    if hasattr(block, "text"):
-                        texts.append(block.text)
-                    elif isinstance(block, dict) and "text" in block:
-                        texts.append(block["text"])
-                if texts:
-                    return "\n".join(texts).strip()
+            text = self._extract_from_content(result_message.content)
+            if text:
+                return text
 
-        # Try converting to string as last resort
-        text = str(result_message).strip()
-        if text and text != "None":
-            return text
+        raise ValueError(
+            f"Could not extract text from SDK response. "
+            f"Result message subtype: {getattr(result_message, 'subtype', 'unknown')}"
+        )
 
-        raise ValueError("Could not extract text from SDK response")
+    def _extract_from_content(self, content: Any) -> str | None:
+        """Extract text from content blocks.
+
+        Args:
+            content: Content from AssistantMessage or ResultMessage.
+
+        Returns:
+            Extracted text or None.
+
+        """
+        if content is None:
+            return None
+
+        if isinstance(content, str):
+            return content.strip() if content.strip() else None
+
+        if isinstance(content, list):
+            texts = []
+            for block in content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+                elif isinstance(block, dict) and "text" in block:
+                    texts.append(block["text"])
+            if texts:
+                return "\n".join(texts).strip()
+
+        return None
+
+    def _extract_json(self, text: str) -> str:
+        """Extract JSON from text, handling various formats.
+
+        Args:
+            text: Raw text that may contain JSON in markdown blocks or with preamble.
+
+        Returns:
+            Extracted JSON string.
+
+        """
+        # Try to extract JSON from markdown code blocks
+        # Match ```json ... ``` or ``` ... ```
+        patterns = [
+            r"```json\s*\n?(.*?)\n?```",  # ```json ... ```
+            r"```\s*\n?(.*?)\n?```",  # ``` ... ```
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                extracted = match.group(1).strip()
+                if extracted:
+                    return extracted
+
+        # Try to find JSON object in text (handles "Let me provide..." preamble)
+        # Look for { ... } pattern that could be a JSON object
+        json_match = re.search(r"\{[\s\S]*\}", text)
+        if json_match:
+            return json_match.group(0).strip()
+
+        # If no JSON found, return original text
+        return text.strip()
 
     async def generate_structured(
         self,
@@ -225,19 +325,24 @@ class ClaudeClient:
         # Add JSON format instructions to prompt
         json_prompt = f"""{prompt}
 
-Respond with valid JSON matching this schema:
+IMPORTANT: Respond with ONLY valid JSON (no markdown, no explanation).
+The JSON must match this schema:
 {model_cls.model_json_schema()}"""
 
-        result_message = await self._query_with_retry(json_prompt)
-        result_text = self._extract_text(result_message)
+        query_result = await self._query_with_retry(json_prompt)
+        result_text = self._extract_text(query_result)
+
+        # Extract JSON from potential markdown blocks
+        json_text = self._extract_json(result_text)
 
         # Parse JSON response
         try:
-            return model_cls.model_validate_json(result_text)
+            return model_cls.model_validate_json(json_text)
         except Exception as e:
             logger.error(
                 "claude_json_parse_error",
                 error=str(e),
-                response_text=result_text[:500],
+                response_text=json_text[:500],
+                raw_text=result_text[:500] if result_text != json_text else None,
             )
             raise

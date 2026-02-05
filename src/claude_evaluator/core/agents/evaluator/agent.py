@@ -66,6 +66,24 @@ class EvaluatorAgent:
 
     """
 
+    # Fallback scores by outcome when reviewer is unavailable
+    OUTCOME_FALLBACK_SCORES: dict[str, int] = {
+        "success": 85,
+        "partial": 60,
+        "failure": 30,
+        "timeout": 40,
+        "budget_exceeded": 50,
+        "loop_detected": 35,
+    }
+
+    # Issue severity penalty mapping for score calculation
+    SEVERITY_PENALTIES: dict[str, int] = {
+        "critical": 15,
+        "high": 10,
+        "medium": 5,
+        "low": 2,
+    }
+
     def __init__(
         self,
         workspace_path: Path | None = None,
@@ -134,9 +152,7 @@ class EvaluatorAgent:
         self.reviewer_registry.register(
             TaskCompletionReviewer(client=self.claude_client)
         )
-        self.reviewer_registry.register(
-            CodeQualityReviewer(client=self.claude_client)
-        )
+        self.reviewer_registry.register(CodeQualityReviewer(client=self.claude_client))
         self.reviewer_registry.register(
             ErrorHandlingReviewer(client=self.claude_client)
         )
@@ -178,68 +194,121 @@ class EvaluatorAgent:
             List of step dictionaries with tool_name and tool_input.
 
         """
-        steps = []
-
-        # Extract from timeline if tool_name is present
-        for event in evaluation.timeline:
-            if hasattr(event, "tool_name") and event.tool_name:
-                steps.append(
-                    {
-                        "tool_name": event.tool_name,
-                        "tool_input": getattr(event, "tool_input", {}),
-                    }
-                )
-
-        # Extract from queries.messages if available
-        # Messages contain ToolUseBlock items in their content
-        if hasattr(evaluation, "metrics") and hasattr(evaluation.metrics, "queries"):
-            for query in evaluation.metrics.queries:
-                messages = getattr(query, "messages", [])
-                for msg in messages:
-                    # Handle dict format (from JSON)
-                    if isinstance(msg, dict):
-                        content = msg.get("content", [])
-                        if isinstance(content, list):
-                            for item in content:
-                                if (
-                                    isinstance(item, dict)
-                                    and item.get("type") == "ToolUseBlock"
-                                ):
-                                    steps.append(
-                                        {
-                                            "tool_name": item.get("name", "unknown"),
-                                            "tool_input": item.get("input", {}),
-                                        }
-                                    )
-                    # Handle object format
-                    elif hasattr(msg, "content"):
-                        content = msg.content
-                        if isinstance(content, list):
-                            for item in content:
-                                if (
-                                    isinstance(item, dict)
-                                    and item.get("type") == "ToolUseBlock"
-                                ):
-                                    steps.append(
-                                        {
-                                            "tool_name": item.get("name", "unknown"),
-                                            "tool_input": item.get("input", {}),
-                                        }
-                                    )
-                                elif (
-                                    hasattr(item, "type")
-                                    and item.type == "ToolUseBlock"
-                                ):
-                                    steps.append(
-                                        {
-                                            "tool_name": getattr(
-                                                item, "name", "unknown"
-                                            ),
-                                            "tool_input": getattr(item, "input", {}),
-                                        }
-                                    )
-
+        steps = self._extract_from_timeline(evaluation.timeline)
+        steps.extend(self._extract_from_queries(evaluation))
         return steps
+
+    def _extract_from_timeline(self, timeline: list) -> list[dict]:
+        """Extract steps from timeline events.
+
+        Args:
+            timeline: List of timeline events.
+
+        Returns:
+            List of step dictionaries from timeline.
+
+        """
+        return [
+            {
+                "tool_name": event.tool_name,
+                "tool_input": getattr(event, "tool_input", {}),
+            }
+            for event in timeline
+            if hasattr(event, "tool_name") and event.tool_name
+        ]
+
+    def _extract_from_queries(self, evaluation: EvaluationReport) -> list[dict]:
+        """Extract steps from query messages.
+
+        Args:
+            evaluation: The evaluation report.
+
+        Returns:
+            List of step dictionaries from queries.
+
+        """
+        if not (
+            hasattr(evaluation, "metrics") and hasattr(evaluation.metrics, "queries")
+        ):
+            return []
+
+        steps = []
+        for query in evaluation.metrics.queries:
+            for msg in getattr(query, "messages", []):
+                steps.extend(self._extract_from_message(msg))
+        return steps
+
+    def _extract_from_message(self, msg: Any) -> list[dict]:
+        """Extract tool use blocks from a single message.
+
+        Args:
+            msg: Message dict or object.
+
+        Returns:
+            List of step dictionaries from the message.
+
+        """
+        content = (
+            msg.get("content", [])
+            if isinstance(msg, dict)
+            else getattr(msg, "content", [])
+        )
+        if not isinstance(content, list):
+            return []
+
+        return [step for item in content if (step := self._parse_tool_block(item))]
+
+    def _parse_tool_block(self, item: Any) -> dict | None:
+        """Parse a ToolUseBlock from content item.
+
+        Args:
+            item: Content item (dict or object).
+
+        Returns:
+            Step dictionary if item is a ToolUseBlock, None otherwise.
+
+        """
+        # Dict format
+        if isinstance(item, dict) and item.get("type") == "ToolUseBlock":
+            return {
+                "tool_name": item.get("name", "unknown"),
+                "tool_input": item.get("input", {}),
+            }
+        # Object format
+        if hasattr(item, "type") and item.type == "ToolUseBlock":
+            return {
+                "tool_name": getattr(item, "name", "unknown"),
+                "tool_input": getattr(item, "input", {}),
+            }
+        return None
+
+    def _read_file_safely(self, file_path: str) -> str | None:
+        """Read a file with error handling.
+
+        Args:
+            file_path: Relative path to the file.
+
+        Returns:
+            File contents, or None on error.
+
+        """
+        path = self.workspace_path / file_path
+        if not path.exists():
+            return None
+
+        try:
+            return path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as e:
+            logger.warning("file_encoding_error", file_path=str(path), error=str(e))
+            return None
+        except Exception as e:
+            logger.error(
+                "file_read_failed",
+                file_path=str(path),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return None
 
     def _prepare_code_files(
         self,
@@ -255,28 +324,18 @@ class EvaluatorAgent:
 
         """
         files = []
-
         for file_analysis in code_analysis.files_analyzed:
-            # Read file content
-            path = self.workspace_path / file_analysis.file_path
-            if not path.exists():
-                continue
-
-            try:
-                content = path.read_text(encoding="utf-8")
-            except Exception:
-                continue
-
-            files.append(
-                (
-                    file_analysis.file_path,
-                    file_analysis.language,
-                    content,
-                    file_analysis.lines_of_code,
-                    file_analysis.ast_metrics,
+            content = self._read_file_safely(file_analysis.file_path)
+            if content is not None:
+                files.append(
+                    (
+                        file_analysis.file_path,
+                        file_analysis.language,
+                        content,
+                        file_analysis.lines_of_code,
+                        file_analysis.ast_metrics,
+                    )
                 )
-            )
-
         return files
 
     def _build_review_context(
@@ -300,21 +359,17 @@ class EvaluatorAgent:
 
         """
         code_files: list[tuple[str, str, str]] = []
-
         if code_analysis:
             for file_analysis in code_analysis.files_analyzed:
-                # Read file content
-                path = self.workspace_path / file_analysis.file_path
-                if not path.exists():
-                    continue
-
-                try:
-                    content = path.read_text(encoding="utf-8")
+                content = self._read_file_safely(file_analysis.file_path)
+                if content is not None:
                     code_files.append(
-                        (file_analysis.file_path, file_analysis.language, content)
+                        (
+                            file_analysis.file_path,
+                            file_analysis.language,
+                            content,
+                        )
                     )
-                except Exception:
-                    continue
 
         return ReviewContext(
             task_description=task_description,
@@ -500,6 +555,25 @@ class EvaluatorAgent:
 
         return score_report
 
+    def _calculate_issue_deduction(
+        self,
+        issues: list,
+    ) -> int:
+        """Calculate total score deduction from issues based on severity.
+
+        Uses SEVERITY_PENALTIES class constant to determine deduction per issue.
+
+        Args:
+            issues: List of ReviewerIssue objects.
+
+        Returns:
+            Total deduction amount (non-negative integer).
+
+        """
+        return sum(
+            self.SEVERITY_PENALTIES.get(issue.severity.value, 2) for issue in issues
+        )
+
     def _calculate_dimension_scores_from_reviewers(
         self,
         reviewer_outputs: list[ReviewerOutput],
@@ -520,6 +594,7 @@ class EvaluatorAgent:
             List of DimensionScore objects for the report.
 
         """
+        _ = reviewer_summary  # Reserved for future aggregation features
         dimension_scores: list[DimensionScore] = []
 
         # Find task completion reviewer output
@@ -530,19 +605,8 @@ class EvaluatorAgent:
 
         # Calculate task completion score
         if task_output and not task_output.skipped:
-            # Base score on confidence and issues
             base_score = task_output.confidence_score
-            # Deduct for issues found (critical=-15, high=-10, medium=-5, low=-2)
-            issue_deduction = 0
-            for issue in task_output.issues:
-                if issue.severity.value == "critical":
-                    issue_deduction += 15
-                elif issue.severity.value == "high":
-                    issue_deduction += 10
-                elif issue.severity.value == "medium":
-                    issue_deduction += 5
-                else:
-                    issue_deduction += 2
+            issue_deduction = self._calculate_issue_deduction(task_output.issues)
             task_score = max(0, min(100, base_score - issue_deduction))
             task_rationale = (
                 f"Task completion scored {task_score}/100 based on reviewer analysis. "
@@ -551,15 +615,7 @@ class EvaluatorAgent:
             )
         else:
             # Fallback score based on outcome
-            outcome_scores = {
-                "success": 85,
-                "partial": 60,
-                "failure": 30,
-                "timeout": 40,
-                "budget_exceeded": 50,
-                "loop_detected": 35,
-            }
-            task_score = outcome_scores.get(evaluation.outcome.value, 50)
+            task_score = self.OUTCOME_FALLBACK_SCORES.get(evaluation.outcome.value, 50)
             task_rationale = (
                 f"Task completion scored {task_score}/100 based on "
                 f"outcome '{evaluation.outcome.value}'."
@@ -583,16 +639,7 @@ class EvaluatorAgent:
         # Calculate code quality score
         if code_output and not code_output.skipped:
             base_score = code_output.confidence_score
-            issue_deduction = 0
-            for issue in code_output.issues:
-                if issue.severity.value == "critical":
-                    issue_deduction += 15
-                elif issue.severity.value == "high":
-                    issue_deduction += 10
-                elif issue.severity.value == "medium":
-                    issue_deduction += 5
-                else:
-                    issue_deduction += 2
+            issue_deduction = self._calculate_issue_deduction(code_output.issues)
             code_score = max(0, min(100, base_score - issue_deduction))
             code_rationale = (
                 f"Code quality scored {code_score}/100 based on reviewer analysis. "
@@ -618,6 +665,32 @@ class EvaluatorAgent:
 
         return dimension_scores
 
+    def _calculate_metric_score(
+        self,
+        value: float,
+        excellent: float,
+        good: float,
+        poor: float,
+    ) -> float:
+        """Calculate a score using tiered thresholds.
+
+        Args:
+            value: The metric value to score.
+            excellent: Threshold for 100% score.
+            good: Threshold for 50% score.
+            poor: Threshold for 0% score.
+
+        Returns:
+            Score from 0-100.
+
+        """
+        if value <= excellent:
+            return 100
+        elif value <= good:
+            return 100 - ((value - excellent) / (good - excellent)) * 50
+        else:
+            return max(0, 50 - ((value - good) / (poor - good)) * 50)
+
     def _calculate_efficiency_score(
         self,
         total_tokens: int,
@@ -638,32 +711,10 @@ class EvaluatorAgent:
             DimensionScore for efficiency dimension.
 
         """
-        # Token efficiency: penalize high token usage
-        # Baseline: 50k tokens = 100%, 200k = 50%, 500k = 0%
-        if total_tokens <= 50000:
-            token_score = 100
-        elif total_tokens <= 200000:
-            token_score = 100 - ((total_tokens - 50000) / 150000) * 50
-        else:
-            token_score = max(0, 50 - ((total_tokens - 200000) / 300000) * 50)
-
-        # Turn efficiency: penalize high turn counts
-        # Baseline: 5 turns = 100%, 20 turns = 50%, 50 turns = 0%
-        if turn_count <= 5:
-            turn_score = 100
-        elif turn_count <= 20:
-            turn_score = 100 - ((turn_count - 5) / 15) * 50
-        else:
-            turn_score = max(0, 50 - ((turn_count - 20) / 30) * 50)
-
-        # Cost efficiency: penalize high costs
-        # Baseline: $0.10 = 100%, $0.50 = 50%, $2.00 = 0%
-        if total_cost <= 0.10:
-            cost_score = 100
-        elif total_cost <= 0.50:
-            cost_score = 100 - ((total_cost - 0.10) / 0.40) * 50
-        else:
-            cost_score = max(0, 50 - ((total_cost - 0.50) / 1.50) * 50)
+        # Calculate individual metric scores using tiered thresholds
+        token_score = self._calculate_metric_score(total_tokens, 50000, 200000, 500000)
+        turn_score = self._calculate_metric_score(turn_count, 5, 20, 50)
+        cost_score = self._calculate_metric_score(total_cost, 0.10, 0.50, 2.00)
 
         # Weighted average: tokens 40%, turns 30%, cost 30%
         efficiency = int(token_score * 0.4 + turn_score * 0.3 + cost_score * 0.3)

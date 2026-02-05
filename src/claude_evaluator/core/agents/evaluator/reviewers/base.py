@@ -11,7 +11,7 @@ This module provides the foundational types for the multi-phase review system:
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 from claude_evaluator.models.base import BaseSchema
@@ -137,6 +137,28 @@ class ReviewerOutput(BaseSchema):
         description="Reason for skipping (if skipped is true)",
     )
 
+    @model_validator(mode="after")
+    def validate_skip_consistency(self) -> "ReviewerOutput":
+        """Ensure skip_reason is provided when skipped is True.
+
+        Validates that:
+        - If skipped=True, skip_reason must be provided
+        - If skipped=False, skip_reason should be None
+
+        Returns:
+            Self after validation.
+
+        Raises:
+            ValueError: If skip_reason is missing when skipped is True.
+
+        """
+        if self.skipped and not self.skip_reason:
+            raise ValueError("skip_reason must be provided when skipped=True")
+        if not self.skipped and self.skip_reason:
+            # Clear skip_reason if not skipped (auto-fix)
+            object.__setattr__(self, "skip_reason", None)
+        return self
+
 
 class ReviewContext(BaseSchema):
     """Input context provided to reviewers for evaluation.
@@ -215,6 +237,25 @@ class ReviewerBase(ABC):
         """
         ...
 
+    def _format_code_files(self, context: ReviewContext) -> str:
+        """Format code files for prompt inclusion.
+
+        Args:
+            context: Review context containing code files.
+
+        Returns:
+            Formatted string with all code files, or placeholder if none.
+
+        """
+        if not context.code_files:
+            return "No code files provided."
+
+        sections = [
+            f"### File: {file_path} ({language})\n```{language}\n{content}\n```"
+            for file_path, language, content in context.code_files
+        ]
+        return "\n\n".join(sections)
+
     def build_prompt(self, context: ReviewContext) -> str:
         """Build the review prompt from the context.
 
@@ -228,14 +269,7 @@ class ReviewerBase(ABC):
             Formatted prompt string for the LLM.
 
         """
-        # Build code files section
-        code_sections: list[str] = []
-        for file_path, language, content in context.code_files:
-            code_sections.append(
-                f"### File: {file_path} ({language})\n```{language}\n{content}\n```"
-            )
-
-        code_files_text = "\n\n".join(code_sections) if code_sections else "No code files provided."
+        code_files_text = self._format_code_files(context)
 
         # Build the prompt
         prompt = f"""You are a code reviewer focusing on: {self.focus_area}
@@ -270,22 +304,27 @@ Also list any positive aspects or strengths you observe in the code.
 
         return prompt
 
-    def filter_by_confidence(self, output: ReviewerOutput) -> ReviewerOutput:
+    def filter_by_confidence(
+        self, output: ReviewerOutput, min_confidence: int | None = None
+    ) -> ReviewerOutput:
         """Filter issues below the minimum confidence threshold.
 
         Returns a new ReviewerOutput with only issues that meet or exceed
-        the reviewer's min_confidence threshold.
+        the specified or default min_confidence threshold.
 
         Args:
             output: The original ReviewerOutput to filter.
+            min_confidence: Override threshold. Uses self.min_confidence if None.
 
         Returns:
             A new ReviewerOutput with low-confidence issues removed.
 
         """
+        threshold = (
+            min_confidence if min_confidence is not None else self.min_confidence
+        )
         filtered_issues = [
-            issue for issue in output.issues
-            if issue.confidence >= self.min_confidence
+            issue for issue in output.issues if issue.confidence >= threshold
         ]
 
         return ReviewerOutput(

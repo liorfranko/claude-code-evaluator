@@ -55,36 +55,28 @@ def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
     """
     defaults = suite.defaults
 
+    # Fields that use suite defaults if not overridden
+    default_fields = [
+        "max_turns",
+        "max_budget_usd",
+        "timeout_seconds",
+        "developer_qa_model",
+        "model",
+    ]
+
     for evaluation in suite.evaluations:
+        # Apply suite-level defaults to unset fields
         if defaults is not None:
-            # Apply max_turns default if not overridden
-            if evaluation.max_turns is None and defaults.max_turns is not None:
-                evaluation.max_turns = defaults.max_turns
+            for field in default_fields:
+                if getattr(evaluation, field) is None:
+                    default_value = getattr(defaults, field, None)
+                    if default_value is not None:
+                        setattr(evaluation, field, default_value)
 
-            # Apply max_budget_usd default if not overridden
-            if evaluation.max_budget_usd is None and defaults.max_budget_usd is not None:
-                evaluation.max_budget_usd = defaults.max_budget_usd
-
-            # Apply timeout_seconds default if not overridden
-            if evaluation.timeout_seconds is None and defaults.timeout_seconds is not None:
-                evaluation.timeout_seconds = defaults.timeout_seconds
-
-            # Apply developer_qa_model default if not overridden
-            if (
-                evaluation.developer_qa_model is None
-                and defaults.developer_qa_model is not None
-            ):
-                evaluation.developer_qa_model = defaults.developer_qa_model
-
-            # Apply model default if not overridden
-            if evaluation.model is None and defaults.model is not None:
-                evaluation.model = defaults.model
-
-        # Ensure timeout_seconds is always set (mandatory)
+        # Ensure mandatory fields are always set
         if evaluation.timeout_seconds is None:
             evaluation.timeout_seconds = DEFAULT_EVALUATION_TIMEOUT_SECONDS
 
-        # Ensure max_turns is always set (mandatory)
         if evaluation.max_turns is None:
             evaluation.max_turns = DEFAULT_MAX_TURNS
 

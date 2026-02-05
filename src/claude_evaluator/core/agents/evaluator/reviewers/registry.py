@@ -4,17 +4,17 @@ This module provides the ReviewerRegistry class for discovering, registering,
 and executing phase reviewers in sequential or parallel mode.
 """
 
+import asyncio
 import importlib
 import pkgutil
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import structlog
 from pydantic import Field
 
 from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from typing import Any
-
 from claude_evaluator.core.agents.evaluator.reviewers.base import (
     IssueSeverity,
     ReviewContext,
@@ -140,9 +140,7 @@ class ReviewerRegistry:
                 continue
 
             try:
-                module = importlib.import_module(
-                    f".{module_info.name}", __package__
-                )
+                module = importlib.import_module(f".{module_info.name}", __package__)
 
                 for attr_name in dir(module):
                     attr = getattr(module, attr_name)
@@ -158,11 +156,28 @@ class ReviewerRegistry:
                             module=module_info.name,
                         )
 
+            except ImportError as e:
+                # Missing dependency - log warning and skip
+                logger.warning(
+                    "reviewer_module_import_failed",
+                    module=module_info.name,
+                    error=str(e),
+                )
+            except SyntaxError as e:
+                # Syntax error in module - this is a critical error
+                logger.error(
+                    "reviewer_module_syntax_error",
+                    module=module_info.name,
+                    error=str(e),
+                    line=e.lineno,
+                )
             except Exception as e:
+                # Other unexpected errors
                 logger.error(
                     "reviewer_discovery_failed",
                     module=module_info.name,
                     error=str(e),
+                    error_type=type(e).__name__,
                 )
 
         logger.info(
@@ -351,21 +366,7 @@ class ReviewerRegistry:
 
         """
         effective_min_confidence = self.get_effective_min_confidence(reviewer)
-
-        filtered_issues = [
-            issue for issue in output.issues
-            if issue.confidence >= effective_min_confidence
-        ]
-
-        return ReviewerOutput(
-            reviewer_name=output.reviewer_name,
-            confidence_score=output.confidence_score,
-            issues=filtered_issues,
-            strengths=output.strengths,
-            execution_time_ms=output.execution_time_ms,
-            skipped=output.skipped,
-            skip_reason=output.skip_reason,
-        )
+        return reviewer.filter_by_confidence(output, effective_min_confidence)
 
     async def run_all(self, context: ReviewContext) -> list[ReviewerOutput]:
         """Execute all enabled reviewers on the provided context.
@@ -418,7 +419,9 @@ class ReviewerRegistry:
 
                 # Apply confidence filtering with config override support
                 effective_min_confidence = self.get_effective_min_confidence(reviewer)
-                filtered_output = self._filter_by_configured_confidence(reviewer, output)
+                filtered_output = self._filter_by_configured_confidence(
+                    reviewer, output
+                )
                 outputs.append(filtered_output)
 
                 logger.debug(
@@ -429,8 +432,8 @@ class ReviewerRegistry:
                     effective_min_confidence=effective_min_confidence,
                 )
 
-            except Exception as e:
-                # Create error output for failed reviewer
+            except (asyncio.TimeoutError, ConnectionError, OSError) as e:
+                # Transient/network errors - mark as failed (distinct from skipped)
                 error_output = ReviewerOutput(
                     reviewer_name=reviewer.reviewer_id,
                     confidence_score=0,
@@ -438,13 +441,32 @@ class ReviewerRegistry:
                     strengths=[],
                     execution_time_ms=0,
                     skipped=True,
-                    skip_reason=f"Execution failed: {e!s}",
+                    skip_reason=f"[FAILED] Network/API error: {e!s}",
+                )
+                outputs.append(error_output)
+                logger.error(
+                    "reviewer_execution_failed_transient",
+                    reviewer_id=reviewer.reviewer_id,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+            except Exception as e:
+                # Unexpected errors - log with full context
+                error_output = ReviewerOutput(
+                    reviewer_name=reviewer.reviewer_id,
+                    confidence_score=0,
+                    issues=[],
+                    strengths=[],
+                    execution_time_ms=0,
+                    skipped=True,
+                    skip_reason=f"[FAILED] Unexpected error: {e!s}",
                 )
                 outputs.append(error_output)
                 logger.error(
                     "reviewer_execution_failed",
                     reviewer_id=reviewer.reviewer_id,
                     error=str(e),
+                    error_type=type(e).__name__,
                 )
 
         logger.info(
@@ -495,15 +517,17 @@ class ReviewerRegistry:
 
             # Aggregate issues
             for issue in output.issues:
-                all_issues.append({
-                    "reviewer": output.reviewer_name,
-                    "severity": issue.severity.value,
-                    "file_path": issue.file_path,
-                    "line_number": issue.line_number,
-                    "message": issue.message,
-                    "suggestion": issue.suggestion,
-                    "confidence": issue.confidence,
-                })
+                all_issues.append(
+                    {
+                        "reviewer": output.reviewer_name,
+                        "severity": issue.severity.value,
+                        "file_path": issue.file_path,
+                        "line_number": issue.line_number,
+                        "message": issue.message,
+                        "suggestion": issue.suggestion,
+                        "confidence": issue.confidence,
+                    }
+                )
                 issues_by_severity[issue.severity.value] += 1
 
             # Aggregate strengths
