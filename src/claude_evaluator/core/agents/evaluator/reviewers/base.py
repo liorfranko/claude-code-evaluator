@@ -214,3 +214,58 @@ class ReviewerBase(ABC):
 
         """
         ...
+
+    def build_prompt(self, context: ReviewContext) -> str:
+        """Build the review prompt from the context.
+
+        Constructs a prompt that includes the task description, code files,
+        evaluation context, and focus area for the reviewer.
+
+        Args:
+            context: Review context containing task and code information.
+
+        Returns:
+            Formatted prompt string for the LLM.
+
+        """
+        # Build code files section
+        code_sections: list[str] = []
+        for file_path, language, content in context.code_files:
+            code_sections.append(
+                f"### File: {file_path} ({language})\n```{language}\n{content}\n```"
+            )
+
+        code_files_text = "\n\n".join(code_sections) if code_sections else "No code files provided."
+
+        # Build the prompt
+        prompt = f"""You are a code reviewer focusing on: {self.focus_area}
+
+## Task Description
+{context.task_description}
+
+## Code Files
+{code_files_text}
+"""
+
+        # Add evaluation context if present
+        if context.evaluation_context:
+            prompt += f"""
+## Additional Context
+{context.evaluation_context}
+"""
+
+        prompt += f"""
+## Instructions
+Review the code focusing on {self.focus_area}. Identify any issues and note any strengths.
+For each issue, provide:
+- Severity (critical, high, medium, low)
+- File path
+- Line number (if applicable)
+- Description of the issue
+- Suggested fix (if applicable)
+- Confidence score (0-100)
+
+Also list any positive aspects or strengths you observe in the code.
+"""
+
+        return prompt
