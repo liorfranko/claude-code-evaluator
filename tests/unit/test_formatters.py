@@ -502,3 +502,200 @@ class TestFormatReviewerOutputs:
         assert "Quality issue" in result
         assert "Task completed" in result
         assert "Good structure" in result
+
+
+class TestPhaseOutputCheckpoint:
+    """T419 CHECKPOINT: Verify evaluation output shows clear per-phase results.
+
+    This checkpoint test verifies that a full multi-phase evaluation produces
+    output that meets all US-003 acceptance criteria:
+    - All three reviewers have formatted sections
+    - Issues show severity, file, line, confidence
+    - Strengths are listed per phase
+    """
+
+    @pytest.fixture
+    def three_phase_outputs(self) -> list[ReviewerOutput]:
+        """Create outputs from all three core reviewers."""
+        return [
+            ReviewerOutput(
+                reviewer_name="task_completion",
+                confidence_score=85,
+                issues=[
+                    ReviewerIssue(
+                        severity=IssueSeverity.HIGH,
+                        file_path="src/auth.py",
+                        line_number=45,
+                        message="Missing validation for empty username",
+                        suggestion="Add check for empty string before processing",
+                        confidence=90,
+                    ),
+                    ReviewerIssue(
+                        severity=IssueSeverity.MEDIUM,
+                        file_path="src/auth.py",
+                        line_number=78,
+                        message="Password hash not using constant-time comparison",
+                        suggestion="Use hmac.compare_digest() instead",
+                        confidence=75,
+                    ),
+                ],
+                strengths=[
+                    "Good separation of authentication logic",
+                    "Clear function naming conventions",
+                ],
+                execution_time_ms=150,
+            ),
+            ReviewerOutput(
+                reviewer_name="code_quality",
+                confidence_score=80,
+                issues=[
+                    ReviewerIssue(
+                        severity=IssueSeverity.LOW,
+                        file_path="src/utils.py",
+                        line_number=22,
+                        message="Consider using pathlib instead of os.path",
+                        confidence=65,
+                    ),
+                ],
+                strengths=[
+                    "Well-organized module structure",
+                    "Comprehensive type annotations",
+                ],
+                execution_time_ms=120,
+            ),
+            ReviewerOutput(
+                reviewer_name="error_handling",
+                confidence_score=75,
+                issues=[
+                    ReviewerIssue(
+                        severity=IssueSeverity.CRITICAL,
+                        file_path="src/database.py",
+                        line_number=103,
+                        message="Database connection not closed on error",
+                        suggestion="Use context manager or finally block",
+                        confidence=95,
+                    ),
+                ],
+                strengths=[
+                    "Good use of try-except blocks",
+                ],
+                execution_time_ms=100,
+            ),
+        ]
+
+    def test_checkpoint_all_three_reviewers_have_sections(
+        self, three_phase_outputs: list[ReviewerOutput]
+    ) -> None:
+        """T419: Verify all three reviewers have formatted sections."""
+        result = format_reviewer_outputs(three_phase_outputs)
+
+        # All three phase names should appear
+        assert "Task Completion Review" in result
+        assert "Code Quality Review" in result
+        assert "Error Handling Review" in result
+
+        # All three should have PHASE: label
+        assert result.count("PHASE:") == 3
+
+    def test_checkpoint_issues_show_severity_file_line_confidence(
+        self, three_phase_outputs: list[ReviewerOutput]
+    ) -> None:
+        """T419: Verify issues show severity, file, line, confidence."""
+        result = format_reviewer_outputs(three_phase_outputs)
+
+        # Check severity levels are present (uppercase)
+        assert "[CRITICAL]" in result
+        assert "[HIGH]" in result
+        assert "[MEDIUM]" in result
+        assert "[LOW]" in result
+
+        # Check file references with line numbers
+        assert "src/auth.py:45" in result
+        assert "src/auth.py:78" in result
+        assert "src/utils.py:22" in result
+        assert "src/database.py:103" in result
+
+        # Check confidence scores are present
+        assert "confidence: 90%" in result
+        assert "confidence: 75%" in result
+        assert "confidence: 65%" in result
+        assert "confidence: 95%" in result
+
+    def test_checkpoint_strengths_listed_per_phase(
+        self, three_phase_outputs: list[ReviewerOutput]
+    ) -> None:
+        """T419: Verify strengths are listed per phase."""
+        result = format_reviewer_outputs(three_phase_outputs)
+
+        # Strengths section should appear for each phase
+        assert result.count("STRENGTHS:") == 3
+
+        # Check specific strengths from each phase
+        # From task_completion
+        assert "Good separation of authentication logic" in result
+        assert "Clear function naming conventions" in result
+
+        # From code_quality
+        assert "Well-organized module structure" in result
+        assert "Comprehensive type annotations" in result
+
+        # From error_handling
+        assert "Good use of try-except blocks" in result
+
+        # Check for checkmark character
+        checkmark = "\u2713"
+        assert checkmark in result
+
+    def test_checkpoint_full_output_is_readable(
+        self, three_phase_outputs: list[ReviewerOutput]
+    ) -> None:
+        """T419: Verify the full output is properly formatted and readable."""
+        result = format_reviewer_outputs(three_phase_outputs)
+
+        # Output should be non-empty
+        assert len(result) > 0
+
+        # Output should have proper sections separated
+        assert "\n\n" in result
+
+        # Box drawing characters should be used
+        assert "\u250c" in result  # top-left corner
+        assert "\u2502" in result  # vertical line
+        assert "\u2514" in result  # bottom-left corner
+
+        # Header lines should be present
+        assert "=" * 59 in result
+
+        # Suggestions should be included
+        assert "Suggestion:" in result
+        assert "Use hmac.compare_digest() instead" in result
+        assert "Use context manager or finally block" in result
+
+    def test_checkpoint_complete_evaluation_output(
+        self, three_phase_outputs: list[ReviewerOutput]
+    ) -> None:
+        """T419: Complete checkpoint verifying all US-003 acceptance criteria."""
+        result = format_reviewer_outputs(three_phase_outputs)
+
+        # AC1: Each reviewer phase output is clearly labeled
+        assert "PHASE: Task Completion Review" in result
+        assert "PHASE: Code Quality Review" in result
+        assert "PHASE: Error Handling Review" in result
+
+        # AC2: Issues include severity levels and confidence scores
+        for severity in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+            assert f"[{severity}]" in result
+        assert "confidence:" in result
+
+        # AC3: File and line references are provided
+        assert "src/auth.py:45" in result
+        assert "src/database.py:103" in result
+
+        # AC4: Strengths and suggestions are included per phase
+        assert result.count("STRENGTHS:") == 3
+        assert "Suggestion:" in result
+
+        # Confidence scores per phase are displayed
+        assert "Confidence: 85%" in result
+        assert "Confidence: 80%" in result
+        assert "Confidence: 75%" in result
