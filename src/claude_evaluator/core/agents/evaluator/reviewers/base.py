@@ -17,6 +17,7 @@ from claude_evaluator.models.base import BaseSchema
 __all__ = [
     "IssueSeverity",
     "ReviewerIssue",
+    "ReviewerOutput",
 ]
 
 
@@ -78,4 +79,52 @@ class ReviewerIssue(BaseSchema):
         ge=0,
         le=100,
         description="Confidence in this specific issue (0-100)",
+    )
+
+
+class ReviewerOutput(BaseSchema):
+    """Complete output from a reviewer execution.
+
+    Attributes:
+        reviewer_name: Identifier of the reviewer that produced this output.
+        confidence_score: Overall confidence in the review findings (0-100).
+        issues: List of identified issues (may be empty).
+        strengths: List of positive findings (may be empty).
+        execution_time_ms: Time taken to execute (non-negative).
+        skipped: Whether this reviewer was skipped (default: false).
+        skip_reason: Reason for skipping (if skipped is true).
+
+    """
+
+    reviewer_name: str = Field(
+        ...,
+        min_length=1,
+        description="Identifier of the reviewer that produced this output",
+    )
+    confidence_score: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Overall confidence in the review findings (0-100)",
+    )
+    issues: list[ReviewerIssue] = Field(
+        default_factory=list,
+        description="List of identified issues (may be empty)",
+    )
+    strengths: list[str] = Field(
+        default_factory=list,
+        description="List of positive findings (may be empty)",
+    )
+    execution_time_ms: int = Field(
+        ...,
+        ge=0,
+        description="Time taken to execute in milliseconds (non-negative)",
+    )
+    skipped: bool = Field(
+        default=False,
+        description="Whether this reviewer was skipped",
+    )
+    skip_reason: str | None = Field(
+        default=None,
+        description="Reason for skipping (if skipped is true)",
     )
