@@ -29,13 +29,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from claude_evaluator.config.defaults import (
     CONTEXT_WINDOW_MAX,
     CONTEXT_WINDOW_MIN,
-    DEFAULT_CLAUDE_EVALUATOR_MODEL,
     DEFAULT_CODE_QUALITY_WEIGHT,
     DEFAULT_CONTEXT_WINDOW_SIZE,
     DEFAULT_EFFICIENCY_WEIGHT,
     DEFAULT_EVALUATION_TIMEOUT_SECONDS,
     DEFAULT_EVALUATOR_ENABLE_AST,
     DEFAULT_EVALUATOR_MAX_TURNS,
+    DEFAULT_EVALUATOR_MODEL,
     DEFAULT_EVALUATOR_TEMPERATURE,
     DEFAULT_EVALUATOR_TIMEOUT_SECONDS,
     DEFAULT_MAX_ANSWER_RETRIES,
@@ -153,7 +153,7 @@ class EvaluatorSettings(BaseSettings):
     )
 
     model: str = Field(
-        default=DEFAULT_CLAUDE_EVALUATOR_MODEL,
+        default=DEFAULT_EVALUATOR_MODEL,
         description="Claude model identifier for evaluation scoring",
     )
     timeout_seconds: int = Field(
