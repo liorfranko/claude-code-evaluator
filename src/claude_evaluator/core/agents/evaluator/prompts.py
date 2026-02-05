@@ -9,6 +9,7 @@ __all__ = [
     "TASK_COMPLETION_PROMPT_TEMPLATE",
     "CODE_QUALITY_SYSTEM_PROMPT",
     "CODE_QUALITY_PROMPT_TEMPLATE",
+    "TASK_COMPLETION_REVIEW_PROMPT",
 ]
 
 # Task Completion Scoring Prompts
@@ -117,3 +118,36 @@ Provide a quality assessment with:
 4. A concise rationale for your scores
 
 Focus on objective quality metrics and avoid subjective opinions about style preferences unless they violate conventions."""
+
+# Phase Reviewer Prompts - Task Completion
+TASK_COMPLETION_REVIEW_PROMPT = """You are reviewing code to determine whether the task requirements were fully satisfied.
+
+## Task Description
+{task_description}
+
+## Code Files
+{code_files}
+
+## Additional Context
+{evaluation_context}
+
+## Your Task
+Analyze whether the code fully satisfies the task requirements. Consider:
+1. Are all stated requirements addressed in the implementation?
+2. Does the code correctly implement the requested functionality?
+3. Are there any missing features or incomplete implementations?
+4. Does the implementation match the intent of the task description?
+
+## Response Format
+Provide your analysis as a structured review with:
+- **confidence_score** (0-100): Your confidence in the review findings
+- **issues**: List of issues where task requirements are not met, each with:
+  - severity (critical, high, medium, low)
+  - file_path: The file containing the issue
+  - line_number: Line number if applicable (null otherwise)
+  - message: Description of the missing or incorrect requirement
+  - suggestion: How to address the issue
+  - confidence (0-100): Confidence in this specific issue
+- **strengths**: List of positive findings where requirements are well-addressed
+
+Focus on whether the code accomplishes what was asked, not on code style or quality."""
