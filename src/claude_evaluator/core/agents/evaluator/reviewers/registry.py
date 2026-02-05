@@ -263,6 +263,53 @@ class ReviewerRegistry:
             return config.enabled
         return True
 
+    def get_enabled_reviewers(self) -> list[ReviewerBase]:
+        """Get all reviewers that are currently enabled.
+
+        Filters the registered reviewers based on their configuration,
+        returning only those whose enabled flag is True (or have no
+        explicit configuration, defaulting to enabled).
+
+        Returns:
+            List of enabled ReviewerBase instances.
+
+        Example:
+            >>> enabled = registry.get_enabled_reviewers()
+            >>> print([r.reviewer_id for r in enabled])
+            ['task_completion', 'code_quality']
+
+        """
+        enabled = [r for r in self.reviewers if self._is_reviewer_enabled(r)]
+        logger.debug(
+            "get_enabled_reviewers",
+            total_reviewers=len(self.reviewers),
+            enabled_count=len(enabled),
+        )
+        return enabled
+
+    def get_disabled_reviewers(self) -> list[ReviewerBase]:
+        """Get all reviewers that are currently disabled.
+
+        Filters the registered reviewers based on their configuration,
+        returning only those whose enabled flag is explicitly False.
+
+        Returns:
+            List of disabled ReviewerBase instances.
+
+        Example:
+            >>> disabled = registry.get_disabled_reviewers()
+            >>> print([r.reviewer_id for r in disabled])
+            ['error_handling']
+
+        """
+        disabled = [r for r in self.reviewers if not self._is_reviewer_enabled(r)]
+        logger.debug(
+            "get_disabled_reviewers",
+            total_reviewers=len(self.reviewers),
+            disabled_count=len(disabled),
+        )
+        return disabled
+
     async def run_all(self, context: ReviewContext) -> list[ReviewerOutput]:
         """Execute all enabled reviewers on the provided context.
 
