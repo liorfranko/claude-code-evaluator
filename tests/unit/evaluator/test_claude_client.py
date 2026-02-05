@@ -501,7 +501,7 @@ class TestClaudeClientExtractText:
         msg = MagicMock()
         msg.result = None
         msg.content = None
-        msg.__str__ = lambda self: "Fallback string"
+        msg.configure_mock(**{"__str__.return_value": "Fallback string"})
 
         result = mock_client._extract_text(msg)
 
