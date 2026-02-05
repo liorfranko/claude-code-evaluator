@@ -8,10 +8,12 @@ This module provides the foundational types for the multi-phase review system:
 - ReviewerBase: Abstract base class for all reviewers
 """
 
+from abc import ABC, abstractmethod
 from enum import Enum
 
 from pydantic import Field
 
+from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 from claude_evaluator.models.base import BaseSchema
 
 __all__ = [
@@ -19,6 +21,7 @@ __all__ = [
     "ReviewerIssue",
     "ReviewerOutput",
     "ReviewContext",
+    "ReviewerBase",
 ]
 
 
@@ -161,3 +164,53 @@ class ReviewContext(BaseSchema):
         default="",
         description="Additional context for the evaluation",
     )
+
+
+class ReviewerBase(ABC):
+    """Abstract base class for all phase reviewers.
+
+    Reviewers analyze code and produce structured output with issues
+    and strengths. Each reviewer focuses on a specific aspect of
+    code quality (e.g., security, performance, correctness).
+
+    Attributes:
+        reviewer_id: Unique identifier for this reviewer (snake_case).
+        focus_area: Description of what this reviewer analyzes.
+        min_confidence: Minimum confidence threshold for issues (0-100).
+        client: Claude client for LLM operations.
+
+    """
+
+    def __init__(
+        self,
+        reviewer_id: str,
+        focus_area: str,
+        client: ClaudeClient,
+        min_confidence: int = 60,
+    ) -> None:
+        """Initialize the reviewer.
+
+        Args:
+            reviewer_id: Unique identifier for this reviewer (snake_case).
+            focus_area: Description of what this reviewer analyzes.
+            client: Claude client for LLM operations.
+            min_confidence: Minimum confidence threshold for issues (0-100).
+
+        """
+        self.reviewer_id = reviewer_id
+        self.focus_area = focus_area
+        self.client = client
+        self.min_confidence = min_confidence
+
+    @abstractmethod
+    async def review(self, context: ReviewContext) -> ReviewerOutput:
+        """Execute the review on the provided context.
+
+        Args:
+            context: Review context containing task and code information.
+
+        Returns:
+            ReviewerOutput with identified issues and strengths.
+
+        """
+        ...
