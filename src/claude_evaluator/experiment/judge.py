@@ -16,6 +16,7 @@ from claude_evaluator.models.experiment import (
     DimensionJudgment,
     JudgeVerdict,
     PairwiseComparison,
+    PresentationOrder,
 )
 from claude_evaluator.models.experiment_models import JudgeDimension
 
@@ -126,6 +127,9 @@ class PairwiseJudge:
         original_verdict = await self._judge_once(task_prompt, code_a, code_b)
         original_duration = _now_ms() - start_ms
 
+        a_first: PresentationOrder = "A_first"
+        b_first: PresentationOrder = "B_first"
+
         if not self._position_bias_mitigation:
             comparisons.append(
                 PairwiseComparison(
@@ -133,7 +137,7 @@ class PairwiseJudge:
                     config_b_id=config_b_id,
                     run_index_a=run_index_a,
                     run_index_b=run_index_b,
-                    presentation_order="A_first",
+                    presentation_order=a_first,
                     dimension_judgments=original_verdict.dimension_judgments,
                     overall_verdict=original_verdict.overall_verdict,
                     overall_rationale=original_verdict.overall_rationale,
@@ -151,7 +155,7 @@ class PairwiseJudge:
         swapped_duration = _now_ms() - start_ms
 
         # Flip the swapped verdict back to A/B frame of reference
-        flipped_verdict = self._flip_verdict(swapped_verdict.overall_verdict)
+        flipped_verdict = swapped_verdict.overall_verdict.flip()
         flipped_judgments = self._flip_dimension_judgments(
             swapped_verdict.dimension_judgments
         )
@@ -178,7 +182,7 @@ class PairwiseJudge:
                 config_b_id=config_b_id,
                 run_index_a=run_index_a,
                 run_index_b=run_index_b,
-                presentation_order="A_first",
+                presentation_order=a_first,
                 dimension_judgments=original_verdict.dimension_judgments,
                 overall_verdict=final_verdict,
                 overall_rationale=original_verdict.overall_rationale,
@@ -196,7 +200,7 @@ class PairwiseJudge:
                 config_b_id=config_b_id,
                 run_index_a=run_index_a,
                 run_index_b=run_index_b,
-                presentation_order="B_first",
+                presentation_order=b_first,
                 dimension_judgments=flipped_judgments,
                 overall_verdict=final_verdict,
                 overall_rationale=swapped_verdict.overall_rationale,
@@ -234,37 +238,19 @@ class PairwiseJudge:
             for d in self._dimensions
         )
 
-        prompt = f"{_SYSTEM_PROMPT}\n\n{_USER_PROMPT_TEMPLATE.format(
-            task_prompt=task_prompt,
-            dimensions_text=dimensions_text,
-            solution_a=_format_code_files(code_first),
-            solution_b=_format_code_files(code_second),
-        )}"
+        prompt = f"{_SYSTEM_PROMPT}\n\n{
+            _USER_PROMPT_TEMPLATE.format(
+                task_prompt=task_prompt,
+                dimensions_text=dimensions_text,
+                solution_a=_format_code_files(code_first),
+                solution_b=_format_code_files(code_second),
+            )
+        }"
 
         try:
             return await self._client.generate_structured(prompt, JudgeVerdict)
         except Exception as e:
             raise JudgeError(f"Judge LLM call failed: {e}") from e
-
-    @staticmethod
-    def _flip_verdict(verdict: ComparisonVerdict) -> ComparisonVerdict:
-        """Flip a verdict from A/B to B/A perspective.
-
-        Args:
-            verdict: Original verdict.
-
-        Returns:
-            Flipped verdict.
-
-        """
-        flip_map = {
-            ComparisonVerdict.a_much_better: ComparisonVerdict.b_much_better,
-            ComparisonVerdict.a_slightly_better: ComparisonVerdict.b_slightly_better,
-            ComparisonVerdict.tie: ComparisonVerdict.tie,
-            ComparisonVerdict.b_slightly_better: ComparisonVerdict.a_slightly_better,
-            ComparisonVerdict.b_much_better: ComparisonVerdict.a_much_better,
-        }
-        return flip_map[verdict]
 
     @staticmethod
     def _flip_dimension_judgments(
@@ -279,18 +265,16 @@ class PairwiseJudge:
             Judgments with scores and verdicts flipped.
 
         """
-        flipped = []
-        for j in judgments:
-            flipped.append(
-                DimensionJudgment(
-                    dimension_id=j.dimension_id,
-                    verdict=PairwiseJudge._flip_verdict(j.verdict),
-                    score_a=j.score_b,
-                    score_b=j.score_a,
-                    rationale=j.rationale,
-                )
+        return [
+            DimensionJudgment(
+                dimension_id=j.dimension_id,
+                verdict=j.verdict.flip(),
+                score_a=j.score_b,
+                score_b=j.score_a,
+                rationale=j.rationale,
             )
-        return flipped
+            for j in judgments
+        ]
 
     @staticmethod
     def _reconcile_verdicts(

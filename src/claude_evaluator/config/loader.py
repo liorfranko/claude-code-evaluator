@@ -439,9 +439,6 @@ def load_experiment(path: Path | str) -> ExperimentConfig:
     except Exception as e:
         raise ExperimentError(f"Experiment config validation failed: {e}") from e
 
-    # Validate dimension weights sum to ~1.0
-    _validate_dimension_weights(config)
-
     logger.info(
         "experiment_config_loaded",
         name=config.name,
@@ -478,24 +475,6 @@ def _merge_experiment_defaults(data: dict[str, Any]) -> None:
                 config_entry[field] = defaults[field]
 
 
-def _validate_dimension_weights(config: ExperimentConfig) -> None:
-    """Validate that dimension weights sum to approximately 1.0.
-
-    Args:
-        config: Validated experiment configuration.
-
-    Raises:
-        ExperimentError: If weights don't sum to ~1.0.
-
-    """
-    from claude_evaluator.experiment.exceptions import ExperimentError
-
-    total_weight = sum(d.weight for d in config.judge_dimensions)
-    if abs(total_weight - 1.0) > 0.01:
-        raise ExperimentError(
-            f"Judge dimension weights must sum to ~1.0 (within 0.01 tolerance). "
-            f"Got {total_weight:.4f}"
-        )
 
 
 def load_reviewer_configs(path: Path | str) -> dict[str, ReviewerConfig]:

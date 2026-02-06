@@ -1,0 +1,43 @@
+name: custom-dimensions-test
+description: >
+  Test custom judge dimensions focused on different criteria.
+
+task:
+  prompt: >
+    Create a Python script called word_count.py that reads text from stdin
+    and prints the count of each word, sorted by frequency (most common first).
+    Handle case-insensitively.
+
+settings:
+  runs_per_config: 1
+  judge_model: haiku
+  position_bias_mitigation: false
+  output_json: true
+  output_html: true
+  output_cli_summary: true
+
+defaults:
+  max_turns: 10
+  timeout_seconds: 120
+
+judge_dimensions:
+  - id: simplicity
+    name: Code Simplicity
+    weight: 0.40
+    description: How simple and readable is the solution? Fewer lines, less complexity is better.
+  - id: pythonic
+    name: Pythonic Style
+    weight: 0.30
+    description: Does it use Python idioms like Counter, defaultdict, list comprehensions?
+  - id: edge_cases
+    name: Edge Case Handling
+    weight: 0.30
+    description: Does it handle empty input, punctuation, whitespace properly?
+
+configs:
+  - id: sonnet
+    name: Sonnet
+    model: sonnet
+  - id: haiku
+    name: Haiku
+    model: haiku

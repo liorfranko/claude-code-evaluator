@@ -2,7 +2,7 @@
 
 This module provides statistical tests (Wilcoxon signed-rank),
 confidence intervals (bootstrap), effect sizes (Cohen's d),
-ELO ratings, and position bias analysis. Uses only stdlib modules.
+Elo ratings, and position bias analysis. Uses only stdlib modules.
 """
 
 from __future__ import annotations
@@ -24,14 +24,6 @@ from claude_evaluator.models.experiment import (
 __all__ = ["EloCalculator", "ExperimentStatistician"]
 
 logger = get_logger(__name__)
-
-VERDICT_SCORES: dict[ComparisonVerdict, int] = {
-    ComparisonVerdict.a_much_better: +2,
-    ComparisonVerdict.a_slightly_better: +1,
-    ComparisonVerdict.tie: 0,
-    ComparisonVerdict.b_slightly_better: -1,
-    ComparisonVerdict.b_much_better: -2,
-}
 
 
 class ExperimentStatistician:
@@ -82,6 +74,13 @@ class ExperimentStatistician:
             # Extract scores (positive = A better)
             scores = self._extract_scores(pair_comparisons, config_a, config_b)
             if len(scores) < 2:
+                logger.warning(
+                    "insufficient_samples_for_test",
+                    config_a=config_a,
+                    config_b=config_b,
+                    sample_count=len(scores),
+                    reason="Need at least 2 samples for Wilcoxon signed-rank test",
+                )
                 continue
 
             test = self._run_pairwise_test(scores, config_a, config_b)
@@ -108,7 +107,7 @@ class ExperimentStatistician:
 
         Args:
             comparisons: Comparisons for this pair.
-            config_a: First config ID.
+            _config_a: First config ID (unused, order inferred from config_b).
             config_b: Second config ID.
 
         Returns:
@@ -117,7 +116,7 @@ class ExperimentStatistician:
         """
         scores: list[int] = []
         for c in comparisons:
-            score = VERDICT_SCORES[c.overall_verdict]
+            score = c.overall_verdict.score
             # If configs are reversed in comparison, flip the score
             if c.config_a_id == config_b:
                 score = -score
@@ -275,7 +274,7 @@ class EloCalculator:
         for c in comparisons:
             if c.position_swapped:
                 continue  # Only count non-swapped to avoid double counting
-            score = VERDICT_SCORES[c.overall_verdict]
+            score = c.overall_verdict.score
             if score > 0:
                 wins[c.config_a_id] = wins.get(c.config_a_id, 0) + 1
                 losses[c.config_b_id] = losses.get(c.config_b_id, 0) + 1
@@ -297,7 +296,7 @@ class EloCalculator:
                 e_a = 1.0 / (1.0 + 10.0 ** ((r_b - r_a) / 400.0))
                 e_b = 1.0 - e_a
 
-                score = VERDICT_SCORES[c.overall_verdict]
+                score = c.overall_verdict.score
                 if score > 0:
                     s_a, s_b = 1.0, 0.0
                 elif score < 0:
@@ -370,7 +369,11 @@ def _wilcoxon_signed_rank(scores: list[int]) -> tuple[float, float]:
     w_minus = sum(rank for rank, sign in ranks if sign < 0)
     w = min(w_plus, w_minus)
 
-    # P-value via normal approximation
+    # P-value via normal approximation.
+    # Note: this approximation is less accurate for n < 20.  For small
+    # samples the exact distribution should be used, but stdlib-only
+    # implementation keeps it simple.  The tie-correction term for
+    # std_w is also omitted.
     if n <= 1:
         return w, 1.0
 

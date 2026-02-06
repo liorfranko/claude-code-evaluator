@@ -31,6 +31,7 @@ from claude_evaluator.models.experiment import (
     JudgeVerdict,
     PairwiseComparison,
     PositionBiasAnalysis,
+    PresentationOrder,
     RunResult,
     StatisticalTest,
 )
@@ -116,6 +117,7 @@ __all__ = [
     "JudgeVerdict",
     "PairwiseComparison",
     "PositionBiasAnalysis",
+    "PresentationOrder",
     "RunResult",
     "StatisticalTest",
     # Reviewer Models

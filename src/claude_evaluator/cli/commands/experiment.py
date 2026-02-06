@@ -46,27 +46,38 @@ class RunExperimentCommand(BaseCommand):
 
         # Run experiment
         runner = ExperimentRunner()
-        report = await runner.run(
+        report, experiment_dir = await runner.run(
             config=config,
             output_dir=output_dir,
             runs_override=runs_override,
             verbose=verbose,
         )
 
-        # Generate reports
+        # Generate reports — produce CLI summary first (never fails),
+        # then attempt file-based reports with error handling.
         report_gen = ExperimentReportGenerator()
-        experiment_dir = output_dir / f"experiment-{report.generated_at.strftime('%Y-%m-%dT%H-%M-%S')}"
-        experiment_dir.mkdir(parents=True, exist_ok=True)
-
-        if config.settings.output_json:
-            report_gen.to_json(report, experiment_dir / "experiment_report.json")
-
-        if config.settings.output_html:
-            report_gen.to_html(report, experiment_dir / "experiment_report.html")
 
         cli_summary = ""
         if config.settings.output_cli_summary:
             cli_summary = report_gen.to_cli(report)
+
+        if config.settings.output_json:
+            try:
+                report_gen.to_json(report, experiment_dir / "experiment_report.json")
+            except OSError:
+                logger.error(
+                    "json_report_write_failed",
+                    path=str(experiment_dir / "experiment_report.json"),
+                )
+
+        if config.settings.output_html:
+            try:
+                report_gen.to_html(report, experiment_dir / "experiment_report.html")
+            except OSError:
+                logger.error(
+                    "html_report_write_failed",
+                    path=str(experiment_dir / "experiment_report.html"),
+                )
 
         return CommandResult(
             exit_code=0,

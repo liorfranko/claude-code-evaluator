@@ -65,7 +65,10 @@ class DockerSandbox:
         await self._ensure_image()
         cmd = self._build_command(args)
         logger.info("docker_run", command=" ".join(cmd))
-        return await self._run_container(cmd)
+        exit_code = await self._run_container(cmd)
+        if exit_code != 0:
+            logger.warning("docker_container_exited", exit_code=exit_code)
+        return exit_code
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -157,6 +160,11 @@ class DockerSandbox:
             host_suite = str(Path(args.suite).resolve())
             flags.extend(["-v", f"{host_suite}:/app/suite.yaml:ro"])
 
+        # Experiment file (read-only)
+        if getattr(args, "experiment", None):
+            host_experiment = str(Path(args.experiment).resolve())
+            flags.extend(["-v", f"{host_experiment}:/app/experiment.yaml:ro"])
+
         # GCloud ADC credentials (read-only)
         adc_path = Path.home() / ".config/gcloud/application_default_credentials.json"
         if adc_path.exists():
@@ -179,6 +187,10 @@ class DockerSandbox:
 
         if getattr(args, "suite", None):
             inner.extend(["--suite", "/app/suite.yaml"])
+        if getattr(args, "experiment", None):
+            inner.extend(["--experiment", "/app/experiment.yaml"])
+        if getattr(args, "runs", None):
+            inner.extend(["--runs", str(args.runs)])
         if getattr(args, "workflow", None):
             inner.extend(["--workflow", args.workflow])
         if getattr(args, "task", None):
@@ -208,8 +220,8 @@ class DockerSandbox:
             stderr=subprocess.STDOUT,
         )
 
-        assert proc.stdout is not None  # noqa: S101
-        async for line in proc.stdout:
-            print(line.decode(), end="", flush=True)
+        if proc.stdout is not None:
+            async for line in proc.stdout:
+                print(line.decode(errors="replace"), end="", flush=True)
 
         return await proc.wait()

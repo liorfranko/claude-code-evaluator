@@ -2,13 +2,14 @@
 
 This module defines data models for experiment results including
 comparison verdicts, pairwise comparisons, run results, statistical
-tests, ELO ratings, and the complete experiment report.
+tests, Elo ratings, and the complete experiment report.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import Field
 
@@ -22,10 +23,16 @@ __all__ = [
     "ExperimentReport",
     "JudgeVerdict",
     "PairwiseComparison",
+    "PresentationOrder",
     "PositionBiasAnalysis",
     "RunResult",
     "StatisticalTest",
 ]
+
+PresentationOrder = Literal["A_first", "B_first"]
+
+_VERDICT_SCORES: dict[ComparisonVerdict, int] = {}
+_VERDICT_FLIPS: dict[ComparisonVerdict, ComparisonVerdict] = {}
 
 
 class ComparisonVerdict(str, Enum):
@@ -45,6 +52,37 @@ class ComparisonVerdict(str, Enum):
     tie = "tie"
     b_slightly_better = "b_slightly_better"
     b_much_better = "b_much_better"
+
+    @property
+    def score(self) -> int:
+        """Return the numeric score for this verdict."""
+        return _VERDICT_SCORES[self]
+
+    def flip(self) -> ComparisonVerdict:
+        """Return the verdict from the opposite perspective (A<->B)."""
+        return _VERDICT_FLIPS[self]
+
+
+# Populate after class is defined
+_VERDICT_SCORES.update(
+    {
+        ComparisonVerdict.a_much_better: +2,
+        ComparisonVerdict.a_slightly_better: +1,
+        ComparisonVerdict.tie: 0,
+        ComparisonVerdict.b_slightly_better: -1,
+        ComparisonVerdict.b_much_better: -2,
+    }
+)
+
+_VERDICT_FLIPS.update(
+    {
+        ComparisonVerdict.a_much_better: ComparisonVerdict.b_much_better,
+        ComparisonVerdict.a_slightly_better: ComparisonVerdict.b_slightly_better,
+        ComparisonVerdict.tie: ComparisonVerdict.tie,
+        ComparisonVerdict.b_slightly_better: ComparisonVerdict.a_slightly_better,
+        ComparisonVerdict.b_much_better: ComparisonVerdict.a_much_better,
+    }
+)
 
 
 class DimensionJudgment(BaseSchema):
@@ -76,9 +114,9 @@ class JudgeVerdict(BaseSchema):
 
     """
 
-    dimension_judgments: list[DimensionJudgment]
+    dimension_judgments: list[DimensionJudgment] = Field(..., min_length=1)
     overall_verdict: ComparisonVerdict
-    overall_rationale: str
+    overall_rationale: str = Field(..., min_length=20)
 
 
 class PairwiseComparison(BaseSchema):
@@ -100,16 +138,16 @@ class PairwiseComparison(BaseSchema):
 
     """
 
-    config_a_id: str
-    config_b_id: str
-    run_index_a: int
-    run_index_b: int
-    presentation_order: str
-    dimension_judgments: list[DimensionJudgment]
+    config_a_id: str = Field(..., min_length=1)
+    config_b_id: str = Field(..., min_length=1)
+    run_index_a: int = Field(..., ge=0)
+    run_index_b: int = Field(..., ge=0)
+    presentation_order: PresentationOrder
+    dimension_judgments: list[DimensionJudgment] = Field(..., min_length=1)
     overall_verdict: ComparisonVerdict
-    overall_rationale: str
-    judge_model: str
-    judge_duration_ms: int
+    overall_rationale: str = Field(..., min_length=1)
+    judge_model: str = Field(..., min_length=1)
+    judge_duration_ms: int = Field(..., ge=0)
     position_swapped: bool
     consistent_with_original: bool | None = None
 
@@ -125,24 +163,24 @@ class RunResult(BaseSchema):
         workspace_path: Path to the workspace used.
         code_files: List of code file paths produced.
         code_content: Mapping of file paths to their content.
-        outcome: Evaluation outcome string.
+        outcome: Evaluation outcome.
         total_tokens: Total tokens consumed.
         total_cost_usd: Total cost in USD.
         total_runtime_ms: Total runtime in milliseconds.
 
     """
 
-    config_id: str
-    run_index: int
-    evaluation_id: str
+    config_id: str = Field(..., min_length=1)
+    run_index: int = Field(..., ge=0)
+    evaluation_id: str = Field(..., min_length=1)
     evaluation_dir: str
     workspace_path: str
     code_files: list[str] = Field(default_factory=list)
     code_content: dict[str, str] = Field(default_factory=dict)
     outcome: str
-    total_tokens: int = 0
-    total_cost_usd: float = 0.0
-    total_runtime_ms: int = 0
+    total_tokens: int = Field(default=0, ge=0)
+    total_cost_usd: float = Field(default=0.0, ge=0.0)
+    total_runtime_ms: int = Field(default=0, ge=0)
 
 
 class StatisticalTest(BaseSchema):
@@ -163,25 +201,25 @@ class StatisticalTest(BaseSchema):
 
     """
 
-    test_name: str
-    config_a_id: str
-    config_b_id: str
+    test_name: str = Field(..., min_length=1)
+    config_a_id: str = Field(..., min_length=1)
+    config_b_id: str = Field(..., min_length=1)
     statistic: float
-    p_value: float
+    p_value: float = Field(..., ge=0.0, le=1.0)
     significant: bool
     effect_size: float
     confidence_interval_lower: float
     confidence_interval_upper: float
-    sample_size: int
+    sample_size: int = Field(..., ge=1)
     notes: str = ""
 
 
 class EloRating(BaseSchema):
-    """ELO rating for a single configuration.
+    """Elo rating for a single configuration.
 
     Attributes:
         config_id: Identifier for the configuration.
-        rating: Current ELO rating.
+        rating: Current Elo rating.
         wins: Number of wins.
         losses: Number of losses.
         ties: Number of ties.
@@ -189,12 +227,12 @@ class EloRating(BaseSchema):
 
     """
 
-    config_id: str
+    config_id: str = Field(..., min_length=1)
     rating: float = 1500.0
-    wins: int = 0
-    losses: int = 0
-    ties: int = 0
-    win_rate: float = 0.0
+    wins: int = Field(default=0, ge=0)
+    losses: int = Field(default=0, ge=0)
+    ties: int = Field(default=0, ge=0)
+    win_rate: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class ConfigResult(BaseSchema):
@@ -215,15 +253,15 @@ class ConfigResult(BaseSchema):
 
     """
 
-    config_id: str
-    config_name: str
+    config_id: str = Field(..., min_length=1)
+    config_name: str = Field(..., min_length=1)
     runs: list[RunResult] = Field(default_factory=list)
-    total_runs: int = 0
-    success_rate: float = 0.0
-    avg_tokens: float = 0.0
-    std_tokens: float = 0.0
-    avg_cost_usd: float = 0.0
-    avg_runtime_ms: float = 0.0
+    total_runs: int = Field(default=0, ge=0)
+    success_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    avg_tokens: float = Field(default=0.0, ge=0.0)
+    std_tokens: float = Field(default=0.0, ge=0.0)
+    avg_cost_usd: float = Field(default=0.0, ge=0.0)
+    avg_runtime_ms: float = Field(default=0.0, ge=0.0)
     dimension_scores: dict[str, float] = Field(default_factory=dict)
     elo_rating: EloRating | None = None
 
@@ -241,12 +279,12 @@ class PositionBiasAnalysis(BaseSchema):
 
     """
 
-    total_pairs_judged: int
-    consistent_count: int
-    inconsistent_count: int
-    consistency_rate: float
-    first_position_win_rate: float
-    detected_bias: str | None = None
+    total_pairs_judged: int = Field(..., ge=0)
+    consistent_count: int = Field(..., ge=0)
+    inconsistent_count: int = Field(..., ge=0)
+    consistency_rate: float = Field(..., ge=0.0, le=1.0)
+    first_position_win_rate: float = Field(..., ge=0.0, le=1.0)
+    detected_bias: Literal["first", "second"] | None = None
 
 
 class ExperimentReport(BaseSchema):
@@ -263,7 +301,7 @@ class ExperimentReport(BaseSchema):
         config_results: Per-config aggregated results.
         pairwise_comparisons: All pairwise comparison results.
         statistical_tests: Statistical significance tests.
-        elo_rankings: ELO ratings for all configs.
+        elo_rankings: Elo ratings for all configs.
         position_bias_analysis: Position bias analysis.
         settings: Experiment settings used.
 
@@ -273,9 +311,9 @@ class ExperimentReport(BaseSchema):
     experiment_description: str | None = None
     task_prompt: str
     generated_at: datetime = Field(default_factory=datetime.now)
-    total_runs: int = 0
-    total_comparisons: int = 0
-    total_cost_usd: float = 0.0
+    total_runs: int = Field(default=0, ge=0)
+    total_comparisons: int = Field(default=0, ge=0)
+    total_cost_usd: float = Field(default=0.0, ge=0.0)
     config_results: list[ConfigResult] = Field(default_factory=list)
     pairwise_comparisons: list[PairwiseComparison] = Field(default_factory=list)
     statistical_tests: list[StatisticalTest] = Field(default_factory=list)

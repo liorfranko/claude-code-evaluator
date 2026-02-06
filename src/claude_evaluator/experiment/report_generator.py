@@ -35,6 +35,9 @@ class ExperimentReportGenerator:
         Returns:
             Path to the written file.
 
+        Raises:
+            OSError: If the file cannot be written.
+
         """
         path.write_text(report.model_dump_json(indent=2))
         logger.info("experiment_report_json_saved", path=str(path))
@@ -71,8 +74,7 @@ class ExperimentReportGenerator:
         lines.append("")
         lines.append("RANKINGS (by Elo Rating):")
         lines.append(
-            f"  {'Rank':<6}{'Config':<24}{'Elo':>7}{'W':>5}{'L':>5}"
-            f"{'T':>5}{'Win%':>7}"
+            f"  {'Rank':<6}{'Config':<24}{'Elo':>7}{'W':>5}{'L':>5}{'T':>5}{'Win%':>7}"
         )
         lines.append(
             f"  {'----':<6}{'------':<24}{'---':>7}{'--':>5}{'--':>5}"
@@ -92,12 +94,8 @@ class ExperimentReportGenerator:
             lines.append("")
             lines.append("HEAD-TO-HEAD:")
             for test in report.statistical_tests:
-                name_a = _find_config_name(
-                    report.config_results, test.config_a_id
-                )
-                name_b = _find_config_name(
-                    report.config_results, test.config_b_id
-                )
+                name_a = _find_config_name(report.config_results, test.config_a_id)
+                name_b = _find_config_name(report.config_results, test.config_b_id)
                 sig = "significant" if test.significant else "not significant"
                 lines.append(
                     f"  {name_a} vs {name_b}: "
@@ -159,6 +157,9 @@ class ExperimentReportGenerator:
 
         Returns:
             Path to the written file.
+
+        Raises:
+            OSError: If the file cannot be written.
 
         """
         h = html.escape
@@ -226,16 +227,12 @@ class ExperimentReportGenerator:
                 "<th>CI</th></tr>"
             )
             for test in report.statistical_tests:
-                name_a = h(
-                    _find_config_name(report.config_results, test.config_a_id)
-                )
-                name_b = h(
-                    _find_config_name(report.config_results, test.config_b_id)
-                )
+                name_a = h(_find_config_name(report.config_results, test.config_a_id))
+                name_b = h(_find_config_name(report.config_results, test.config_b_id))
                 sig_class = "sig-yes" if test.significant else "sig-no"
                 sig_text = "Yes" if test.significant else "No"
                 html_parts.append(
-                    f'<tr><td>{name_a} vs {name_b}</td>'
+                    f"<tr><td>{name_a} vs {name_b}</td>"
                     f"<td>{test.p_value:.4f}</td>"
                     f'<td class="{sig_class}">{sig_text}</td>'
                     f"<td>{test.effect_size:.3f}</td>"
@@ -264,12 +261,8 @@ class ExperimentReportGenerator:
             for comp in report.pairwise_comparisons:
                 if comp.position_swapped:
                     continue
-                name_a = h(
-                    _find_config_name(report.config_results, comp.config_a_id)
-                )
-                name_b = h(
-                    _find_config_name(report.config_results, comp.config_b_id)
-                )
+                name_a = h(_find_config_name(report.config_results, comp.config_a_id))
+                name_b = h(_find_config_name(report.config_results, comp.config_b_id))
                 html_parts.append("<details>")
                 html_parts.append(
                     f"<summary>{name_a} vs {name_b} "
@@ -296,9 +289,7 @@ class ExperimentReportGenerator:
 # --- Helper functions ---
 
 
-def _find_config_name(
-    config_results: list[ConfigResult], config_id: str
-) -> str:
+def _find_config_name(config_results: list[ConfigResult], config_id: str) -> str:
     """Find config name by ID."""
     for cr in config_results:
         if cr.config_id == config_id:
@@ -434,9 +425,7 @@ def _generate_matrix_html(
                     else:
                         cls = "draw"
                     sig = "*" if test.significant else ""
-                    parts.append(
-                        f'<td class="{cls}">d={d:.2f}{sig}</td>'
-                    )
+                    parts.append(f'<td class="{cls}">d={d:.2f}{sig}</td>')
                 else:
                     parts.append("<td>-</td>")
         parts.append("</tr>")

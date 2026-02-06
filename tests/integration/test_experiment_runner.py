@@ -94,7 +94,8 @@ class TestExperimentRunnerPipeline:
     @patch("claude_evaluator.experiment.runner.ClaudeClient")
     @patch.object(
         __import__(
-            "claude_evaluator.cli.commands.evaluation", fromlist=["RunEvaluationCommand"]
+            "claude_evaluator.cli.commands.evaluation",
+            fromlist=["RunEvaluationCommand"],
         ).RunEvaluationCommand,
         "run_evaluation",
         new_callable=AsyncMock,
@@ -123,13 +124,16 @@ class TestExperimentRunnerPipeline:
         runner = ExperimentRunner()
         runner._eval_command.run_evaluation = mock_run_evaluation
 
-        report = await runner.run(config, output_dir=tmp_path, verbose=False)
+        report, experiment_dir = await runner.run(
+            config, output_dir=tmp_path, verbose=False
+        )
 
         assert isinstance(report, ExperimentReport)
         assert report.experiment_name == "test-experiment"
         assert report.total_runs == 4  # 2 configs * 2 runs each
         assert len(report.config_results) == 2
         assert len(report.elo_rankings) == 2
+        assert experiment_dir.exists()
 
     @pytest.mark.asyncio
     @patch("claude_evaluator.experiment.runner.ClaudeClient")
@@ -153,12 +157,11 @@ class TestExperimentRunnerPipeline:
         runner = ExperimentRunner()
         runner._eval_command.run_evaluation = mock_run_eval
 
-        await runner.run(config, output_dir=tmp_path)
+        _, experiment_dir = await runner.run(config, output_dir=tmp_path)
 
         # Check that experiment directory was created
-        dirs = list(tmp_path.iterdir())
-        assert len(dirs) == 1
-        assert dirs[0].name.startswith("experiment-")
+        assert experiment_dir.exists()
+        assert experiment_dir.name.startswith("experiment-")
 
     @pytest.mark.asyncio
     @patch("claude_evaluator.experiment.runner.ClaudeClient")
@@ -182,7 +185,7 @@ class TestExperimentRunnerPipeline:
         runner = ExperimentRunner()
         runner._eval_command.run_evaluation = mock_run_eval
 
-        report = await runner.run(config, output_dir=tmp_path)
+        report, _ = await runner.run(config, output_dir=tmp_path)
 
         # Should still produce a report even with failed runs
         assert isinstance(report, ExperimentReport)

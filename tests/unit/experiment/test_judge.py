@@ -73,10 +73,12 @@ class TestFormatCodeFiles:
 
     def test_format_multiple_files(self) -> None:
         """Test formatting multiple code files sorted by path."""
-        result = _format_code_files({
-            "b.py": "b_content",
-            "a.py": "a_content",
-        })
+        result = _format_code_files(
+            {
+                "b.py": "b_content",
+                "a.py": "a_content",
+            }
+        )
         assert result.index("a.py") < result.index("b.py")
 
     def test_format_empty_files(self) -> None:
@@ -86,28 +88,22 @@ class TestFormatCodeFiles:
 
 
 class TestVerdictFlipping:
-    """Tests for verdict flipping logic."""
+    """Tests for verdict flipping logic via ComparisonVerdict.flip()."""
 
     def test_flip_a_much_better(self) -> None:
         """Test flipping a_much_better becomes b_much_better."""
-        assert (
-            PairwiseJudge._flip_verdict(ComparisonVerdict.a_much_better)
-            == ComparisonVerdict.b_much_better
-        )
+        assert ComparisonVerdict.a_much_better.flip() == ComparisonVerdict.b_much_better
 
     def test_flip_b_slightly_better(self) -> None:
         """Test flipping b_slightly_better becomes a_slightly_better."""
         assert (
-            PairwiseJudge._flip_verdict(ComparisonVerdict.b_slightly_better)
+            ComparisonVerdict.b_slightly_better.flip()
             == ComparisonVerdict.a_slightly_better
         )
 
     def test_flip_tie_stays_tie(self) -> None:
         """Test flipping tie stays tie."""
-        assert (
-            PairwiseJudge._flip_verdict(ComparisonVerdict.tie)
-            == ComparisonVerdict.tie
-        )
+        assert ComparisonVerdict.tie.flip() == ComparisonVerdict.tie
 
 
 class TestVerdictReconciliation:
@@ -140,9 +136,7 @@ class TestPairwiseJudgeCompare:
         """Test compare returns 1 comparison without bias mitigation."""
         mock_client = AsyncMock()
         mock_client.model = "test-model"
-        mock_client.generate_structured = AsyncMock(
-            return_value=_make_verdict()
-        )
+        mock_client.generate_structured = AsyncMock(return_value=_make_verdict())
 
         judge = PairwiseJudge(
             client=mock_client,
@@ -241,9 +235,7 @@ class TestPairwiseJudgeCompare:
         """Test that _judge_once uses generate_structured with JudgeVerdict."""
         mock_client = AsyncMock()
         mock_client.model = "test-model"
-        mock_client.generate_structured = AsyncMock(
-            return_value=_make_verdict()
-        )
+        mock_client.generate_structured = AsyncMock(return_value=_make_verdict())
 
         judge = PairwiseJudge(
             client=mock_client,

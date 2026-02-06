@@ -247,7 +247,7 @@ judge_dimensions:
         path = tmp_path / "bad_weights.yaml"
         path.write_text(content)
 
-        with pytest.raises(ExperimentError, match="sum to ~1.0"):
+        with pytest.raises(ExperimentError, match="weights must sum to 1.0"):
             load_experiment(path)
 
 

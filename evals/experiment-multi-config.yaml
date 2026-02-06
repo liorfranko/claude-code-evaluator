@@ -1,0 +1,36 @@
+name: multi-config-experiment
+description: >
+  Compare 3 configs on a slightly more complex task.
+  Tests pairwise comparison matrix with multiple configs.
+
+task:
+  prompt: >
+    Create a Python module called calculator.py with a Calculator class that:
+    1. Supports add, subtract, multiply, divide operations
+    2. Stores a running result (starting at 0)
+    3. Has a reset() method
+    4. Raises ValueError for division by zero
+
+settings:
+  runs_per_config: 2
+  judge_model: opus
+  position_bias_mitigation: false
+  output_json: true
+  output_html: true
+  output_cli_summary: true
+
+defaults:
+  max_turns: 10
+  timeout_seconds: 120
+
+configs:
+  - id: sonnet
+    name: Sonnet
+    model: sonnet
+  - id: haiku
+    name: Haiku
+    model: haiku
+  - id: sonnet-plan
+    name: Sonnet Plan
+    model: sonnet
+    workflow_type: plan_then_implement

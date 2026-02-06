@@ -167,9 +167,7 @@ class ExperimentConfig(BaseSchema):
         ids = [c.id for c in self.configs]
         duplicates = [cid for cid in ids if ids.count(cid) > 1]
         if duplicates:
-            raise ValueError(
-                f"Duplicate config IDs found: {sorted(set(duplicates))}"
-            )
+            raise ValueError(f"Duplicate config IDs found: {sorted(set(duplicates))}")
         return self
 
     @model_validator(mode="after")
@@ -179,4 +177,16 @@ class ExperimentConfig(BaseSchema):
             self.judge_dimensions = [
                 JudgeDimension.model_validate(d) for d in DEFAULT_JUDGE_DIMENSIONS
             ]
+        return self
+
+    @model_validator(mode="after")
+    def validate_dimension_weights(self) -> ExperimentConfig:
+        """Validate that dimension weights sum to approximately 1.0."""
+        if not self.judge_dimensions:
+            return self
+        total = sum(d.weight for d in self.judge_dimensions)
+        if not (0.99 <= total <= 1.01):
+            raise ValueError(
+                f"Judge dimension weights must sum to 1.0, got {total:.4f}"
+            )
         return self

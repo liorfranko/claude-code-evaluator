@@ -1,12 +1,10 @@
 """Unit tests for experiment statistical analysis.
 
-Tests Wilcoxon signed-rank, bootstrap CI, Cohen's d, ELO ratings,
+Tests Wilcoxon signed-rank, bootstrap CI, Cohen's d, Elo ratings,
 position bias analysis, and score extraction.
 """
 
-
 from claude_evaluator.experiment.statistics import (
-    VERDICT_SCORES,
     EloCalculator,
     ExperimentStatistician,
     _bootstrap_ci,
@@ -35,7 +33,7 @@ def _make_comparison(
         config_b_id=config_b,
         run_index_a=run_index_a,
         run_index_b=run_index_b,
-        presentation_order=f"{config_a} vs {config_b}",
+        presentation_order="B_first" if position_swapped else "A_first",
         dimension_judgments=[
             DimensionJudgment(
                 dimension_id="correctness",
@@ -55,20 +53,20 @@ def _make_comparison(
 
 
 class TestVerdictScores:
-    """Tests for VERDICT_SCORES mapping."""
+    """Tests for ComparisonVerdict.score property."""
 
-    def test_all_verdicts_mapped(self) -> None:
-        """Test all ComparisonVerdict values have score mappings."""
+    def test_all_verdicts_have_scores(self) -> None:
+        """Test all ComparisonVerdict values have score properties."""
         for verdict in ComparisonVerdict:
-            assert verdict in VERDICT_SCORES
+            assert isinstance(verdict.score, int)
 
     def test_score_symmetry(self) -> None:
         """Test score values are symmetric around zero."""
-        assert VERDICT_SCORES[ComparisonVerdict.a_much_better] == 2
-        assert VERDICT_SCORES[ComparisonVerdict.b_much_better] == -2
-        assert VERDICT_SCORES[ComparisonVerdict.a_slightly_better] == 1
-        assert VERDICT_SCORES[ComparisonVerdict.b_slightly_better] == -1
-        assert VERDICT_SCORES[ComparisonVerdict.tie] == 0
+        assert ComparisonVerdict.a_much_better.score == 2
+        assert ComparisonVerdict.b_much_better.score == -2
+        assert ComparisonVerdict.a_slightly_better.score == 1
+        assert ComparisonVerdict.b_slightly_better.score == -1
+        assert ComparisonVerdict.tie.score == 0
 
 
 class TestWilcoxonSignedRank:
@@ -206,8 +204,12 @@ class TestEloCalculator:
     def test_win_loss_tie_counts(self) -> None:
         """Test W/L/T counts are correct."""
         comparisons = [
-            _make_comparison(verdict=ComparisonVerdict.a_slightly_better, run_index_a=0),
-            _make_comparison(verdict=ComparisonVerdict.b_slightly_better, run_index_a=1),
+            _make_comparison(
+                verdict=ComparisonVerdict.a_slightly_better, run_index_a=0
+            ),
+            _make_comparison(
+                verdict=ComparisonVerdict.b_slightly_better, run_index_a=1
+            ),
             _make_comparison(verdict=ComparisonVerdict.tie, run_index_a=2),
         ]
         calc = EloCalculator()

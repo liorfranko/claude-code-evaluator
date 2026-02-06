@@ -38,6 +38,33 @@ class TestComparisonVerdict:
         """Test exactly 5 verdicts exist."""
         assert len(ComparisonVerdict) == 5
 
+    def test_score_property(self) -> None:
+        """Test score property returns correct numeric values."""
+        assert ComparisonVerdict.a_much_better.score == 2
+        assert ComparisonVerdict.a_slightly_better.score == 1
+        assert ComparisonVerdict.tie.score == 0
+        assert ComparisonVerdict.b_slightly_better.score == -1
+        assert ComparisonVerdict.b_much_better.score == -2
+
+    def test_flip_method(self) -> None:
+        """Test flip() returns the opposite perspective."""
+        assert ComparisonVerdict.a_much_better.flip() == ComparisonVerdict.b_much_better
+        assert (
+            ComparisonVerdict.a_slightly_better.flip()
+            == ComparisonVerdict.b_slightly_better
+        )
+        assert ComparisonVerdict.tie.flip() == ComparisonVerdict.tie
+        assert (
+            ComparisonVerdict.b_slightly_better.flip()
+            == ComparisonVerdict.a_slightly_better
+        )
+        assert ComparisonVerdict.b_much_better.flip() == ComparisonVerdict.a_much_better
+
+    def test_flip_is_involution(self) -> None:
+        """Test that flipping twice returns original."""
+        for v in ComparisonVerdict:
+            assert v.flip().flip() == v
+
 
 class TestDimensionJudgment:
     """Tests for DimensionJudgment model."""
@@ -220,6 +247,26 @@ class TestExperimentConfig:
         )
         assert len(config.judge_dimensions) == 1
         assert config.judge_dimensions[0].id == "custom"
+
+    def test_dimension_weights_must_sum_to_one(self) -> None:
+        """Test that dimension weights must sum to approximately 1.0."""
+        with pytest.raises(ValidationError, match="weights must sum to 1.0"):
+            self._make_config(
+                judge_dimensions=[
+                    JudgeDimension(
+                        id="a",
+                        name="A",
+                        weight=0.3,
+                        description="First dimension for testing",
+                    ),
+                    JudgeDimension(
+                        id="b",
+                        name="B",
+                        weight=0.3,
+                        description="Second dimension for testing",
+                    ),
+                ],
+            )
 
 
 class TestSerializationRoundtrip:

@@ -71,7 +71,7 @@ def _make_report(
                 config_b_id="config-b",
                 run_index_a=0,
                 run_index_b=0,
-                presentation_order="config-a vs config-b",
+                presentation_order="A_first",
                 dimension_judgments=[
                     DimensionJudgment(
                         dimension_id="correctness",

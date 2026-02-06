@@ -57,7 +57,7 @@ class ExperimentRunner:
         output_dir: Path,
         runs_override: int | None = None,
         verbose: bool = False,
-    ) -> ExperimentReport:
+    ) -> tuple[ExperimentReport, Path]:
         """Run a complete experiment.
 
         Args:
@@ -67,10 +67,14 @@ class ExperimentRunner:
             verbose: Whether to print progress.
 
         Returns:
-            Complete ExperimentReport with all results and analysis.
+            Tuple of (ExperimentReport, experiment output directory path).
 
         """
-        runs_per_config = runs_override or config.settings.runs_per_config
+        runs_per_config = (
+            runs_override
+            if runs_override is not None
+            else config.settings.runs_per_config
+        )
 
         # Create experiment output directory
         timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -129,6 +133,16 @@ class ExperimentRunner:
                     run_a = all_runs[config_a_id][run_idx]
                     run_b = all_runs[config_b_id][run_idx]
 
+                    # Skip comparisons involving failed runs
+                    if run_a.outcome == "failure" or run_b.outcome == "failure":
+                        logger.warning(
+                            "skipping_comparison_failed_run",
+                            config_a=config_a_id,
+                            config_b=config_b_id,
+                            run_index=run_idx,
+                        )
+                        continue
+
                     comparisons = await judge.compare(
                         task_prompt=config.task.prompt,
                         code_a=run_a.code_content,
@@ -186,7 +200,7 @@ class ExperimentRunner:
         if verbose:
             print(f"\n  Experiment complete. Total cost: ${total_cost:.4f}")
 
-        return report
+        return report, experiment_dir
 
     async def _run_single_evaluation(
         self,
@@ -293,7 +307,7 @@ class ExperimentRunner:
             config_entry: The config entry.
             runs: All runs for this config.
             comparisons: All pairwise comparisons.
-            elo_ratings: ELO ratings for all configs.
+            elo_ratings: Elo ratings for all configs.
 
         Returns:
             Aggregated ConfigResult.
@@ -306,9 +320,7 @@ class ExperimentRunner:
         avg_tokens = stats.mean(tokens_list) if tokens_list else 0.0
         std_tokens = stats.stdev(tokens_list) if len(tokens_list) > 1 else 0.0
         avg_cost = stats.mean([r.total_cost_usd for r in runs]) if runs else 0.0
-        avg_runtime = (
-            stats.mean([r.total_runtime_ms for r in runs]) if runs else 0.0
-        )
+        avg_runtime = stats.mean([r.total_runtime_ms for r in runs]) if runs else 0.0
         success_count = sum(1 for r in runs if r.outcome == "success")
         success_rate = success_count / len(runs) if runs else 0.0
 
@@ -329,7 +341,7 @@ class ExperimentRunner:
             if scores
         }
 
-        # Find ELO rating
+        # Find Elo rating
         elo = next((r for r in elo_ratings if r.config_id == config_id), None)
 
         return ConfigResult(
@@ -365,6 +377,10 @@ def _collect_code_from_workspace(
     code_content: dict[str, str] = {}
 
     if not workspace_path.exists():
+        logger.warning(
+            "workspace_not_found",
+            workspace_path=str(workspace_path),
+        )
         return code_files, code_content
 
     for root, dirs, files in os.walk(workspace_path):
@@ -379,8 +395,11 @@ def _collect_code_from_workspace(
                 content = filepath.read_text(encoding="utf-8")
                 code_files.append(rel_path)
                 code_content[rel_path] = content
-            except (UnicodeDecodeError, OSError):
-                # Skip binary or unreadable files
+            except UnicodeDecodeError:
+                logger.debug("skipping_binary_file", path=rel_path)
+                continue
+            except OSError as e:
+                logger.warning("file_read_error", path=rel_path, error=str(e))
                 continue
 
     return code_files, code_content
