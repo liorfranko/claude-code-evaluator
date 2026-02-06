@@ -17,7 +17,7 @@ This plan reorganizes the codebase to establish clearer folder structures, fix a
 ```
 Phase 1: Nest models by domain          [██████████] 100% ✅ COMPLETED
 Phase 2: Nest config loaders            [██████████] 100% ✅ COMPLETED
-Phase 3: Rename core/ → evaluation/     [░░░░░░░░░░]   0%
+Phase 3: Rename core/ → evaluation/     [██████████] 100% ✅ COMPLETED
 Phase 4: Create agents/ top-level       [░░░░░░░░░░]   0%
 Phase 5: Break up DeveloperAgent        [░░░░░░░░░░]   0%
 Phase 6: Create scoring/ module         [░░░░░░░░░░]   0%
@@ -25,7 +25,7 @@ Phase 7: Slim down workflows            [░░░░░░░░░░]   0%
 Phase 8: Add sandbox abstraction        [░░░░░░░░░░]   0%
 Phase 9: Final cleanup                  [░░░░░░░░░░]   0%
 ─────────────────────────────────────────────────────────
-Overall Progress                        [██░░░░░░░░]  22% (2/9 phases)
+Overall Progress                        [███░░░░░░░]  33% (3/9 phases)
 ```
 
 **Last Updated:** 2026-02-06

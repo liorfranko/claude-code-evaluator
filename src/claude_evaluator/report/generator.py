@@ -18,7 +18,7 @@ from claude_evaluator.models.execution.decision import Decision
 from claude_evaluator.report.exceptions import ReportGenerationError
 
 if TYPE_CHECKING:
-    from claude_evaluator.core import Evaluation
+    from claude_evaluator.evaluation import Evaluation
 
 __all__ = ["ReportGenerator", "ReportGenerationError"]
 
