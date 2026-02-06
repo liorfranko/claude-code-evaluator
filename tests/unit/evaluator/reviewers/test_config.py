@@ -8,11 +8,9 @@ This module tests the reviewer configuration functionality including:
 """
 
 import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-import yaml
 
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import load_reviewer_configs

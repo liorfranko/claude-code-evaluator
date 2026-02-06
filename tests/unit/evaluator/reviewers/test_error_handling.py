@@ -8,7 +8,7 @@ This module tests the ErrorHandlingReviewer functionality including:
 - filter_by_confidence() is applied to output
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

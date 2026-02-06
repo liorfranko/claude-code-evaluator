@@ -24,10 +24,6 @@ from claude_evaluator.core.agents.evaluator.reviewers.base import (
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.registry import (
-    ReviewerConfig,
-    ReviewerRegistry,
-)
 
 
 class TestReviewerConfigurationCheckpoint:

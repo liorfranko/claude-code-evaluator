@@ -12,7 +12,7 @@ This module tests the reviewer registry functionality including:
 - aggregate_outputs() combines results correctly
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

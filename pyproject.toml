@@ -50,6 +50,14 @@ task-manager = "task_manager.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+    "pyright>=1.1.0",
+]
+
 [tool.ruff]
 target-version = "py310"
 line-length = 88
@@ -70,7 +78,12 @@ select = [
 ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
+    "B009",   # do not call getattr with constant (intentional for duck-typed objects)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG", "B017"]
+"src/claude_evaluator/core/agents/evaluator/checks/**/*.py" = ["ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["claude_evaluator", "task_manager"]

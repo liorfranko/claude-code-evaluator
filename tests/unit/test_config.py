@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from claude_evaluator.config.settings import get_settings
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import apply_defaults, load_suite
 from claude_evaluator.config.models import (
@@ -20,6 +19,7 @@ from claude_evaluator.config.models import (
     EvaluationSuite,
     Phase,
 )
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.models.enums import PermissionMode
 
 
