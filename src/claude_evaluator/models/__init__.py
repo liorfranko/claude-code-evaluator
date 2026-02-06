@@ -22,6 +22,18 @@ from claude_evaluator.models.enums import (
     WorkflowType,
 )
 from claude_evaluator.models.exceptions import ModelValidationError
+from claude_evaluator.models.experiment import (
+    ComparisonVerdict,
+    ConfigResult,
+    DimensionJudgment,
+    EloRating,
+    ExperimentReport,
+    JudgeVerdict,
+    PairwiseComparison,
+    PositionBiasAnalysis,
+    RunResult,
+    StatisticalTest,
+)
 from claude_evaluator.models.metrics import Metrics
 from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.query_metrics import QueryMetrics
@@ -95,6 +107,17 @@ __all__ = [
     # Report Models
     "ChangeSummary",
     "EvaluationReport",
+    # Experiment Models
+    "ComparisonVerdict",
+    "ConfigResult",
+    "DimensionJudgment",
+    "EloRating",
+    "ExperimentReport",
+    "JudgeVerdict",
+    "PairwiseComparison",
+    "PositionBiasAnalysis",
+    "RunResult",
+    "StatisticalTest",
     # Reviewer Models
     "CodeFile",
     "ExecutionMode",

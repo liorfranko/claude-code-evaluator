@@ -1,14 +1,14 @@
-"""YAML suite loader with validation for evaluation configurations.
+"""YAML configuration loaders for evaluation suites and experiments.
 
-This module provides functionality to load evaluation suite configurations
-from YAML files, parsing them into strongly-typed dataclasses with
-comprehensive validation.
+This module provides functionality to load evaluation suite and experiment
+configurations from YAML files, parsing them into strongly-typed models
+with comprehensive validation.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -22,10 +22,16 @@ from claude_evaluator.config.models import (
 )
 from claude_evaluator.config.settings import get_settings
 from claude_evaluator.config.validators import FieldValidator
+from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode, WorkflowType
 from claude_evaluator.models.reviewer import ReviewerConfig
 
-__all__ = ["load_suite", "apply_defaults", "load_reviewer_configs"]
+if TYPE_CHECKING:
+    from claude_evaluator.models.experiment_models import ExperimentConfig
+
+__all__ = ["load_suite", "apply_defaults", "load_experiment", "load_reviewer_configs"]
+
+logger = get_logger(__name__)
 
 
 def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
@@ -375,6 +381,121 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
         max_turns=v.optional("max_turns", int),
         continue_session=v.optional("continue_session", bool, default=True),
     )
+
+
+# --- Experiment loader ---
+
+# Fields that can be set in experiment defaults and applied to config entries
+_EXPERIMENT_DEFAULT_FIELDS = [
+    "max_turns",
+    "max_budget_usd",
+    "timeout_seconds",
+    "model",
+]
+
+
+def load_experiment(path: Path | str) -> ExperimentConfig:
+    """Load and validate an experiment configuration from a YAML file.
+
+    Args:
+        path: Path to the YAML experiment file.
+
+    Returns:
+        Validated ExperimentConfig instance.
+
+    Raises:
+        ExperimentError: If the file is invalid or validation fails.
+        FileNotFoundError: If the file does not exist.
+
+    """
+    from claude_evaluator.experiment.exceptions import ExperimentError
+    from claude_evaluator.models.experiment_models import ExperimentConfig
+
+    path = Path(path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Experiment file not found: {path}")
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise ExperimentError(f"Failed to parse YAML file {path}: {e}") from e
+
+    if data is None:
+        raise ExperimentError(f"Empty YAML file: {path}")
+
+    if not isinstance(data, dict):
+        raise ExperimentError(
+            f"Invalid YAML structure: expected mapping, got {type(data).__name__}"
+        )
+
+    # Merge defaults into config entries before validation
+    _merge_experiment_defaults(data)
+
+    # Parse and validate via Pydantic
+    try:
+        config = ExperimentConfig.model_validate(data)
+    except Exception as e:
+        raise ExperimentError(f"Experiment config validation failed: {e}") from e
+
+    # Validate dimension weights sum to ~1.0
+    _validate_dimension_weights(config)
+
+    logger.info(
+        "experiment_config_loaded",
+        name=config.name,
+        num_configs=len(config.configs),
+        num_dimensions=len(config.judge_dimensions),
+    )
+
+    return config
+
+
+def _merge_experiment_defaults(data: dict[str, Any]) -> None:
+    """Merge experiment defaults dict into each config entry's raw dict.
+
+    Applies default values for fields that are not explicitly set
+    in each config entry. Modifies the data dict in place.
+
+    Args:
+        data: Raw YAML data dictionary.
+
+    """
+    defaults = data.get("defaults")
+    if not defaults or not isinstance(defaults, dict):
+        return
+
+    configs = data.get("configs")
+    if not configs or not isinstance(configs, list):
+        return
+
+    for config_entry in configs:
+        if not isinstance(config_entry, dict):
+            continue
+        for field in _EXPERIMENT_DEFAULT_FIELDS:
+            if field not in config_entry and field in defaults:
+                config_entry[field] = defaults[field]
+
+
+def _validate_dimension_weights(config: ExperimentConfig) -> None:
+    """Validate that dimension weights sum to approximately 1.0.
+
+    Args:
+        config: Validated experiment configuration.
+
+    Raises:
+        ExperimentError: If weights don't sum to ~1.0.
+
+    """
+    from claude_evaluator.experiment.exceptions import ExperimentError
+
+    total_weight = sum(d.weight for d in config.judge_dimensions)
+    if abs(total_weight - 1.0) > 0.01:
+        raise ExperimentError(
+            f"Judge dimension weights must sum to ~1.0 (within 0.01 tolerance). "
+            f"Got {total_weight:.4f}"
+        )
 
 
 def load_reviewer_configs(path: Path | str) -> dict[str, ReviewerConfig]:

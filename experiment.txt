@@ -1,0 +1,52 @@
+# Experiment System Context
+
+This file has been superseded by EXPERIMENT_IMPLEMENTATION_PLAN.md which contains the updated
+implementation plan aligned with the repository structure.
+
+## Key Changes from Original Plan
+
+The original plan placed all models in `experiment/models.py` and the config loader in
+`experiment/config_loader.py`. This has been revised to follow the existing repository patterns:
+
+### Repository Structure Alignment
+
+1. **`models/experiment.py`** — Result/domain models shared across the system
+   - ComparisonVerdict (enum)
+   - DimensionJudgment, JudgeVerdict
+   - PairwiseComparison, RunResult
+   - StatisticalTest, EloRating
+   - ConfigResult, PositionBiasAnalysis
+   - ExperimentReport
+
+2. **`models/experiment_models.py`** — Configuration models for experiment YAML files
+   - ExperimentSettings
+   - JudgeDimension
+   - ExperimentTask
+   - ExperimentConfigEntry
+   - ExperimentConfig
+
+3. **`config/loader.py`** — Experiment loader added to existing file
+   - load_experiment(path) -> ExperimentConfig (alongside existing load_suite)
+
+4. **`experiment/`** — Runtime components only
+   - __init__.py — Public API exports
+   - exceptions.py — ExperimentError, JudgeError, StatisticsError
+   - judge.py — PairwiseJudge
+   - statistics.py — ExperimentStatistician, EloCalculator
+   - runner.py — ExperimentRunner
+   - report_generator.py — ExperimentReportGenerator
+
+5. **`cli/commands/experiment.py`** — CLI command
+   - RunExperimentCommand
+
+### Files to Modify
+
+- `models/__init__.py` — Export experiment result models and config models
+- `config/__init__.py` — Export load_experiment from loader
+- `config/loader.py` — Add load_experiment() function and helpers
+- `cli/parser.py` — Add --experiment and --runs arguments
+- `cli/validators.py` — Add experiment file validation
+- `cli/main.py` — Add experiment dispatch
+- `cli/commands/__init__.py` — Export RunExperimentCommand
+
+See EXPERIMENT_IMPLEMENTATION_PLAN.md for the complete detailed plan.

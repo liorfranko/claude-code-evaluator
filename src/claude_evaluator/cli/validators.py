@@ -63,6 +63,15 @@ def validate_args(args: argparse.Namespace) -> str | None:
         Error message if validation fails, None if valid.
 
     """
+    # --experiment is a standalone command
+    if getattr(args, "experiment", None) is not None:
+        exp_path = Path(args.experiment)
+        if not exp_path.exists():
+            return f"Error: Experiment file not found: {args.experiment}"
+        if exp_path.suffix not in (".yaml", ".yml"):
+            return f"Error: Experiment file must be YAML: {args.experiment}"
+        return None
+
     # --score is a standalone command
     if getattr(args, "score", None) is not None:
         score_path = Path(args.score)

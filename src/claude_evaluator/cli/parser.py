@@ -45,6 +45,9 @@ Examples:
   # Score with verbose output
   claude-evaluator --score evaluation.json --verbose
 
+  # Run inside a Docker container for isolation
+  claude-evaluator --suite evals/example.yaml --sandbox docker
+
 For more information, see the documentation.
 """,
     )
@@ -139,6 +142,30 @@ For more information, see the documentation.
         "--no-ast",
         action="store_true",
         help="Disable AST-based metrics extraction",
+    )
+
+    # Sandbox
+    parser.add_argument(
+        "--sandbox",
+        type=str,
+        choices=["docker"],
+        default=None,
+        help="Run the evaluation inside an isolated sandbox (e.g. docker)",
+    )
+
+    # Experiment arguments
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        metavar="FILE",
+        help="Path to experiment YAML config for pairwise comparison",
+    )
+
+    parser.add_argument(
+        "--runs",
+        type=int,
+        metavar="N",
+        help="Override number of runs per config from experiment YAML",
     )
 
     return parser

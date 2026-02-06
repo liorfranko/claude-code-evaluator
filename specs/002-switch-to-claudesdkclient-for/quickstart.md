@@ -8,7 +8,6 @@ Before you begin, ensure you have:
 
 - [ ] Python 3.10 or later installed
 - [ ] claude-agent-sdk installed (`pip install claude-agent-sdk`)
-- [ ] ANTHROPIC_API_KEY environment variable set
 - [ ] A Claude Code project directory
 
 ## Installation
@@ -33,7 +32,7 @@ SDK available
 ### Step 3: Set Up API Key
 
 ```bash
-export ANTHROPIC_API_KEY="your-api-key-here"
+
 ```
 
 ## Quick Start

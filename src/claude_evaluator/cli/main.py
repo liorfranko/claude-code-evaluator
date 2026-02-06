@@ -34,6 +34,23 @@ async def _dispatch(args: argparse.Namespace) -> int:
         Exit code (0 for success, non-zero for errors).
 
     """
+    # Handle sandbox — delegate entire execution to the container
+    if getattr(args, "sandbox", None) == "docker":
+        from claude_evaluator.sandbox import DockerSandbox
+
+        sandbox = DockerSandbox()
+        return await sandbox.run(args)
+
+    # Handle experiment command
+    if getattr(args, "experiment", None):
+        from claude_evaluator.cli.commands.experiment import RunExperimentCommand
+
+        experiment_cmd = RunExperimentCommand()
+        result = await experiment_cmd.execute(args)
+        if result.message:
+            print(result.message)
+        return result.exit_code
+
     # Handle score command
     if args.score:
         args.evaluation_path = args.score
