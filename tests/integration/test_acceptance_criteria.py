@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from claude_evaluator.agents.worker import WorkerAgent
-from claude_evaluator.core.agents import DeveloperAgent
+from claude_evaluator.agents.developer import DeveloperAgent
 from claude_evaluator.agents.worker.exceptions import QuestionCallbackTimeoutError
 from claude_evaluator.models.enums import (
     DeveloperState,
@@ -240,7 +240,7 @@ class TestT700WorkerToDeveloperQuestionFlow:
                 )
 
             with patch(
-                "claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query
+                "claude_evaluator.agents.developer.agent.sdk_query", mock_sdk_query
             ):
                 answer_result = await developer.answer_question(context)
                 return answer_result.answer
@@ -708,7 +708,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         )
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", capture_model_call
+            "claude_evaluator.agents.developer.agent.sdk_query", capture_model_call
         ):
             developer.transition_to(DeveloperState.prompting)
             developer.transition_to(DeveloperState.awaiting_response)
@@ -765,7 +765,7 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
+        with patch("claude_evaluator.agents.developer.agent.sdk_query", capture_prompt):
             developer.transition_to(DeveloperState.prompting)
             developer.transition_to(DeveloperState.awaiting_response)
 
@@ -822,7 +822,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         )
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", track_query_call
+            "claude_evaluator.agents.developer.agent.sdk_query", track_query_call
         ):
             developer.transition_to(DeveloperState.prompting)
             developer.transition_to(DeveloperState.awaiting_response)
@@ -876,7 +876,7 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", return_answer):
+        with patch("claude_evaluator.agents.developer.agent.sdk_query", return_answer):
             developer.transition_to(DeveloperState.prompting)
             developer.transition_to(DeveloperState.awaiting_response)
 
@@ -957,7 +957,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         )
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             capture_contextual_prompt,
         ):
             # Test ML context
@@ -1020,7 +1020,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         async def developer_callback(context: QuestionContext) -> str:
             flow_events.append("Developer callback invoked")
             with patch(
-                "claude_evaluator.core.agents.developer.sdk_query", mock_llm_call
+                "claude_evaluator.agents.developer.agent.sdk_query", mock_llm_call
             ):
                 # Need to transition Developer to the right state
                 if developer.current_state == DeveloperState.initializing:
@@ -6611,9 +6611,9 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         )
 
         with (
-            patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query),
+            patch("claude_evaluator.agents.developer.agent.sdk_query", mock_sdk_query),
             patch(
-                "claude_evaluator.core.agents.developer.get_settings",
+                "claude_evaluator.agents.developer.agent.get_settings",
                 return_value=mock_dev_settings,
             ),
         ):
@@ -6687,9 +6687,9 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         )
 
         with (
-            patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query),
+            patch("claude_evaluator.agents.developer.agent.sdk_query", mock_sdk_query),
             patch(
-                "claude_evaluator.core.agents.developer.get_settings",
+                "claude_evaluator.agents.developer.agent.get_settings",
                 return_value=mock_dev_settings,
             ),
         ):
@@ -6835,9 +6835,9 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         )
 
         with (
-            patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt),
+            patch("claude_evaluator.agents.developer.agent.sdk_query", capture_prompt),
             patch(
-                "claude_evaluator.core.agents.developer.get_settings",
+                "claude_evaluator.agents.developer.agent.get_settings",
                 return_value=mock_dev_settings,
             ),
         ):
@@ -6995,9 +6995,9 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         )
 
         with (
-            patch("claude_evaluator.core.agents.developer.sdk_query", mock_query),
+            patch("claude_evaluator.agents.developer.agent.sdk_query", mock_query),
             patch(
-                "claude_evaluator.core.agents.developer.get_settings",
+                "claude_evaluator.agents.developer.agent.get_settings",
                 return_value=mock_dev_settings,
             ),
         ):
@@ -7194,9 +7194,9 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         )
 
         with (
-            patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt),
+            patch("claude_evaluator.agents.developer.agent.sdk_query", capture_prompt),
             patch(
-                "claude_evaluator.core.agents.developer.get_settings",
+                "claude_evaluator.agents.developer.agent.get_settings",
                 return_value=mock_dev_settings,
             ),
         ):

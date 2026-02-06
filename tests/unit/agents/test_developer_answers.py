@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from claude_evaluator.config.settings import get_settings
-from claude_evaluator.core.agents import DeveloperAgent
+from claude_evaluator.agents.developer import DeveloperAgent
 from claude_evaluator.models.enums import DeveloperState
 from claude_evaluator.models.interaction.answer import AnswerResult
 from claude_evaluator.models.interaction.question import (
@@ -140,7 +140,7 @@ class TestAnswerQuestionGeneratesResponse:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=mock_sdk_query,
         ):
             # Transition to awaiting_response first (required for answering_question transition)
@@ -173,7 +173,7 @@ class TestAnswerQuestionGeneratesResponse:
             )
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=capture_prompt,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -214,7 +214,7 @@ class TestAnswerQuestionGeneratesResponse:
                 return create_async_generator(ResultMessage(result="Answer"))
 
             with patch(
-                "claude_evaluator.core.agents.developer.sdk_query",
+                "claude_evaluator.agents.developer.agent.sdk_query",
                 side_effect=capture_prompt,
             ):
                 agent.transition_to(DeveloperState.prompting)
@@ -250,7 +250,7 @@ class TestAnswerQuestionGeneratesResponse:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=mock_sdk_query,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -280,7 +280,7 @@ class TestAnswerQuestionGeneratesResponse:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=mock_sdk_query,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -316,7 +316,7 @@ class TestDeveloperQAModelSelection:
             return create_async_generator(ResultMessage(result="Custom model answer"))
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=capture_model,
         ):
             agent_with_custom_model.transition_to(DeveloperState.prompting)
@@ -344,7 +344,7 @@ class TestDeveloperQAModelSelection:
             return create_async_generator(ResultMessage(result="Default model answer"))
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=capture_model,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -369,7 +369,7 @@ class TestDeveloperQAModelSelection:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=mock_sdk_query,
         ):
             agent_with_custom_model.transition_to(DeveloperState.prompting)
@@ -415,7 +415,7 @@ class TestRetryUsesFullHistory:
             )
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=capture_prompt,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -457,7 +457,7 @@ class TestRetryUsesFullHistory:
                 )
 
             with patch(
-                "claude_evaluator.core.agents.developer.sdk_query",
+                "claude_evaluator.agents.developer.agent.sdk_query",
                 side_effect=capture_prompt,
             ):
                 agent.transition_to(DeveloperState.prompting)
@@ -486,7 +486,7 @@ class TestRetryUsesFullHistory:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=mock_sdk_query,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -511,7 +511,7 @@ class TestRetryUsesFullHistory:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=mock_sdk_query,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -547,7 +547,7 @@ class TestMaxRetriesExceeded:
     ) -> None:
         """Test that SDK failure causes transition to failed state."""
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.agents.developer.agent.sdk_query", new_callable=AsyncMock
         ) as mock_query:
             mock_query.side_effect = Exception("SDK query failed")
 
@@ -568,7 +568,7 @@ class TestMaxRetriesExceeded:
     ) -> None:
         """Test that SDK failure logs an appropriate error decision."""
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.agents.developer.agent.sdk_query", new_callable=AsyncMock
         ) as mock_query:
             mock_query.side_effect = Exception("Connection timeout")
 
@@ -591,7 +591,7 @@ class TestMaxRetriesExceeded:
         """Test that empty string response from SDK raises RuntimeError."""
         # Return a plain empty string (not an object with attributes)
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.agents.developer.agent.sdk_query", new_callable=AsyncMock
         ) as mock_query:
             mock_query.return_value = ""  # Empty string response
 
@@ -611,7 +611,7 @@ class TestMaxRetriesExceeded:
     ) -> None:
         """Test that None response from SDK raises RuntimeError."""
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
+            "claude_evaluator.agents.developer.agent.sdk_query", new_callable=AsyncMock
         ) as mock_query:
             mock_query.return_value = None
 
@@ -878,7 +878,7 @@ class TestAnswerGenerationIntegration:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=mock_sdk_query,
         ):
             base_developer_agent.transition_to(DeveloperState.prompting)
@@ -929,7 +929,7 @@ class TestAnswerGenerationIntegration:
             )
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query",
+            "claude_evaluator.agents.developer.agent.sdk_query",
             side_effect=capture_and_respond,
         ):
             agent.transition_to(DeveloperState.prompting)

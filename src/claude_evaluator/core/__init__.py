@@ -10,11 +10,12 @@ reorganized as follows:
   Moved to claude_evaluator.agents.worker
 
 - DeveloperAgent:
-  Still available here from core/agents/ (will move to agents/ in Phase 5)
+  Moved to claude_evaluator.agents.developer
 
 New code should import from claude_evaluator.evaluation for evaluation-related
 functionality and claude_evaluator.agents for agent classes.
 """
+
 
 def __getattr__(name: str):
     """Lazy import for backward compatibility to avoid circular imports."""
@@ -23,7 +24,7 @@ def __getattr__(name: str):
 
         return WorkerAgent
     if name == "DeveloperAgent":
-        from claude_evaluator.core.agents.developer import DeveloperAgent
+        from claude_evaluator.agents.developer import DeveloperAgent
 
         return DeveloperAgent
     if name == "Evaluation":
