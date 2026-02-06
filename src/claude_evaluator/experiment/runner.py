@@ -14,7 +14,6 @@ from datetime import datetime
 from pathlib import Path
 
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 from claude_evaluator.evaluation import EvaluationExecutor
 from claude_evaluator.experiment.judge import PairwiseJudge
 from claude_evaluator.experiment.statistics import ExperimentStatistician
@@ -31,6 +30,7 @@ from claude_evaluator.models.experiment.results import (
     PairwiseComparison,
     RunResult,
 )
+from claude_evaluator.scoring import ClaudeClient
 
 __all__ = ["ExperimentRunner"]
 

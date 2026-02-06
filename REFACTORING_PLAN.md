@@ -20,12 +20,12 @@ Phase 2: Nest config loaders            [██████████] 100% �
 Phase 3: Rename core/ → evaluation/     [██████████] 100% ✅ COMPLETED
 Phase 4: Create agents/ top-level       [██████████] 100% ✅ COMPLETED
 Phase 5: Break up DeveloperAgent        [██████████] 100% ✅ COMPLETED
-Phase 6: Create scoring/ module         [░░░░░░░░░░]   0%
+Phase 6: Create scoring/ module         [██████████] 100% ✅ COMPLETED
 Phase 7: Slim down workflows            [░░░░░░░░░░]   0%
 Phase 8: Add sandbox abstraction        [░░░░░░░░░░]   0%
 Phase 9: Final cleanup                  [░░░░░░░░░░]   0%
 ─────────────────────────────────────────────────────────
-Overall Progress                        [█████░░░░░]  56% (5/9 phases)
+Overall Progress                        [██████░░░░]  67% (6/9 phases)
 ```
 
 **Last Updated:** 2026-02-07

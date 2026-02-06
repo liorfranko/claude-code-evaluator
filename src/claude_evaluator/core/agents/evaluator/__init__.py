@@ -1,26 +1,29 @@
-"""Evaluator agent package for scoring evaluation.json files.
+"""Evaluator agent package - backward compatibility shim.
 
-This package provides the EvaluatorAgent and related components for
-analyzing evaluation execution and producing quality scores using the
-Claude SDK-based multi-phase reviewer system.
+This module re-exports from claude_evaluator.scoring for backward
+compatibility. New code should import from claude_evaluator.scoring directly.
+
+.. deprecated::
+    Import from claude_evaluator.scoring instead.
 """
 
-from claude_evaluator.core.agents.evaluator.agent import EvaluatorAgent
-from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from claude_evaluator.core.agents.evaluator.exceptions import (
+# Re-export from new location for backward compatibility
+from claude_evaluator.scoring import (
     ASTParsingError,
     ClaudeAPIError,
+    ClaudeClient,
+    EvaluatorAgent,
     EvaluatorError,
     ParsingError,
     ScoringError,
 )
 
 __all__ = [
-    "EvaluatorAgent",
-    "ClaudeClient",
-    "EvaluatorError",
-    "ScoringError",
-    "ParsingError",
-    "ClaudeAPIError",
     "ASTParsingError",
+    "ClaudeAPIError",
+    "ClaudeClient",
+    "EvaluatorAgent",
+    "EvaluatorError",
+    "ParsingError",
+    "ScoringError",
 ]
