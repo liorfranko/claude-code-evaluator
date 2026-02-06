@@ -21,11 +21,11 @@ Phase 3: Rename core/ → evaluation/     [██████████] 100% 
 Phase 4: Create agents/ top-level       [██████████] 100% ✅ COMPLETED
 Phase 5: Break up DeveloperAgent        [██████████] 100% ✅ COMPLETED
 Phase 6: Create scoring/ module         [██████████] 100% ✅ COMPLETED
-Phase 7: Slim down workflows            [░░░░░░░░░░]   0%
-Phase 8: Add sandbox abstraction        [░░░░░░░░░░]   0%
+Phase 7: Slim down workflows            [██████████] 100% ✅ COMPLETED
+Phase 8: Add sandbox abstraction        [██████████] 100% ✅ COMPLETED
 Phase 9: Final cleanup                  [░░░░░░░░░░]   0%
 ─────────────────────────────────────────────────────────
-Overall Progress                        [██████░░░░]  67% (6/9 phases)
+Overall Progress                        [████████░░]  89% (8/9 phases)
 ```
 
 **Last Updated:** 2026-02-07
