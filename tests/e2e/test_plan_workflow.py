@@ -43,6 +43,7 @@ class TestPlanWorkflowE2EPlanModeExecution:
         return Evaluation(
             task_description="Create a Python module for parsing YAML configuration files",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -188,6 +189,7 @@ class TestPlanWorkflowE2EPlanToImplementTransition:
         return Evaluation(
             task_description="Refactor the authentication module to use JWT tokens",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -390,6 +392,7 @@ class TestPlanWorkflowE2EMetricsCapture:
         return Evaluation(
             task_description="Build a REST API endpoint for user management",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -624,6 +627,7 @@ class TestPlanWorkflowE2ECompleteLifecycle:
         return Evaluation(
             task_description="Implement a caching layer for the database queries",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )

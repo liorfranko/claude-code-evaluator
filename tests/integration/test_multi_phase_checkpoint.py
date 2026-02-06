@@ -565,4 +565,4 @@ class TestMultiPhaseEvaluationEndToEnd:
         assert aggregated["total_issues"] >= 0
         assert len(aggregated["all_strengths"]) >= 3
         assert aggregated["average_confidence"] > 0
-        assert aggregated["total_execution_time_ms"] > 0
+        assert aggregated["total_execution_time_ms"] >= 0

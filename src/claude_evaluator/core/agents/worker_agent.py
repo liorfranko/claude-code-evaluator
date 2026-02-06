@@ -356,6 +356,10 @@ class WorkerAgent(BaseSchema):
             else:
                 raise RuntimeError("No result message received from SDK")
 
+        # Sync tool invocations from tracker so callers of this method
+        # (not just execute_query) can access them via get_tool_invocations()
+        self.tool_invocations = self._tool_tracker.get_invocations()
+
         return result_message, response_content, all_messages
 
     def _create_synthetic_result(self) -> Any:
@@ -447,6 +451,31 @@ class WorkerAgent(BaseSchema):
     def end_session(self) -> None:
         """End the current Claude Code session."""
         raise NotImplementedError("Session management not yet implemented")
+
+    def _on_tool_use(
+        self,
+        tool_name: str,
+        tool_use_id: str,
+        tool_input: dict[str, Any] | None = None,
+    ) -> ToolInvocation:
+        """Record a tool invocation via the internal tool tracker.
+
+        Convenience method that delegates to the ToolTracker component.
+
+        Args:
+            tool_name: Name of the tool being invoked.
+            tool_use_id: Unique identifier for this invocation.
+            tool_input: Input parameters for the tool.
+
+        Returns:
+            The created ToolInvocation record.
+
+        """
+        invocation = self._tool_tracker.on_tool_use(
+            tool_name, tool_use_id, tool_input or {}
+        )
+        self.tool_invocations.append(invocation)
+        return invocation
 
     def configure_tools(self, tools: list[str]) -> None:
         """Configure the list of auto-approved tools."""

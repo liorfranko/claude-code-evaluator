@@ -69,6 +69,7 @@ class TestDeveloperWorkerCommunication:
         evaluation = Evaluation(
             task_description="Test task for agent communication",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -91,6 +92,7 @@ class TestDeveloperWorkerCommunication:
         Evaluation(
             task_description="Test decision logging",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -118,6 +120,7 @@ class TestDeveloperWorkerCommunication:
         Evaluation(
             task_description="Test state transitions",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -147,6 +150,7 @@ class TestDeveloperWorkerCommunication:
         evaluation = Evaluation(
             task_description="Test metrics return",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -249,6 +253,7 @@ class TestAgentCoordinationInWorkflows:
         evaluation = Evaluation(
             task_description="Direct workflow test",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -272,6 +277,7 @@ class TestAgentCoordinationInWorkflows:
         evaluation = Evaluation(
             task_description="Plan workflow test",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -295,6 +301,7 @@ class TestAgentCoordinationInWorkflows:
         evaluation = Evaluation(
             task_description="Multi-command workflow test",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -348,6 +355,7 @@ class TestAgentCoordinationInWorkflows:
         evaluation = Evaluation(
             task_description="Create a hello world script",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -386,6 +394,7 @@ class TestAgentErrorHandling:
         evaluation = Evaluation(
             task_description="Test error handling",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -422,6 +431,7 @@ class TestAgentErrorHandling:
         evaluation = Evaluation(
             task_description="Test developer error handling",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )

@@ -8,11 +8,12 @@ Task IDs: T700-T708
 
 import asyncio
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
+from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
 from claude_evaluator.models.enums import (
     DeveloperState,
     PermissionMode,
@@ -226,7 +227,6 @@ class TestT700WorkerToDeveloperQuestionFlow:
         # Create Developer agent
         developer = DeveloperAgent(
             developer_qa_model="claude-haiku-4-5@20251001",
-            context_window_size=10,
         )
 
         # Create callback that uses Developer to answer questions
@@ -234,7 +234,7 @@ class TestT700WorkerToDeveloperQuestionFlow:
             # Mock the SDK query function since we don't have actual SDK
             # Use AsyncMock to return an awaitable
             async def mock_sdk_query(*args, **kwargs):  # noqa: ARG001
-                return "Use pytest for its simplicity and powerful fixtures"
+                yield ResultMessage(result="Use pytest for its simplicity and powerful fixtures")
 
             with patch(
                 "claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query
@@ -512,7 +512,7 @@ class TestT700ErrorHandling:
         with pytest.raises(RuntimeError) as exc_info:
             await worker._stream_sdk_messages_with_client("Test", mock_client)
 
-        assert "no on_question_callback is configured" in str(exc_info.value)
+        assert "no question callback is configured" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_timeout_produces_descriptive_error(self) -> None:
@@ -522,13 +522,19 @@ class TestT700ErrorHandling:
             await asyncio.sleep(10)  # Very slow
             return "late answer"
 
-        worker = WorkerAgent(
-            project_directory="/tmp/test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=slow_developer,
-            question_timeout_seconds=1,  # Very short timeout
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=slow_developer,
+            )
 
         mock_client = MockClaudeSDKClient()
         question = AskUserQuestionBlock(questions=[{"question": "Will this timeout?"}])
@@ -538,7 +544,7 @@ class TestT700ErrorHandling:
             ]
         )
 
-        with pytest.raises(asyncio.TimeoutError) as exc_info:
+        with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
             await worker._stream_sdk_messages_with_client("Test", mock_client)
 
         error_msg = str(exc_info.value)
@@ -677,16 +683,16 @@ class TestT701DeveloperLLMAnswerGeneration:
         # Create Developer with custom model
         developer = DeveloperAgent(
             developer_qa_model="claude-sonnet-4-5@20251001",
-            context_window_size=5,
-            max_answer_retries=1,
         )
 
         # Track which model was used
         used_model: list[str] = []
 
-        async def capture_model_call(prompt: str, model: str) -> str:  # noqa: ARG001
-            used_model.append(model)
-            return "LLM-generated contextual answer"
+        async def capture_model_call(*args, **kwargs):  # noqa: ARG001
+            options = kwargs.get("options")
+            if options and hasattr(options, "model"):
+                used_model.append(options.model)
+            yield ResultMessage(result="LLM-generated contextual answer")
 
         question_context = QuestionContext(
             questions=[QuestionItem(question="Which approach is best?")],
@@ -700,7 +706,7 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", capture_model_call
-        ), patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
+        ):
             developer.transition_to(DeveloperState.prompting)
             developer.transition_to(DeveloperState.awaiting_response)
 
@@ -722,13 +728,12 @@ class TestT701DeveloperLLMAnswerGeneration:
         """
         captured_prompts: list[str] = []
 
-        async def capture_prompt(prompt: str, model: str) -> str:  # noqa: ARG001
+        async def capture_prompt(*args, **kwargs):
+            prompt = kwargs.get("prompt", args[0] if args else "")
             captured_prompts.append(prompt)
-            return "Answer based on full context"
+            yield ResultMessage(result="Answer based on full context")
 
-        developer = DeveloperAgent(
-            context_window_size=10,
-        )
+        developer = DeveloperAgent()
 
         question_context = QuestionContext(
             questions=[
@@ -757,32 +762,31 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):  # noqa: SIM117
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
-                developer.transition_to(DeveloperState.prompting)
-                developer.transition_to(DeveloperState.awaiting_response)
+        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
+            developer.transition_to(DeveloperState.prompting)
+            developer.transition_to(DeveloperState.awaiting_response)
 
-                await developer.answer_question(question_context)
+            await developer.answer_question(question_context)
 
-                # VERIFY: Prompt was captured
-                assert len(captured_prompts) == 1
-                prompt = captured_prompts[0]
+            # VERIFY: Prompt was captured
+            assert len(captured_prompts) == 1
+            prompt = captured_prompts[0]
 
-                # VERIFY: Question is in the prompt
-                assert "Should I use PostgreSQL or MongoDB?" in prompt
+            # VERIFY: Question is in the prompt
+            assert "Should I use PostgreSQL or MongoDB?" in prompt
 
-                # VERIFY: Options are in the prompt
-                assert "PostgreSQL" in prompt
-                assert "MongoDB" in prompt
-                assert "Relational database" in prompt
-                assert "Document database" in prompt
+            # VERIFY: Options are in the prompt
+            assert "PostgreSQL" in prompt
+            assert "MongoDB" in prompt
+            assert "Relational database" in prompt
+            assert "Document database" in prompt
 
-                # VERIFY: Conversation history is in the prompt
-                assert "user management" in prompt.lower()
-                assert "complex queries" in prompt.lower()
+            # VERIFY: Conversation history is in the prompt
+            assert "user management" in prompt.lower()
+            assert "complex queries" in prompt.lower()
 
-                # VERIFY: Header is in the prompt
-                assert "Database Selection" in prompt
+            # VERIFY: Header is in the prompt
+            assert "Database Selection" in prompt
 
     @pytest.mark.asyncio
     async def test_developer_calls_query_for_llm_answer(self) -> None:
@@ -796,11 +800,14 @@ class TestT701DeveloperLLMAnswerGeneration:
         query_called = False
         query_kwargs: dict[str, Any] = {}
 
-        async def track_query_call(prompt: str, model: str) -> str:
+        async def track_query_call(*args, **kwargs):
             nonlocal query_called, query_kwargs
             query_called = True
+            prompt = kwargs.get("prompt", args[0] if args else "")
+            options = kwargs.get("options")
+            model = options.model if options and hasattr(options, "model") else ""
             query_kwargs = {"prompt": prompt, "model": model}
-            return "Generated LLM answer"
+            yield ResultMessage(result="Generated LLM answer")
 
         developer = DeveloperAgent()
 
@@ -813,7 +820,7 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", track_query_call
-        ), patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
+        ):
             developer.transition_to(DeveloperState.prompting)
             developer.transition_to(DeveloperState.awaiting_response)
 
@@ -848,12 +855,11 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         llm_answer = "Based on the context, I recommend using FastAPI for its async support and automatic API documentation."
 
-        async def return_answer(prompt: str, model: str) -> str:  # noqa: ARG001
-            return llm_answer
+        async def return_answer(*args, **kwargs):  # noqa: ARG001
+            yield ResultMessage(result=llm_answer)
 
         developer = DeveloperAgent(
             developer_qa_model="custom-model-123",
-            context_window_size=10,
         )
 
         question_context = QuestionContext(
@@ -867,32 +873,31 @@ class TestT701DeveloperLLMAnswerGeneration:
             attempt_number=1,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", return_answer):  # noqa: SIM117
-            with patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
-                developer.transition_to(DeveloperState.prompting)
-                developer.transition_to(DeveloperState.awaiting_response)
+        with patch("claude_evaluator.core.agents.developer.sdk_query", return_answer):
+            developer.transition_to(DeveloperState.prompting)
+            developer.transition_to(DeveloperState.awaiting_response)
 
-                result = await developer.answer_question(question_context)
+            result = await developer.answer_question(question_context)
 
-                # VERIFY: Result is AnswerResult
-                assert isinstance(result, AnswerResult)
+            # VERIFY: Result is AnswerResult
+            assert isinstance(result, AnswerResult)
 
-                # VERIFY: Answer contains LLM response
-                assert result.answer == llm_answer
-                assert "FastAPI" in result.answer
-                assert "async support" in result.answer
+            # VERIFY: Answer contains LLM response
+            assert result.answer == llm_answer
+            assert "FastAPI" in result.answer
+            assert "async support" in result.answer
 
-                # VERIFY: Model used is recorded
-                assert result.model_used == "custom-model-123"
+            # VERIFY: Model used is recorded
+            assert result.model_used == "custom-model-123"
 
-                # VERIFY: Context size is recorded
-                assert result.context_size == 3  # 3 messages in history
+            # VERIFY: Context size is recorded
+            assert result.context_size == 3  # 3 messages in history
 
-                # VERIFY: Generation time is recorded
-                assert result.generation_time_ms >= 0
+            # VERIFY: Generation time is recorded
+            assert result.generation_time_ms >= 0
 
-                # VERIFY: Attempt number matches
-                assert result.attempt_number == 1
+            # VERIFY: Attempt number matches
+            assert result.attempt_number == 1
 
     @pytest.mark.asyncio
     async def test_developer_contextual_answer_uses_conversation_history(self) -> None:
@@ -908,19 +913,20 @@ class TestT701DeveloperLLMAnswerGeneration:
         """
         prompts_by_context: dict[str, str] = {}
 
-        async def capture_contextual_prompt(prompt: str, model: str) -> str:  # noqa: ARG001
+        async def capture_contextual_prompt(*args, **kwargs):
+            prompt = kwargs.get("prompt", args[0] if args else "")
             # Determine context from prompt content
             if "machine learning" in prompt.lower():
                 prompts_by_context["ml"] = prompt
-                return "Use scikit-learn for ML"
+                yield ResultMessage(result="Use scikit-learn for ML")
             elif "web scraping" in prompt.lower():
                 prompts_by_context["scraping"] = prompt
-                return "Use BeautifulSoup for scraping"
+                yield ResultMessage(result="Use BeautifulSoup for scraping")
             else:
                 prompts_by_context["unknown"] = prompt
-                return "Generic answer"
+                yield ResultMessage(result="Generic answer")
 
-        developer = DeveloperAgent(context_window_size=10)
+        developer = DeveloperAgent()
 
         # Context 1: Machine Learning project
         ml_context = QuestionContext(
@@ -950,7 +956,7 @@ class TestT701DeveloperLLMAnswerGeneration:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query",
             capture_contextual_prompt,
-        ), patch("claude_evaluator.core.agents.developer.SDK_AVAILABLE", True):
+        ):
             # Test ML context
             developer.reset()
             developer.transition_to(DeveloperState.prompting)
@@ -992,23 +998,24 @@ class TestT701DeveloperLLMAnswerGeneration:
 
         developer = DeveloperAgent(
             developer_qa_model="test-model-t701",
-            context_window_size=10,
         )
 
         # Mock LLM that logs and responds
-        async def mock_llm_call(prompt: str, model: str) -> str:
+        async def mock_llm_call(*args, **kwargs):
+            prompt = kwargs.get("prompt", args[0] if args else "")
+            options = kwargs.get("options")
+            model = options.model if options and hasattr(options, "model") else ""
             flow_events.append(f"LLM called with model {model}")
             # Formulate contextual response based on prompt
             if "python version" in prompt.lower():
-                return "I recommend Python 3.11 for its improved performance and new features."
-            return "Generic answer"
+                yield ResultMessage(result="I recommend Python 3.11 for its improved performance and new features.")
+            else:
+                yield ResultMessage(result="Generic answer")
 
         async def developer_callback(context: QuestionContext) -> str:
             flow_events.append("Developer callback invoked")
             with patch(
                 "claude_evaluator.core.agents.developer.sdk_query", mock_llm_call
-            ), patch(
-                "claude_evaluator.core.agents.developer.SDK_AVAILABLE", True
             ):
                 # Need to transition Developer to the right state
                 if developer.current_state == DeveloperState.initializing:
@@ -3596,12 +3603,11 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         # Patch the SDK client class
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", TrackingClaudeSDKClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Execute query - this should create a new client
-                await worker.execute_query("Test client creation")
+            # Execute query - this should create a new client
+            await worker.execute_query("Test client creation")
 
         # VERIFY: A client was created at evaluation start
         assert len(clients_created) == 1, (
@@ -3645,11 +3651,10 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", SequenceTrackingClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                await worker.execute_query("Sequence test query")
+            await worker.execute_query("Sequence test query")
 
         # VERIFY: Correct sequence
         assert len(call_sequence) >= 3, (
@@ -3708,9 +3713,8 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         # Before evaluation, no client should exist
         assert worker._client is None, "Client should be None before evaluation"
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StorageTestClient):  # noqa: SIM117
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                await worker.execute_query("Storage test query")
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StorageTestClient):
+            await worker.execute_query("Storage test query")
 
         # VERIFY: After evaluation, client is stored
         assert worker._client is not None, "Client should be stored after evaluation"
@@ -3754,11 +3758,10 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", ConnectionStateClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                await worker.execute_query("Connection state test")
+            await worker.execute_query("Connection state test")
 
         # VERIFY: When streaming started (query called), connection was already established
         assert len(connection_state_at_stream_start) > 0, (
@@ -3806,16 +3809,15 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", CountingClient):  # noqa: SIM117
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # First evaluation
-                await worker.execute_query("First evaluation", resume_session=False)
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", CountingClient):
+            # First evaluation
+            await worker.execute_query("First evaluation", resume_session=False)
 
-                # Second evaluation (not resuming)
-                await worker.execute_query("Second evaluation", resume_session=False)
+            # Second evaluation (not resuming)
+            await worker.execute_query("Second evaluation", resume_session=False)
 
-                # Third evaluation (not resuming)
-                await worker.execute_query("Third evaluation", resume_session=False)
+            # Third evaluation (not resuming)
+            await worker.execute_query("Third evaluation", resume_session=False)
 
         # VERIFY: A new client was created for each evaluation
         assert len(clients_created) == 3, (
@@ -3860,18 +3862,17 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", ReuseTrackingClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # First query creates a client
-                await worker.execute_query("First query", resume_session=False)
+            # First query creates a client
+            await worker.execute_query("First query", resume_session=False)
 
-                # Second query reuses client
-                await worker.execute_query("Second query (resume)", resume_session=True)
+            # Second query reuses client
+            await worker.execute_query("Second query (resume)", resume_session=True)
 
-                # Third query reuses client
-                await worker.execute_query("Third query (resume)", resume_session=True)
+            # Third query reuses client
+            await worker.execute_query("Third query (resume)", resume_session=True)
 
         # VERIFY: Only one client was created (for first query)
         assert len(clients_created) == 1, (
@@ -3913,14 +3914,12 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailingConnectClient
+        ), pytest.raises(
+            ConnectionError, match="Simulated connection failure"
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                with pytest.raises(
-                    ConnectionError, match="Simulated connection failure"
-                ):
-                    await worker.execute_query("Should fail to connect")
+            await worker.execute_query("Should fail to connect")
 
         # VERIFY: Connect was called but query was not (connection failed first)
         assert "connect_called" in connection_attempts, "connect() should be called"
@@ -3979,11 +3978,10 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", VerificationClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                await worker.execute_query("T706 verification query")
+            await worker.execute_query("T706 verification query")
 
         # CRITERION 1: Client is instantiated when evaluation starts
         # Verified by: INSTANTIATED appears in lifecycle events
@@ -4077,18 +4075,17 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", DisconnectTrackingClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Execute a successful query
-                await worker.execute_query("Success query")
+            # Execute a successful query
+            await worker.execute_query("Success query")
 
-                # Verify client is stored after success
-                assert worker._client is not None, "Client should exist after success"
+            # Verify client is stored after success
+            assert worker._client is not None, "Client should exist after success"
 
-                # Explicitly close the connection
-                await worker.clear_session()
+            # Explicitly close the connection
+            await worker.clear_session()
 
         # VERIFY: disconnect was called during cleanup
         assert len(disconnect_called) == 1, (
@@ -4134,12 +4131,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailingConnectClient
-        ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                with pytest.raises(ConnectionError, match="T707: Connection failed"):
-                    await worker.execute_query("Should fail")
+        ), pytest.raises(ConnectionError, match="T707: Connection failed"):
+            await worker.execute_query("Should fail")
 
         # VERIFY: disconnect was called after connection failure
         assert "disconnect_called" in cleanup_sequence, (
@@ -4192,12 +4187,10 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailingStreamClient
-        ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                with pytest.raises(RuntimeError, match="T707: Streaming failed"):
-                    await worker.execute_query("Should fail during streaming")
+        ), pytest.raises(RuntimeError, match="T707: Streaming failed"):
+            await worker.execute_query("Should fail during streaming")
 
         # VERIFY: Sequence shows connect -> query -> stream -> disconnect
         assert "connected" in cleanup_sequence, "Should have connected"
@@ -4247,17 +4240,16 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", DoubleFailureClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                try:
-                    await worker.execute_query("Should fail")
-                except ValueError as e:
-                    if "Original connect error" in str(e):
-                        original_error_caught.append(True)
-                    else:
-                        raise
+            try:
+                await worker.execute_query("Should fail")
+            except ValueError as e:
+                if "Original connect error" in str(e):
+                    original_error_caught.append(True)
+                else:
+                    raise
 
         # VERIFY: Original error is raised (not masked by disconnect error)
         assert len(original_error_caught) == 1, (
@@ -4327,17 +4319,16 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", TrackingClient):  # noqa: SIM117
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # First query - creates client 1
-                await worker.execute_query("First query", resume_session=False)
-                assert len(clients) == 1
-                assert clients[0]["connected"] is True
-                assert clients[0]["disconnected"] is False
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", TrackingClient):
+            # First query - creates client 1
+            await worker.execute_query("First query", resume_session=False)
+            assert len(clients) == 1
+            assert clients[0]["connected"] is True
+            assert clients[0]["disconnected"] is False
 
-                # Second query without resume - should disconnect client 1, create client 2
-                await worker.execute_query("Second query", resume_session=False)
-                assert len(clients) == 2
+            # Second query without resume - should disconnect client 1, create client 2
+            await worker.execute_query("Second query", resume_session=False)
+            assert len(clients) == 2
 
         # VERIFY: First client was disconnected when second was created
         assert clients[0]["disconnected"] is True, (
@@ -4387,20 +4378,19 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", LeakTrackingClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Run 5 sequential evaluations with cleanup
-                for i in range(5):
-                    await worker.execute_query(f"Evaluation {i + 1}")
-                    await worker.clear_session()
+            # Run 5 sequential evaluations with cleanup
+            for i in range(5):
+                await worker.execute_query(f"Evaluation {i + 1}")
+                await worker.clear_session()
 
-                    # After each cleanup, no connections should be active
-                    assert len(active_connections) == 0, (
-                        f"Evaluation {i + 1}: Expected no active connections, "
-                        f"got {active_connections}"
-                    )
+                # After each cleanup, no connections should be active
+                assert len(active_connections) == 0, (
+                    f"Evaluation {i + 1}: Expected no active connections, "
+                    f"got {active_connections}"
+                )
 
         # VERIFY: All operations show proper connect/disconnect pairs
         connect_count = sum(
@@ -4452,16 +4442,15 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", IdempotentTestClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                await worker.execute_query("Test query")
+            await worker.execute_query("Test query")
 
-                # Call clear_session multiple times
-                await worker.clear_session()
-                await worker.clear_session()  # Should not error
-                await worker.clear_session()  # Should not error
+            # Call clear_session multiple times
+            await worker.clear_session()
+            await worker.clear_session()  # Should not error
+            await worker.clear_session()  # Should not error
 
         # VERIFY: disconnect was only called once (first clear_session)
         assert len(disconnect_calls) == 1, (
@@ -4506,9 +4495,8 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         # Before any query
         assert worker.has_active_client() is False, "No client before query"
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StateTestClient):  # noqa: SIM117
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                await worker.execute_query("Test query")
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StateTestClient):
+            await worker.execute_query("Test query")
 
         # After query
         assert worker.has_active_client() is True, "Client should exist after query"
@@ -4577,7 +4565,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             ComprehensiveVerificationClient,
-        ), patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
+        ):
             # SCENARIO 1: Successful query with explicit cleanup
             await worker.execute_query("T707 success query")
             await worker.clear_session()
@@ -4692,7 +4680,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
             LeakTrackingSequentialClient,
-        ), patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
+        ):
             # Run 50 sequential evaluations
             for i in range(50):
                 await worker.execute_query(f"Evaluation {i + 1}")
@@ -4756,19 +4744,18 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", AccumulationTrackingClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Run 10 sequential evaluations
-                for i in range(10):
-                    await worker.execute_query(f"Eval {i + 1}")
-                    await worker.clear_session()
+            # Run 10 sequential evaluations
+            for i in range(10):
+                await worker.execute_query(f"Eval {i + 1}")
+                await worker.clear_session()
 
-                    # VERIFY: Worker no longer holds reference to client
-                    assert worker._client is None, (
-                        f"Evaluation {i + 1}: Worker should not hold client reference"
-                    )
+                # VERIFY: Worker no longer holds reference to client
+                assert worker._client is None, (
+                    f"Evaluation {i + 1}: Worker should not hold client reference"
+                )
 
         # VERIFY: 10 clients were created (one per evaluation)
         assert len(created_clients) == 10, (
@@ -4831,19 +4818,18 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             on_question_callback=count_and_answer,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", QuestionLeakTrackingClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Run 10 sequential evaluations, each with a question
-                for i in range(10):
-                    await worker.execute_query(f"Evaluation with question {i + 1}")
-                    await worker.clear_session()
+            # Run 10 sequential evaluations, each with a question
+            for i in range(10):
+                await worker.execute_query(f"Evaluation with question {i + 1}")
+                await worker.clear_session()
 
-                    # After cleanup, no connections should be active
-                    assert len(active_connections) == 0, (
-                        f"Eval {i + 1}: Expected 0 active connections, got {active_connections}"
-                    )
+                # After cleanup, no connections should be active
+                assert len(active_connections) == 0, (
+                    f"Eval {i + 1}: Expected 0 active connections, got {active_connections}"
+                )
 
         # VERIFY: 10 questions were answered
         assert question_count == 10, (
@@ -4904,23 +4890,22 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         success_count = 0
         failure_count = 0
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", FailureLeakTrackingClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Run 30 sequential evaluations with some failures
-                for i in range(30):
-                    try:
-                        await worker.execute_query(f"Evaluation {i + 1}")
-                        await worker.clear_session()
-                        success_count += 1
-                    except ConnectionError:
-                        failure_count += 1
+            # Run 30 sequential evaluations with some failures
+            for i in range(30):
+                try:
+                    await worker.execute_query(f"Evaluation {i + 1}")
+                    await worker.clear_session()
+                    success_count += 1
+                except ConnectionError:
+                    failure_count += 1
 
-                    # After each evaluation (success or failure), no connections should leak
-                    assert len(active_connections) == 0, (
-                        f"Eval {i + 1}: Expected 0 active connections, got {active_connections}"
-                    )
+                # After each evaluation (success or failure), no connections should leak
+                assert len(active_connections) == 0, (
+                    f"Eval {i + 1}: Expected 0 active connections, got {active_connections}"
+                )
 
         # VERIFY: Expected number of successes and failures
         assert failure_count == len(fail_on_eval), (
@@ -4967,33 +4952,32 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", SimpleClient):  # noqa: SIM117
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                for i in range(10):
-                    # Before query, add some tool invocations to simulate previous state
-                    from datetime import datetime
+        with patch("claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", SimpleClient):
+            for i in range(10):
+                # Before query, add some tool invocations to simulate previous state
+                from datetime import datetime
 
-                    worker.tool_invocations.append(
-                        ToolInvocation(
-                            timestamp=datetime.now(),
-                            tool_name="test_tool",
-                            tool_use_id=f"test-{i}",
-                            tool_input={"test": i},
-                            tool_output="test output",
-                            is_error=False,
-                        )
+                worker.tool_invocations.append(
+                    ToolInvocation(
+                        timestamp=datetime.now(),
+                        tool_name="test_tool",
+                        tool_use_id=f"test-{i}",
+                        tool_input={"test": i},
+                        tool_output="test output",
+                        is_error=False,
                     )
+                )
 
-                    # Execute query - should clear tool_invocations
-                    await worker.execute_query(f"Eval {i + 1}")
+                # Execute query - should clear tool_invocations
+                await worker.execute_query(f"Eval {i + 1}")
 
-                    # VERIFY: tool_invocations is empty after query
-                    assert len(worker.tool_invocations) == 0, (
-                        f"Eval {i + 1}: tool_invocations should be cleared, "
-                        f"got {len(worker.tool_invocations)} items"
-                    )
+                # VERIFY: tool_invocations is empty after query
+                assert len(worker.tool_invocations) == 0, (
+                    f"Eval {i + 1}: tool_invocations should be cleared, "
+                    f"got {len(worker.tool_invocations)} items"
+                )
 
-                    await worker.clear_session()
+                await worker.clear_session()
 
     @pytest.mark.asyncio
     async def test_question_attempt_counter_resets_between_evaluations(self) -> None:
@@ -5042,14 +5026,13 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             on_question_callback=track_attempts,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", CounterCheckClient
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Run 5 sequential evaluations, each with a question
-                for i in range(5):
-                    await worker.execute_query(f"Eval {i + 1}")
-                    await worker.clear_session()
+            # Run 5 sequential evaluations, each with a question
+            for i in range(5):
+                await worker.execute_query(f"Eval {i + 1}")
+                await worker.clear_session()
 
         # VERIFY: Each question had attempt_number == 1 (counter reset)
         assert len(attempt_counts_at_question) == 5
@@ -5112,18 +5095,17 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
             permission_mode=PermissionMode.plan,
         )
 
-        with patch(  # noqa: SIM117
+        with patch(
             "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", ComprehensiveT708Client
         ):
-            with patch("claude_evaluator.core.agents.worker.SDK_AVAILABLE", True):
-                # Run 55 sequential evaluations (exceeding 50 requirement)
-                for i in range(55):
-                    await worker.execute_query(f"Verification eval {i + 1}")
-                    await worker.clear_session()
+            # Run 55 sequential evaluations (exceeding 50 requirement)
+            for i in range(55):
+                await worker.execute_query(f"Verification eval {i + 1}")
+                await worker.clear_session()
 
-                    # Track that cleanup happened properly
-                    if len(active_connections) == 0 and worker._client is None:
-                        cleanup_verified_count += 1
+                # Track that cleanup happened properly
+                if len(active_connections) == 0 and worker._client is None:
+                    cleanup_verified_count += 1
 
         # CRITERION 1: No connection accumulation (max 1 concurrent)
         verification_results["no_connection_accumulation"] = max_concurrent == 1
@@ -5846,13 +5828,19 @@ class TestT710TimeoutTriggersGracefulFailure:
             await asyncio.sleep(10)  # Much longer than timeout
             return "this will never be returned"
 
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=slow_callback,
-            question_timeout_seconds=1,  # Short timeout for fast test
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=slow_callback,
+            )
 
         mock_client = MockClaudeSDKClient()
         mock_client.session_id = "t710-timeout-session"
@@ -5866,7 +5854,7 @@ class TestT710TimeoutTriggersGracefulFailure:
             ]
         )
 
-        with pytest.raises(asyncio.TimeoutError) as exc_info:
+        with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
             await worker._stream_sdk_messages_with_client("Design service", mock_client)
 
         error_message = str(exc_info.value)
@@ -5906,13 +5894,19 @@ class TestT710TimeoutTriggersGracefulFailure:
             callback_finished = True
             return "answer"
 
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=tracked_slow_callback,
-            question_timeout_seconds=1,
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=tracked_slow_callback,
+            )
 
         mock_client = MockClaudeSDKClient()
 
@@ -5926,7 +5920,7 @@ class TestT710TimeoutTriggersGracefulFailure:
             ]
         )
 
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(QuestionCallbackTimeoutError):
             await worker._stream_sdk_messages_with_client("Start", mock_client)
 
         # VERIFY: Callback was started but not finished
@@ -5935,7 +5929,7 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         # VERIFY: Worker's internal state is consistent
         # The question attempt counter should have incremented before timeout
-        assert worker._question_attempt_counter >= 0
+        assert worker._question_handler._attempt_counter >= 0
 
     @pytest.mark.asyncio
     async def test_resources_cleaned_up_after_timeout(self) -> None:
@@ -5960,13 +5954,19 @@ class TestT710TimeoutTriggersGracefulFailure:
                 cleanup_tracker["callback_cancelled"] = True
                 raise
 
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=cancellable_callback,
-            question_timeout_seconds=1,
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=cancellable_callback,
+            )
 
         mock_client = MockClaudeSDKClient()
         # Simulate that client is connected (as it would be in a real session)
@@ -5985,7 +5985,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         # Track tasks before timeout
         cleanup_tracker["tasks_before"] = len(asyncio.all_tasks())
 
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(QuestionCallbackTimeoutError):
             await worker._stream_sdk_messages_with_client("Cleanup test", mock_client)
 
         # Allow a small delay for cleanup
@@ -6019,16 +6019,18 @@ class TestT710TimeoutTriggersGracefulFailure:
         async def dummy_callback(context: QuestionContext) -> str:  # noqa: ARG001
             return "answer"
 
-        worker = WorkerAgent(
+        _worker = WorkerAgent(  # noqa: F841
             project_directory="/tmp/t710_test",
             active_session=False,
             permission_mode=PermissionMode.plan,
             on_question_callback=dummy_callback,
         )
 
-        # VERIFY: Default timeout is 60 seconds
-        assert worker.question_timeout_seconds == 60, (
-            f"Default timeout should be 60 seconds, got {worker.question_timeout_seconds}"
+        # VERIFY: Default timeout is 60 seconds (read from settings)
+        from claude_evaluator.config.settings import get_settings
+
+        assert get_settings().worker.question_timeout_seconds == 60, (
+            f"Default timeout should be 60 seconds, got {get_settings().worker.question_timeout_seconds}"
         )
 
     @pytest.mark.asyncio
@@ -6052,13 +6054,19 @@ class TestT710TimeoutTriggersGracefulFailure:
             return "answer"
 
         # Use a 2-second timeout
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=timed_callback,
-            question_timeout_seconds=2,
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 2
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=timed_callback,
+            )
 
         mock_client = MockClaudeSDKClient()
 
@@ -6071,7 +6079,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         )
 
         start_time = time.monotonic()
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(QuestionCallbackTimeoutError):
             await worker._stream_sdk_messages_with_client("Timing test", mock_client)
         elapsed = time.monotonic() - start_time
 
@@ -6091,13 +6099,19 @@ class TestT710TimeoutTriggersGracefulFailure:
             await asyncio.sleep(10)
             return "answer"
 
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=slow_callback,
-            question_timeout_seconds=1,
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=slow_callback,
+            )
 
         mock_client = MockClaudeSDKClient()
 
@@ -6116,7 +6130,7 @@ class TestT710TimeoutTriggersGracefulFailure:
             ]
         )
 
-        with pytest.raises(asyncio.TimeoutError) as exc_info:
+        with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
             await worker._stream_sdk_messages_with_client("Multi-question", mock_client)
 
         error_message = str(exc_info.value)
@@ -6142,13 +6156,19 @@ class TestT710TimeoutTriggersGracefulFailure:
                 await asyncio.sleep(10)  # First call times out
             return f"Fast answer {call_count}"
 
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=sometimes_slow_callback,
-            question_timeout_seconds=1,
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=sometimes_slow_callback,
+            )
 
         mock_client_1 = MockClaudeSDKClient()
         mock_client_1.set_responses(
@@ -6164,7 +6184,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         )
 
         # First operation times out
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(QuestionCallbackTimeoutError):
             await worker._stream_sdk_messages_with_client("First", mock_client_1)
 
         # Create a new client for second operation
@@ -6203,13 +6223,19 @@ class TestT710TimeoutTriggersGracefulFailure:
             await asyncio.sleep(10)
             return "answer"
 
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_test",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=slow_callback,
-            question_timeout_seconds=1,
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_test",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=slow_callback,
+            )
 
         mock_client = MockClaudeSDKClient()
         mock_client.session_id = "debug-session-xyz-123"
@@ -6235,7 +6261,7 @@ class TestT710TimeoutTriggersGracefulFailure:
             ]
         )
 
-        with pytest.raises(asyncio.TimeoutError) as exc_info:
+        with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
             await worker._stream_sdk_messages_with_client(
                 "Architecture decision", mock_client
             )
@@ -6271,7 +6297,6 @@ class TestT710TimeoutTriggersGracefulFailure:
             active_session=False,
             permission_mode=PermissionMode.plan,
             on_question_callback=fast_callback,
-            question_timeout_seconds=60,  # Default timeout
         )
 
         mock_client = MockClaudeSDKClient()
@@ -6332,13 +6357,19 @@ class TestT710TimeoutTriggersGracefulFailure:
                 # Clean up on cancel
                 raise
 
-        worker = WorkerAgent(
-            project_directory="/tmp/t710_verify",
-            active_session=False,
-            permission_mode=PermissionMode.plan,
-            on_question_callback=tracked_slow_callback,
-            question_timeout_seconds=1,  # 1 second for fast testing
-        )
+        mock_settings = MagicMock()
+        mock_settings.worker.question_timeout_seconds = 1
+
+        with patch(
+            "claude_evaluator.core.agents.worker_agent.get_settings",
+            return_value=mock_settings,
+        ):
+            worker = WorkerAgent(
+                project_directory="/tmp/t710_verify",
+                active_session=False,
+                permission_mode=PermissionMode.plan,
+                on_question_callback=tracked_slow_callback,
+            )
 
         mock_client = MockClaudeSDKClient()
         mock_client.session_id = "t710-verification"
@@ -6361,7 +6392,7 @@ class TestT710TimeoutTriggersGracefulFailure:
 
         try:
             await worker._stream_sdk_messages_with_client("Verify T710", mock_client)
-        except asyncio.TimeoutError as e:
+        except QuestionCallbackTimeoutError as e:
             error_message = str(e)
 
             # CRITERION 1: Operation fails gracefully (raises TimeoutError, not crashes)
@@ -6498,13 +6529,18 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         # difference between limited and full history obvious
         developer = DeveloperAgent(
             developer_qa_model="claude-haiku-4-5@20251001",
-            context_window_size=3,  # Only 3 messages normally
-            max_answer_retries=1,
         )
+
+        # Mock settings to use context_window_size=3
+        mock_dev_settings = MagicMock()
+        mock_dev_settings.developer.context_window_size = 3
+        mock_dev_settings.developer.max_answer_retries = 1
+        mock_dev_settings.developer.qa_model = "claude-haiku-4-5@20251001"
+        mock_dev_settings.developer.max_iterations = 10
 
         # Track which context strategy was used
         async def mock_sdk_query(*args, **kwargs):  # noqa: ARG001
-            return "Answer based on context"
+            yield ResultMessage(result="Answer based on context")
 
         # Build a large conversation history (more than context_window_size)
         large_history = [
@@ -6536,7 +6572,8 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,  # Retry
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query), \
+             patch("claude_evaluator.core.agents.developer.get_settings", return_value=mock_dev_settings):
             # First attempt
             result_1 = await developer.answer_question(context_attempt_1)
             context_sizes_used.append(result_1.context_size)
@@ -6570,12 +6607,16 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         """
         developer = DeveloperAgent(
             developer_qa_model="claude-haiku-4-5@20251001",
-            context_window_size=5,
-            max_answer_retries=1,
         )
 
+        mock_dev_settings = MagicMock()
+        mock_dev_settings.developer.context_window_size = 5
+        mock_dev_settings.developer.max_answer_retries = 1
+        mock_dev_settings.developer.qa_model = "claude-haiku-4-5@20251001"
+        mock_dev_settings.developer.max_iterations = 10
+
         async def mock_sdk_query(*args, **kwargs):  # noqa: ARG001
-            return "Answer"
+            yield ResultMessage(result="Answer")
 
         history = [
             {"role": "user", "content": "msg1"},
@@ -6602,7 +6643,8 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_sdk_query), \
+             patch("claude_evaluator.core.agents.developer.get_settings", return_value=mock_dev_settings):
             # First attempt
             await developer.answer_question(context_attempt_1)
             decisions_after_first = len(developer.decisions_log)
@@ -6697,12 +6739,17 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         async def capture_prompt(*args, **kwargs):
             prompt = kwargs.get("prompt", args[0] if args else "")
             prompts_received.append(prompt)
-            return "Better answer with more context"
+            yield ResultMessage(result="Better answer with more context")
 
         developer = DeveloperAgent(
             developer_qa_model="claude-haiku-4-5@20251001",
-            context_window_size=2,  # Very small window
         )
+
+        mock_dev_settings = MagicMock()
+        mock_dev_settings.developer.context_window_size = 2
+        mock_dev_settings.developer.max_answer_retries = 1
+        mock_dev_settings.developer.qa_model = "claude-haiku-4-5@20251001"
+        mock_dev_settings.developer.max_iterations = 10
 
         # History with important early context
         history = [
@@ -6739,7 +6786,8 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt), \
+             patch("claude_evaluator.core.agents.developer.get_settings", return_value=mock_dev_settings):
             await developer.answer_question(context_1)
             developer.current_state = DeveloperState.awaiting_response
             await developer.answer_question(context_2)
@@ -6864,12 +6912,16 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         """
         developer = DeveloperAgent(
             developer_qa_model="claude-haiku-4-5@20251001",
-            context_window_size=5,
-            max_answer_retries=1,  # Allow 1 retry (so 2 total attempts)
         )
 
+        mock_dev_settings = MagicMock()
+        mock_dev_settings.developer.context_window_size = 5
+        mock_dev_settings.developer.max_answer_retries = 1
+        mock_dev_settings.developer.qa_model = "claude-haiku-4-5@20251001"
+        mock_dev_settings.developer.max_iterations = 10
+
         async def mock_query(*args, **kwargs):  # noqa: ARG001
-            return "Answer"
+            yield ResultMessage(result="Answer")
 
         history = [{"role": "user", "content": "test"}]
 
@@ -6889,7 +6941,8 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_query):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", mock_query), \
+             patch("claude_evaluator.core.agents.developer.get_settings", return_value=mock_dev_settings):
             result_1 = await developer.answer_question(context_1)
             developer.current_state = DeveloperState.awaiting_response
             result_2 = await developer.answer_question(context_2)
@@ -6900,12 +6953,13 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
 
         # VERIFY: This enables downstream code to detect exceeded retries
         # max_answer_retries=1 means max 1 retry, so attempt 2 is the limit
-        exceeded_retries = result_2.attempt_number > developer.max_answer_retries + 1
+        max_answer_retries = mock_dev_settings.developer.max_answer_retries
+        exceeded_retries = result_2.attempt_number > max_answer_retries + 1
         assert not exceeded_retries, "2 attempts should not exceed max_answer_retries=1"
 
         # If attempt 3 were to happen, it would exceed the limit
         hypothetical_attempt_3_number = 3
-        would_exceed = hypothetical_attempt_3_number > developer.max_answer_retries + 1
+        would_exceed = hypothetical_attempt_3_number > max_answer_retries + 1
         assert would_exceed, "3 attempts would exceed max_answer_retries=1"
 
     @pytest.mark.asyncio
@@ -6950,6 +7004,9 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
 
         first_query_attempts = attempt_numbers.copy()
         attempt_numbers.clear()
+
+        # Reset counter as execute_query would do between queries
+        worker._question_handler.reset_counter()
 
         # Second query - counter should reset, first question should be attempt 1
         mock_client_2 = MockClaudeSDKClient()
@@ -7009,7 +7066,7 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         async def capture_prompt(*args, **kwargs):
             prompt = kwargs.get("prompt", args[0] if args else "")
             test_state["prompts"].append(prompt)
-            return "Answer"
+            yield ResultMessage(result="Answer")
 
         # Test Worker-side retry detection
         worker = WorkerAgent(
@@ -7047,8 +7104,13 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
         # Test Developer-side full history usage
         developer = DeveloperAgent(
             developer_qa_model="claude-haiku-4-5@20251001",
-            context_window_size=2,  # Small window
         )
+
+        mock_dev_settings = MagicMock()
+        mock_dev_settings.developer.context_window_size = 2
+        mock_dev_settings.developer.max_answer_retries = 1
+        mock_dev_settings.developer.qa_model = "claude-haiku-4-5@20251001"
+        mock_dev_settings.developer.max_iterations = 10
 
         large_history = [
             {"role": "user", "content": "Early context message 1"},
@@ -7073,7 +7135,8 @@ class TestT711AnswerRejectionTriggersRetryWithFullHistory:
             attempt_number=2,
         )
 
-        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt):
+        with patch("claude_evaluator.core.agents.developer.sdk_query", capture_prompt), \
+             patch("claude_evaluator.core.agents.developer.get_settings", return_value=mock_dev_settings):
             result_1 = await developer.answer_question(context_1)
             test_state["context_sizes"].append(result_1.context_size)
 

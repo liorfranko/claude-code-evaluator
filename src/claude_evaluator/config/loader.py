@@ -34,6 +34,52 @@ __all__ = ["load_suite", "apply_defaults", "load_experiment", "load_reviewer_con
 logger = get_logger(__name__)
 
 
+def _load_yaml_file(
+    path: Path,
+    error_class: type[Exception] = ConfigurationError,
+    label: str = "File",
+) -> dict[str, Any]:
+    """Load and validate a YAML file, returning the parsed dict.
+
+    Handles file existence check, YAML parsing, empty-file check,
+    and mapping-type validation.
+
+    Args:
+        path: Path to the YAML file.
+        error_class: Exception class to raise on validation errors.
+        label: Human-readable label for error messages (e.g. "Suite file").
+
+    Returns:
+        Parsed dictionary from the YAML file.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        error_class: If the file is empty or not a mapping.
+        yaml.YAMLError: If the file contains invalid YAML.
+
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"{label} not found: {path}")
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise error_class(f"Failed to parse YAML file {path}: {e}") from e
+    except OSError as e:
+        raise OSError(f"Failed to read YAML file {path}: {e}") from e
+
+    if data is None:
+        raise error_class(f"Empty YAML file: {path}")
+
+    if not isinstance(data, dict):
+        raise error_class(
+            f"Invalid YAML structure: expected mapping, got {type(data).__name__}"
+        )
+
+    return data
+
+
 def apply_defaults(suite: EvaluationSuite) -> EvaluationSuite:
     """Apply suite-level defaults to individual evaluation configurations.
 
@@ -108,26 +154,7 @@ def load_suite(path: Path | str) -> EvaluationSuite:
 
     """
     path = Path(path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"Suite file not found: {path}")
-
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise yaml.YAMLError(f"Failed to parse YAML file {path}: {e}") from e
-    except OSError as e:
-        raise OSError(f"Failed to read YAML file {path}: {e}") from e
-
-    if data is None:
-        raise ConfigurationError(f"Empty YAML file: {path}")
-
-    if not isinstance(data, dict):
-        raise ConfigurationError(
-            f"Invalid YAML structure: expected mapping, got {type(data).__name__}"
-        )
-
+    data = _load_yaml_file(path, label="Suite file")
     suite = _parse_suite(data, path)
     return apply_defaults(suite)
 
@@ -247,7 +274,7 @@ def _parse_evaluation(
             raise ConfigurationError(
                 f"Invalid workflow_type '{workflow_type_str}' in {context}. "
                 f"Valid values: {valid_types}"
-            )
+            ) from None
 
     # Parse phases - required only if workflow_type is not 'direct'
     phases: list[Phase] = []
@@ -385,13 +412,23 @@ def _parse_phase(data: dict[str, Any], index: int, parent_context: str) -> Phase
 
 # --- Experiment loader ---
 
-# Fields that can be set in experiment defaults and applied to config entries
-_EXPERIMENT_DEFAULT_FIELDS = [
-    "max_turns",
-    "max_budget_usd",
-    "timeout_seconds",
-    "model",
-]
+# Fields that can be set in experiment defaults and applied to config entries.
+# Derived from ExperimentConfigEntry model fields that have optional (None) defaults,
+# excluding metadata and structural fields.
+_EXPERIMENT_NON_DEFAULT_FIELDS = frozenset(
+    {"id", "name", "description", "workflow_type", "phases"}
+)
+
+
+def _get_experiment_default_fields() -> list[str]:
+    """Derive defaultable field names from ExperimentConfigEntry."""
+    from claude_evaluator.models.experiment_models import ExperimentConfigEntry
+
+    return [
+        name
+        for name, field in ExperimentConfigEntry.model_fields.items()
+        if field.default is None and name not in _EXPERIMENT_NON_DEFAULT_FIELDS
+    ]
 
 
 def load_experiment(path: Path | str) -> ExperimentConfig:
@@ -412,23 +449,7 @@ def load_experiment(path: Path | str) -> ExperimentConfig:
     from claude_evaluator.models.experiment_models import ExperimentConfig
 
     path = Path(path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"Experiment file not found: {path}")
-
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise ExperimentError(f"Failed to parse YAML file {path}: {e}") from e
-
-    if data is None:
-        raise ExperimentError(f"Empty YAML file: {path}")
-
-    if not isinstance(data, dict):
-        raise ExperimentError(
-            f"Invalid YAML structure: expected mapping, got {type(data).__name__}"
-        )
+    data = _load_yaml_file(path, ExperimentError, label="Experiment file")
 
     # Merge defaults into config entries before validation
     _merge_experiment_defaults(data)
@@ -470,11 +491,9 @@ def _merge_experiment_defaults(data: dict[str, Any]) -> None:
     for config_entry in configs:
         if not isinstance(config_entry, dict):
             continue
-        for field in _EXPERIMENT_DEFAULT_FIELDS:
+        for field in _get_experiment_default_fields():
             if field not in config_entry and field in defaults:
                 config_entry[field] = defaults[field]
-
-
 
 
 def load_reviewer_configs(path: Path | str) -> dict[str, ReviewerConfig]:
@@ -501,26 +520,7 @@ def load_reviewer_configs(path: Path | str) -> dict[str, ReviewerConfig]:
 
     """
     path = Path(path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {path}")
-
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise yaml.YAMLError(f"Failed to parse YAML file {path}: {e}") from e
-    except OSError as e:
-        raise OSError(f"Failed to read YAML file {path}: {e}") from e
-
-    if data is None:
-        raise ConfigurationError(f"Empty YAML file: {path}")
-
-    if not isinstance(data, dict):
-        raise ConfigurationError(
-            f"Invalid YAML structure: expected mapping, got {type(data).__name__}"
-        )
-
+    data = _load_yaml_file(path, label="Configuration file")
     return _parse_reviewer_configs(data, path)
 
 

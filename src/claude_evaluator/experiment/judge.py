@@ -132,19 +132,18 @@ class PairwiseJudge:
 
         if not self._position_bias_mitigation:
             comparisons.append(
-                PairwiseComparison(
+                self._make_comparison(
                     config_a_id=config_a_id,
                     config_b_id=config_b_id,
                     run_index_a=run_index_a,
                     run_index_b=run_index_b,
-                    presentation_order=a_first,
-                    dimension_judgments=original_verdict.dimension_judgments,
-                    overall_verdict=original_verdict.overall_verdict,
-                    overall_rationale=original_verdict.overall_rationale,
-                    judge_model=self._client.model,
-                    judge_duration_ms=original_duration,
-                    position_swapped=False,
-                    consistent_with_original=None,
+                    order=a_first,
+                    judgments=original_verdict.dimension_judgments,
+                    verdict=original_verdict.overall_verdict,
+                    rationale=original_verdict.overall_rationale,
+                    duration_ms=original_duration,
+                    swapped=False,
+                    consistent=None,
                 )
             )
             return comparisons
@@ -177,41 +176,69 @@ class PairwiseJudge:
 
         # Original comparison
         comparisons.append(
-            PairwiseComparison(
+            self._make_comparison(
                 config_a_id=config_a_id,
                 config_b_id=config_b_id,
                 run_index_a=run_index_a,
                 run_index_b=run_index_b,
-                presentation_order=a_first,
-                dimension_judgments=original_verdict.dimension_judgments,
-                overall_verdict=final_verdict,
-                overall_rationale=original_verdict.overall_rationale,
-                judge_model=self._client.model,
-                judge_duration_ms=original_duration,
-                position_swapped=False,
-                consistent_with_original=None,
+                order=a_first,
+                judgments=original_verdict.dimension_judgments,
+                verdict=final_verdict,
+                rationale=original_verdict.overall_rationale,
+                duration_ms=original_duration,
+                swapped=False,
+                consistent=None,
             )
         )
 
         # Swapped comparison
         comparisons.append(
-            PairwiseComparison(
+            self._make_comparison(
                 config_a_id=config_a_id,
                 config_b_id=config_b_id,
                 run_index_a=run_index_a,
                 run_index_b=run_index_b,
-                presentation_order=b_first,
-                dimension_judgments=flipped_judgments,
-                overall_verdict=final_verdict,
-                overall_rationale=swapped_verdict.overall_rationale,
-                judge_model=self._client.model,
-                judge_duration_ms=swapped_duration,
-                position_swapped=True,
-                consistent_with_original=is_consistent,
+                order=b_first,
+                judgments=flipped_judgments,
+                verdict=final_verdict,
+                rationale=swapped_verdict.overall_rationale,
+                duration_ms=swapped_duration,
+                swapped=True,
+                consistent=is_consistent,
             )
         )
 
         return comparisons
+
+    def _make_comparison(
+        self,
+        config_a_id: str,
+        config_b_id: str,
+        run_index_a: int,
+        run_index_b: int,
+        order: PresentationOrder,
+        judgments: list[DimensionJudgment],
+        verdict: ComparisonVerdict,
+        rationale: str,
+        duration_ms: int,
+        swapped: bool,
+        consistent: bool | None,
+    ) -> PairwiseComparison:
+        """Build a PairwiseComparison with common fields filled in."""
+        return PairwiseComparison(
+            config_a_id=config_a_id,
+            config_b_id=config_b_id,
+            run_index_a=run_index_a,
+            run_index_b=run_index_b,
+            presentation_order=order,
+            dimension_judgments=judgments,
+            overall_verdict=verdict,
+            overall_rationale=rationale,
+            judge_model=self._client.model,
+            judge_duration_ms=duration_ms,
+            position_swapped=swapped,
+            consistent_with_original=consistent,
+        )
 
     async def _judge_once(
         self,

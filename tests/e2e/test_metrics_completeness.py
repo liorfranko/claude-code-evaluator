@@ -120,8 +120,9 @@ class TestMetricsSchemaValidation:
         evaluation = Evaluation(
             task_description="Test task for metrics validation",
             workflow_type=WorkflowType.direct,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         collector = MetricsCollector()
@@ -154,8 +155,9 @@ class TestMetricsSchemaValidation:
         evaluation = Evaluation(
             task_description="Test task for report validation",
             workflow_type=WorkflowType.direct,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         collector = MetricsCollector()
@@ -183,8 +185,9 @@ class TestMetricsSchemaValidation:
         evaluation = Evaluation(
             task_description="Test task for query metrics",
             workflow_type=WorkflowType.direct,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         collector = MetricsCollector()
@@ -216,8 +219,9 @@ class TestMetricsSchemaValidation:
         evaluation = Evaluation(
             task_description="Test task for tool count extraction",
             workflow_type=WorkflowType.direct,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         collector = MetricsCollector()
@@ -249,8 +253,9 @@ class TestMetricsSchemaValidation:
         evaluation = Evaluation(
             task_description="Test task for type validation",
             workflow_type=WorkflowType.direct,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         collector = MetricsCollector()
@@ -292,8 +297,9 @@ class TestMetricsSchemaValidation:
         evaluation = Evaluation(
             task_description="Test task for phase tokens",
             workflow_type=WorkflowType.direct,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         collector = MetricsCollector()
@@ -323,8 +329,9 @@ class TestMetricsSchemaValidation:
         evaluation = Evaluation(
             task_description="Test task for tool counts",
             workflow_type=WorkflowType.direct,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         collector = MetricsCollector()
@@ -392,8 +399,9 @@ class TestMultiPhaseMetricsCompleteness:
         evaluation = Evaluation(
             task_description="Test multi-phase metrics",
             workflow_type=WorkflowType.multi_command,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         phases = [
@@ -440,8 +448,9 @@ class TestMultiPhaseMetricsCompleteness:
         evaluation = Evaluation(
             task_description="Test aggregate metrics",
             workflow_type=WorkflowType.multi_command,
-            developer_agent=developer,
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=developer,
         )
 
         phases = [

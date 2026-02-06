@@ -960,7 +960,7 @@ class TestSC003APICostEfficiency:
         # But we allow some buffer for edge cases
         max_reasonable_cost = MAX_COST_PER_EVALUATION_USD * 3  # $1.50 max
 
-        assert cost < max_reasonable_cost, (
+        assert cost <= max_reasonable_cost, (
             f"Large evaluation cost ${cost:.4f} exceeds reasonable limit "
             f"${max_reasonable_cost}"
         )

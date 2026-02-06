@@ -25,6 +25,22 @@ _DEFAULT_CPUS = "2"
 
 _ENV_PREFIXES = ("ANTHROPIC_", "CLAUDE_", "CLOUD_ML_REGION")
 
+# Mapping of (argparse attr, CLI flag, default) for boolean flags forwarded to container
+_BOOL_FLAGS = [
+    ("verbose", "--verbose", False),
+    ("json_output", "--json", False),
+    ("dry_run", "--dry-run", False),
+    ("no_ast", "--no-ast", False),
+]
+
+# Mapping of (argparse attr, CLI flag) for value flags forwarded to container
+_VALUE_FLAGS = [
+    ("runs", "--runs"),
+    ("workflow", "--workflow"),
+    ("task", "--task"),
+    ("timeout", "--timeout"),
+]
+
 
 class DockerSandbox:
     """Runs evaluations inside a Docker container.
@@ -138,11 +154,7 @@ class DockerSandbox:
     @staticmethod
     def _collect_env_vars() -> list[str]:
         """Collect host environment variables to forward into the container."""
-        env_flags: list[str] = []
-        for key in os.environ:
-            if key.startswith(_ENV_PREFIXES):
-                env_flags.append(key)
-        return env_flags
+        return [key for key in os.environ if key.startswith(_ENV_PREFIXES)]
 
     @staticmethod
     def _get_volume_mounts(args: argparse.Namespace) -> list[str]:
@@ -185,29 +197,24 @@ class DockerSandbox:
         """
         inner: list[str] = []
 
+        # Path arguments are remapped to container paths
         if getattr(args, "suite", None):
             inner.extend(["--suite", "/app/suite.yaml"])
         if getattr(args, "experiment", None):
             inner.extend(["--experiment", "/app/experiment.yaml"])
-        if getattr(args, "runs", None):
-            inner.extend(["--runs", str(args.runs)])
-        if getattr(args, "workflow", None):
-            inner.extend(["--workflow", args.workflow])
-        if getattr(args, "task", None):
-            inner.extend(["--task", args.task])
+
+        # Value flags
+        for attr, flag in _VALUE_FLAGS:
+            value = getattr(args, attr, None)
+            if value is not None:
+                inner.extend([flag, str(value)])
 
         inner.extend(["--output", "/app/output"])
 
-        if getattr(args, "verbose", False):
-            inner.append("--verbose")
-        if getattr(args, "json_output", False):
-            inner.append("--json")
-        if getattr(args, "timeout", None):
-            inner.extend(["--timeout", str(args.timeout)])
-        if getattr(args, "dry_run", False):
-            inner.append("--dry-run")
-        if getattr(args, "no_ast", False):
-            inner.append("--no-ast")
+        # Boolean flags
+        for attr, flag, default in _BOOL_FLAGS:
+            if getattr(args, attr, default):
+                inner.append(flag)
 
         return inner
 

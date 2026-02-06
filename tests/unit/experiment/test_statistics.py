@@ -283,7 +283,7 @@ class TestExperimentStatistician:
             ),
         ]
         statistician = ExperimentStatistician()
-        scores = statistician._extract_scores(comparisons, "a", "b")
+        scores = statistician._extract_scores(comparisons, "b")
         # Original verdict is a_slightly_better (+1), but config_a is "b",
         # so score should be flipped to -1 (meaning "a" is worse)
         assert scores[0] == -1

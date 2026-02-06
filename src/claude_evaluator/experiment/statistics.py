@@ -72,7 +72,7 @@ class ExperimentStatistician:
                 continue
 
             # Extract scores (positive = A better)
-            scores = self._extract_scores(pair_comparisons, config_a, config_b)
+            scores = self._extract_scores(pair_comparisons, config_b)
             if len(scores) < 2:
                 logger.warning(
                     "insufficient_samples_for_test",
@@ -98,17 +98,16 @@ class ExperimentStatistician:
     def _extract_scores(
         self,
         comparisons: list[PairwiseComparison],
-        _config_a: str,
         config_b: str,
     ) -> list[int]:
         """Extract numeric scores for a config pair.
 
-        Positive scores mean config_a is better.
+        Positive scores mean config_a is better. The score is flipped
+        when config_b appears in the config_a_id position.
 
         Args:
             comparisons: Comparisons for this pair.
-            _config_a: First config ID (unused, order inferred from config_b).
-            config_b: Second config ID.
+            config_b: Second config ID (used to detect flipped pairs).
 
         Returns:
             List of integer scores.
@@ -276,22 +275,22 @@ class EloCalculator:
                 continue  # Only count non-swapped to avoid double counting
             score = c.overall_verdict.score
             if score > 0:
-                wins[c.config_a_id] = wins.get(c.config_a_id, 0) + 1
-                losses[c.config_b_id] = losses.get(c.config_b_id, 0) + 1
+                wins[c.config_a_id] += 1
+                losses[c.config_b_id] += 1
             elif score < 0:
-                losses[c.config_a_id] = losses.get(c.config_a_id, 0) + 1
-                wins[c.config_b_id] = wins.get(c.config_b_id, 0) + 1
+                losses[c.config_a_id] += 1
+                wins[c.config_b_id] += 1
             else:
-                ties[c.config_a_id] = ties.get(c.config_a_id, 0) + 1
-                ties[c.config_b_id] = ties.get(c.config_b_id, 0) + 1
+                ties[c.config_a_id] += 1
+                ties[c.config_b_id] += 1
 
         # Run 3 passes to stabilize ratings
         for _ in range(3):
             for c in comparisons:
                 if c.position_swapped:
                     continue
-                r_a = ratings.get(c.config_a_id, self.INITIAL_RATING)
-                r_b = ratings.get(c.config_b_id, self.INITIAL_RATING)
+                r_a = ratings[c.config_a_id]
+                r_b = ratings[c.config_b_id]
 
                 e_a = 1.0 / (1.0 + 10.0 ** ((r_b - r_a) / 400.0))
                 e_b = 1.0 - e_a

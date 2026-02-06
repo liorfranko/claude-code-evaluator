@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import statistics as stats
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -234,7 +235,7 @@ class ExperimentRunner:
                 task=task_prompt,
                 workflow_type=workflow_type,
                 output_dir=run_dir,
-                phases=config_entry.phases or None,
+                phases=config_entry.phases if config_entry.phases else None,
                 model=config_entry.model,
                 max_turns=config_entry.max_turns,
                 timeout_seconds=config_entry.timeout_seconds,
@@ -325,11 +326,9 @@ class ExperimentRunner:
         success_rate = success_count / len(runs) if runs else 0.0
 
         # Compute dimension scores from comparisons
-        dimension_scores: dict[str, list[float]] = {}
+        dimension_scores: dict[str, list[float]] = defaultdict(list)
         for c in comparisons:
             for dj in c.dimension_judgments:
-                if dj.dimension_id not in dimension_scores:
-                    dimension_scores[dj.dimension_id] = []
                 if c.config_a_id == config_id:
                     dimension_scores[dj.dimension_id].append(float(dj.score_a))
                 elif c.config_b_id == config_id:

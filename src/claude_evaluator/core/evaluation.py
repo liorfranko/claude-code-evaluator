@@ -8,6 +8,7 @@ are handled by workflow implementations.
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import ConfigDict, Field
 
@@ -66,7 +67,7 @@ class Evaluation(BaseSchema):
 
     task_description: str
     workflow_type: WorkflowType
-    workspace_path: str
+    workspace_path: str = Field(default="/tmp/eval")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: EvaluationStatus = Field(default=EvaluationStatus.pending)
     start_time: datetime = Field(default_factory=datetime.now)
@@ -74,6 +75,8 @@ class Evaluation(BaseSchema):
     decisions_log: list[Decision] = Field(default_factory=list)
     metrics: Metrics | None = Field(default=None)
     error: str | None = Field(default=None)
+    worker_agent: Any = Field(default=None, exclude=True)
+    developer_agent: Any = Field(default=None, exclude=True)
 
     def start(self) -> None:
         """Start the evaluation, transitioning from pending to running.
@@ -159,6 +162,14 @@ class Evaluation(BaseSchema):
         """
         valid_targets = _VALID_TRANSITIONS.get(self.status, set())
         return new_status in valid_targets
+
+    def cleanup(self) -> None:
+        """Clean up evaluation resources.
+
+        Resets the workspace path to indicate the workspace has been
+        cleaned up. Safe to call multiple times.
+        """
+        self.workspace_path = None  # type: ignore[assignment]
 
     def get_duration_ms(self) -> int | None:
         """Get the total duration of the evaluation in milliseconds.

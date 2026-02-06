@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import html
 import math
+from collections.abc import Callable
 from pathlib import Path
+from string import Template
 
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.experiment import (
     ConfigResult,
     ExperimentReport,
+    PositionBiasAnalysis,
     StatisticalTest,
 )
 
@@ -107,11 +110,7 @@ class ExperimentReportGenerator:
             lines.append("")
             lines.append("DIMENSION SCORES (mean across all judgments):")
 
-            # Collect all dimension IDs
-            all_dims = set()
-            for cr in report.config_results:
-                all_dims.update(cr.dimension_scores.keys())
-            dim_ids = sorted(all_dims)
+            dim_ids = _all_dimension_ids(report.config_results)
 
             config_names = [cr.config_name for cr in report.config_results]
             header = f"  {'Dimension':<20}" + "".join(
@@ -164,23 +163,15 @@ class ExperimentReportGenerator:
         """
         h = html.escape
 
-        html_parts: list[str] = []
-        html_parts.append("<!DOCTYPE html>")
-        html_parts.append('<html lang="en"><head>')
-        html_parts.append('<meta charset="UTF-8">')
-        html_parts.append(
-            '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
-        )
-        html_parts.append(f"<title>Experiment: {h(report.experiment_name)}</title>")
-        html_parts.append(f"<style>{_CSS}</style>")
-        html_parts.append("</head><body>")
+        # Build dynamic sections
+        sections: list[str] = []
 
-        # Header
-        html_parts.append('<div class="container">')
-        html_parts.append(f"<h1>{h(report.experiment_name)}</h1>")
+        # Description
         if report.experiment_description:
-            html_parts.append(f"<p>{h(report.experiment_description)}</p>")
-        html_parts.append(
+            sections.append(f"<p>{h(report.experiment_description)}</p>")
+
+        # Meta
+        sections.append(
             f'<p class="meta">Generated: {report.generated_at.isoformat()} '
             f"| Runs: {report.total_runs} "
             f"| Comparisons: {report.total_comparisons} "
@@ -188,105 +179,156 @@ class ExperimentReportGenerator:
         )
 
         # Rankings table
-        html_parts.append("<h2>Rankings</h2>")
-        html_parts.append('<table class="rankings">')
-        html_parts.append(
+        sections.append("<h2>Rankings</h2>")
+        sections.append(self._render_rankings_table(report, h))
+
+        # Radar chart
+        if report.config_results and report.config_results[0].dimension_scores:
+            sections.append("<h2>Dimension Scores</h2>")
+            sections.append(_generate_radar_svg(report.config_results))
+
+        # Head-to-head matrix
+        if len(report.config_results) >= 2:
+            sections.append("<h2>Head-to-Head</h2>")
+            sections.append(
+                _generate_matrix_html(report.config_results, report.statistical_tests)
+            )
+
+        # Statistical significance
+        if report.statistical_tests:
+            sections.append("<h2>Statistical Tests</h2>")
+            sections.append(self._render_stats_table(report, h))
+
+        # Position bias
+        if report.position_bias_analysis:
+            sections.append(
+                self._render_position_bias(report.position_bias_analysis, h)
+            )
+
+        # Comparison details (expandable)
+        if report.pairwise_comparisons:
+            sections.append(self._render_comparison_details(report, h))
+
+        content = "\n".join(sections)
+        output = _HTML_TEMPLATE.safe_substitute(
+            title=h(report.experiment_name),
+            css=_CSS,
+            heading=h(report.experiment_name),
+            content=content,
+        )
+
+        path.write_text(output)
+        logger.info("experiment_report_html_saved", path=str(path))
+        return path
+
+    @staticmethod
+    def _render_rankings_table(
+        report: ExperimentReport,
+        h: Callable[[str], str],
+    ) -> str:
+        """Render the rankings table HTML."""
+        parts = ['<table class="rankings">']
+        parts.append(
             "<tr><th>Rank</th><th>Config</th><th>Elo</th>"
             "<th>W</th><th>L</th><th>T</th><th>Win%</th></tr>"
         )
         for rank, elo in enumerate(report.elo_rankings, 1):
             name = h(_find_config_name(report.config_results, elo.config_id))
-            html_parts.append(
+            parts.append(
                 f"<tr><td>{rank}</td><td>{name}</td>"
                 f"<td>{elo.rating:.0f}</td>"
                 f"<td>{elo.wins}</td><td>{elo.losses}</td>"
                 f"<td>{elo.ties}</td>"
                 f"<td>{elo.win_rate * 100:.0f}%</td></tr>"
             )
-        html_parts.append("</table>")
+        parts.append("</table>")
+        return "\n".join(parts)
 
-        # Radar chart
-        if report.config_results and report.config_results[0].dimension_scores:
-            html_parts.append("<h2>Dimension Scores</h2>")
-            html_parts.append(_generate_radar_svg(report.config_results))
-
-        # Head-to-head matrix
-        if len(report.config_results) >= 2:
-            html_parts.append("<h2>Head-to-Head</h2>")
-            html_parts.append(
-                _generate_matrix_html(report.config_results, report.statistical_tests)
+    @staticmethod
+    def _render_stats_table(
+        report: ExperimentReport,
+        h: Callable[[str], str],
+    ) -> str:
+        """Render the statistical tests table HTML."""
+        parts = ['<table class="stats">']
+        parts.append(
+            "<tr><th>Pair</th><th>p-value</th>"
+            "<th>Significant</th><th>Effect Size</th>"
+            "<th>CI</th></tr>"
+        )
+        for test in report.statistical_tests:
+            name_a = h(_find_config_name(report.config_results, test.config_a_id))
+            name_b = h(_find_config_name(report.config_results, test.config_b_id))
+            sig_class = "sig-yes" if test.significant else "sig-no"
+            sig_text = "Yes" if test.significant else "No"
+            parts.append(
+                f"<tr><td>{name_a} vs {name_b}</td>"
+                f"<td>{test.p_value:.4f}</td>"
+                f'<td class="{sig_class}">{sig_text}</td>'
+                f"<td>{test.effect_size:.3f}</td>"
+                f"<td>[{test.confidence_interval_lower:.3f}, "
+                f"{test.confidence_interval_upper:.3f}]</td></tr>"
             )
+        parts.append("</table>")
+        return "\n".join(parts)
 
-        # Statistical significance
-        if report.statistical_tests:
-            html_parts.append("<h2>Statistical Tests</h2>")
-            html_parts.append('<table class="stats">')
-            html_parts.append(
-                "<tr><th>Pair</th><th>p-value</th>"
-                "<th>Significant</th><th>Effect Size</th>"
-                "<th>CI</th></tr>"
+    @staticmethod
+    def _render_position_bias(
+        ba: PositionBiasAnalysis,
+        h: Callable[[str], str],
+    ) -> str:
+        """Render position bias section HTML."""
+        parts = ["<h2>Position Bias</h2>"]
+        parts.append(
+            f"<p>Consistency: {ba.consistency_rate * 100:.0f}% "
+            f"({ba.consistent_count}/{ba.total_pairs_judged} pairs)</p>"
+        )
+        if ba.detected_bias:
+            parts.append(
+                f'<p class="warning">Detected bias toward '
+                f"{h(ba.detected_bias)} position</p>"
             )
-            for test in report.statistical_tests:
-                name_a = h(_find_config_name(report.config_results, test.config_a_id))
-                name_b = h(_find_config_name(report.config_results, test.config_b_id))
-                sig_class = "sig-yes" if test.significant else "sig-no"
-                sig_text = "Yes" if test.significant else "No"
-                html_parts.append(
-                    f"<tr><td>{name_a} vs {name_b}</td>"
-                    f"<td>{test.p_value:.4f}</td>"
-                    f'<td class="{sig_class}">{sig_text}</td>'
-                    f"<td>{test.effect_size:.3f}</td>"
-                    f"<td>[{test.confidence_interval_lower:.3f}, "
-                    f"{test.confidence_interval_upper:.3f}]</td></tr>"
-                )
-            html_parts.append("</table>")
+        return "\n".join(parts)
 
-        # Position bias
-        if report.position_bias_analysis:
-            ba = report.position_bias_analysis
-            html_parts.append("<h2>Position Bias</h2>")
-            html_parts.append(
-                f"<p>Consistency: {ba.consistency_rate * 100:.0f}% "
-                f"({ba.consistent_count}/{ba.total_pairs_judged} pairs)</p>"
+    @staticmethod
+    def _render_comparison_details(
+        report: ExperimentReport,
+        h: Callable[[str], str],
+    ) -> str:
+        """Render expandable comparison details HTML."""
+        parts = ["<h2>Comparison Details</h2>"]
+        for comp in report.pairwise_comparisons:
+            if comp.position_swapped:
+                continue
+            name_a = h(_find_config_name(report.config_results, comp.config_a_id))
+            name_b = h(_find_config_name(report.config_results, comp.config_b_id))
+            parts.append("<details>")
+            parts.append(
+                f"<summary>{name_a} vs {name_b} "
+                f"(run {comp.run_index_a}): "
+                f"{h(comp.overall_verdict.value)}</summary>"
             )
-            if ba.detected_bias:
-                html_parts.append(
-                    f'<p class="warning">Detected bias toward '
-                    f"{h(ba.detected_bias)} position</p>"
+            parts.append(f"<p>{h(comp.overall_rationale)}</p>")
+            for dj in comp.dimension_judgments:
+                parts.append(
+                    f"<p><strong>{h(dj.dimension_id)}</strong>: "
+                    f"A={dj.score_a} B={dj.score_b} "
+                    f"({h(dj.verdict.value)})<br>"
+                    f"<em>{h(dj.rationale)}</em></p>"
                 )
-
-        # Comparison details (expandable)
-        if report.pairwise_comparisons:
-            html_parts.append("<h2>Comparison Details</h2>")
-            for comp in report.pairwise_comparisons:
-                if comp.position_swapped:
-                    continue
-                name_a = h(_find_config_name(report.config_results, comp.config_a_id))
-                name_b = h(_find_config_name(report.config_results, comp.config_b_id))
-                html_parts.append("<details>")
-                html_parts.append(
-                    f"<summary>{name_a} vs {name_b} "
-                    f"(run {comp.run_index_a}): "
-                    f"{h(comp.overall_verdict.value)}</summary>"
-                )
-                html_parts.append(f"<p>{h(comp.overall_rationale)}</p>")
-                for dj in comp.dimension_judgments:
-                    html_parts.append(
-                        f"<p><strong>{h(dj.dimension_id)}</strong>: "
-                        f"A={dj.score_a} B={dj.score_b} "
-                        f"({h(dj.verdict.value)})<br>"
-                        f"<em>{h(dj.rationale)}</em></p>"
-                    )
-                html_parts.append("</details>")
-
-        html_parts.append("</div></body></html>")
-
-        path.write_text("\n".join(html_parts))
-        logger.info("experiment_report_html_saved", path=str(path))
-        return path
+            parts.append("</details>")
+        return "\n".join(parts)
 
 
 # --- Helper functions ---
+
+
+def _all_dimension_ids(config_results: list[ConfigResult]) -> list[str]:
+    """Collect and sort all dimension IDs across config results."""
+    all_dims: set[str] = set()
+    for cr in config_results:
+        all_dims.update(cr.dimension_scores.keys())
+    return sorted(all_dims)
 
 
 def _find_config_name(config_results: list[ConfigResult], config_id: str) -> str:
@@ -307,10 +349,7 @@ def _generate_radar_svg(config_results: list[ConfigResult]) -> str:
         SVG markup string.
 
     """
-    all_dims = set()
-    for cr in config_results:
-        all_dims.update(cr.dimension_scores.keys())
-    dim_ids = sorted(all_dims)
+    dim_ids = _all_dimension_ids(config_results)
 
     if not dim_ids:
         return "<p>No dimension scores available.</p>"
@@ -433,6 +472,19 @@ def _generate_matrix_html(
     parts.append("</table>")
     return "\n".join(parts)
 
+
+_HTML_TEMPLATE = Template("""\
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experiment: $title</title>
+<style>$css</style>
+</head><body>
+<div class="container">
+<h1>$heading</h1>
+$content
+</div></body></html>""")
 
 _CSS = """
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

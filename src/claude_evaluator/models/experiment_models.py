@@ -164,10 +164,14 @@ class ExperimentConfig(BaseSchema):
     @model_validator(mode="after")
     def validate_unique_config_ids(self) -> ExperimentConfig:
         """Ensure all config entry IDs are unique."""
-        ids = [c.id for c in self.configs]
-        duplicates = [cid for cid in ids if ids.count(cid) > 1]
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for c in self.configs:
+            if c.id in seen:
+                duplicates.add(c.id)
+            seen.add(c.id)
         if duplicates:
-            raise ValueError(f"Duplicate config IDs found: {sorted(set(duplicates))}")
+            raise ValueError(f"Duplicate config IDs found: {sorted(duplicates)}")
         return self
 
     @model_validator(mode="after")
@@ -182,8 +186,6 @@ class ExperimentConfig(BaseSchema):
     @model_validator(mode="after")
     def validate_dimension_weights(self) -> ExperimentConfig:
         """Validate that dimension weights sum to approximately 1.0."""
-        if not self.judge_dimensions:
-            return self
         total = sum(d.weight for d in self.judge_dimensions)
         if not (0.99 <= total <= 1.01):
             raise ValueError(

@@ -73,6 +73,7 @@ class TestDirectWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Direct workflow test task",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -97,6 +98,7 @@ class TestDirectWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Single phase test",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -122,6 +124,7 @@ class TestDirectWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Permission mode test",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -145,6 +148,7 @@ class TestDirectWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Report generation test",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -176,6 +180,7 @@ class TestPlanThenImplementWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Plan then implement test task",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -200,6 +205,7 @@ class TestPlanThenImplementWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Two phase test",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -226,6 +232,7 @@ class TestPlanThenImplementWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Planning response test",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -250,6 +257,7 @@ class TestPlanThenImplementWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Permission transition test",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -273,6 +281,7 @@ class TestPlanThenImplementWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Report generation test",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -304,6 +313,7 @@ class TestMultiCommandWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Multi command test task",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -334,6 +344,7 @@ class TestMultiCommandWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="All phases test",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -366,6 +377,7 @@ class TestMultiCommandWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Context passing test",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -403,6 +415,7 @@ class TestMultiCommandWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Per-phase metrics test",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -435,6 +448,7 @@ class TestMultiCommandWorkflowCoverage(TestWorkflowCoverageSC003):
         evaluation = Evaluation(
             task_description="Report generation test",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
