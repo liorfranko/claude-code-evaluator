@@ -139,6 +139,9 @@ class BaseWorkflow(ABC):
         are owned by this workflow instance. Agents read additional configuration
         from settings.
 
+        If the evaluation already has worker_agent and/or developer_agent set
+        (e.g., from tests), those agents are reused instead of creating new ones.
+
         This method should be called at the start of execute() before any
         agent interaction. Call cleanup_worker() when execution completes.
 
@@ -149,6 +152,14 @@ class BaseWorkflow(ABC):
             Tuple of (developer, worker) agents.
 
         """
+        # Reuse agents from evaluation if already set (test support)
+        if getattr(evaluation, "worker_agent", None) is not None:
+            developer = getattr(evaluation, "developer_agent", None) or DeveloperAgent()
+            worker = evaluation.worker_agent
+            self._developer = developer
+            self._worker = worker
+            return developer, worker
+
         # Build additional directories
         claude_plans_dir = str(Path.home() / ".claude" / "plans")
         claude_plugins_dir = str(Path.home() / ".claude" / "plugins")

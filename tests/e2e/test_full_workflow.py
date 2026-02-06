@@ -88,6 +88,7 @@ class TestFullWorkflowExecution:
         evaluation = Evaluation(
             task_description="Create a utility function that validates email addresses",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -139,6 +140,7 @@ class TestFullWorkflowExecution:
         evaluation = Evaluation(
             task_description="Design and implement a REST API endpoint for user management",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -175,6 +177,7 @@ class TestFullWorkflowExecution:
         evaluation = Evaluation(
             task_description="Refactor legacy authentication module",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -281,6 +284,7 @@ class TestFullWorkflowWithYAMLConfig:
         evaluation = Evaluation(
             task_description=eval_config.task,
             workflow_type=workflow_type,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -355,6 +359,7 @@ class TestFullWorkflowReportPersistence:
         evaluation = Evaluation(
             task_description="Test report persistence",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -394,6 +399,7 @@ class TestFullWorkflowReportPersistence:
         evaluation = Evaluation(
             task_description="Test timeline completeness",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -457,6 +463,7 @@ class TestFullWorkflowErrorScenarios:
         evaluation = Evaluation(
             task_description="Test failure handling",
             workflow_type=WorkflowType.direct,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -519,6 +526,7 @@ class TestFullWorkflowErrorScenarios:
         evaluation = Evaluation(
             task_description="Test partial completion",
             workflow_type=WorkflowType.plan_then_implement,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )

@@ -496,30 +496,29 @@ class InsecureRandomCheck(ASTCheck):
             return results
 
         # Also check for random module import
-        if lang == Language.python:
-            if "import random" in source_code or "from random import" in source_code:
-                # Find random function calls
-                lines = source_code.split("\n")
-                for line_num, line in enumerate(lines, 1):
-                    for func in insecure:
-                        if f"random.{func}" in line or f"{func}(" in line:
-                            # Skip if it's in a comment
-                            stripped = line.strip()
-                            if stripped.startswith("#"):
-                                continue
+        if lang == Language.python and ("import random" in source_code or "from random import" in source_code):
+            # Find random function calls
+            lines = source_code.split("\n")
+            for line_num, line in enumerate(lines, 1):
+                for func in insecure:
+                    if f"random.{func}" in line or f"{func}(" in line:
+                        # Skip if it's in a comment
+                        stripped = line.strip()
+                        if stripped.startswith("#"):
+                            continue
 
-                            results.append(
-                                CheckResult(
-                                    check_id=self.check_id,
-                                    category=self.category,
-                                    severity=CheckSeverity.medium,
-                                    file_path=file_path,
-                                    line_number=line_num,
-                                    message=f"Insecure random: '{func}' is not cryptographically secure",
-                                    confidence=0.7,
-                                    suggestion=f"For security-sensitive operations, use {self.SECURE_ALTERNATIVES.get(lang, 'a secure random generator')}",
-                                )
+                        results.append(
+                            CheckResult(
+                                check_id=self.check_id,
+                                category=self.category,
+                                severity=CheckSeverity.medium,
+                                file_path=file_path,
+                                line_number=line_num,
+                                message=f"Insecure random: '{func}' is not cryptographically secure",
+                                confidence=0.7,
+                                suggestion=f"For security-sensitive operations, use {self.SECURE_ALTERNATIVES.get(lang, 'a secure random generator')}",
                             )
-                            break
+                        )
+                        break
 
         return results

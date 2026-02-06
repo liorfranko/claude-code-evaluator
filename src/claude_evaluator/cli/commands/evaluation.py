@@ -184,7 +184,7 @@ class RunEvaluationCommand(BaseCommand):
 
         report = generator.generate(
             evaluation,
-            workspace_path=str(workspace_path) if is_brownfield else None,
+            workspace_path=str(workspace_path),
             change_summary=change_summary,
             ref_used=ref_used,
         )

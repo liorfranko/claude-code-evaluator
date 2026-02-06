@@ -278,11 +278,10 @@ class TestClaudeClientGenerateStructured:
         with patch(
             "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
             side_effect=mock_sdk_query,
-        ):
-            with pytest.raises(Exception):  # JSON parse error
-                await mock_client.generate_structured(
-                    "Generate a sample", SampleResponse
-                )
+        ), pytest.raises(Exception):  # JSON parse error
+            await mock_client.generate_structured(
+                "Generate a sample", SampleResponse
+            )
 
 
 class TestClaudeClientRetryLogic:
@@ -352,10 +351,9 @@ class TestClaudeClientRetryLogic:
             patch(
                 "claude_evaluator.core.agents.evaluator.claude_client.asyncio.sleep",
                 side_effect=mock_sleep,
-            ),
+            ), pytest.raises(ClaudeAPIError)
         ):
-            with pytest.raises(ClaudeAPIError):
-                await mock_client.generate("Test prompt")
+            await mock_client.generate("Test prompt")
 
         # Check exponential backoff: base * 2^attempt
         # attempt 0: 0.001 * 2^0 = 0.001

@@ -43,6 +43,7 @@ class TestMultiCommandE2ESequentialExecution:
         return Evaluation(
             task_description="Build a microservice with database integration",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -229,6 +230,7 @@ class TestMultiCommandE2EContextPassing:
         return Evaluation(
             task_description="Create a CLI tool for file processing",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -454,6 +456,7 @@ class TestMultiCommandE2EMetrics:
         return Evaluation(
             task_description="Build a data pipeline",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )
@@ -668,6 +671,7 @@ class TestMultiCommandE2EErrorHandling:
         return Evaluation(
             task_description="Build something",
             workflow_type=WorkflowType.multi_command,
+            workspace_path="/tmp/test",
             developer_agent=developer,
             worker_agent=worker,
         )

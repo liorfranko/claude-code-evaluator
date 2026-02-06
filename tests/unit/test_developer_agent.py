@@ -36,7 +36,7 @@ class TestDeveloperAgentInitialization:
     def test_max_iterations_read_from_settings(self) -> None:
         """Test that max_iterations is read from settings at runtime."""
         with patch.object(get_settings().developer, "max_iterations", 50):
-            agent = DeveloperAgent()
+            DeveloperAgent()
             # Agent reads max_iterations from settings during _increment_iteration
             assert get_settings().developer.max_iterations == 50
 

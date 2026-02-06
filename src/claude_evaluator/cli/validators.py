@@ -63,11 +63,22 @@ def validate_args(args: argparse.Namespace) -> str | None:
         Error message if validation fails, None if valid.
 
     """
-    # --score is a standalone command
-    if getattr(args, "score", None) is not None:
-        score_path = Path(args.score)
+    # --experiment and --score use getattr because tests may construct
+    # partial Namespace objects without these attributes.
+    experiment = getattr(args, "experiment", None)
+    if experiment is not None:
+        exp_path = Path(experiment)
+        if not exp_path.exists():
+            return f"Error: Experiment file not found: {experiment}"
+        if exp_path.suffix not in (".yaml", ".yml"):
+            return f"Error: Experiment file must be YAML: {experiment}"
+        return None
+
+    score = getattr(args, "score", None)
+    if score is not None:
+        score_path = Path(score)
         if not score_path.exists():
-            return f"Error: Evaluation file not found: {args.score}"
+            return f"Error: Evaluation file not found: {score}"
         return None
 
     # Check --workflow requires --task
@@ -92,8 +103,9 @@ def validate_args(args: argparse.Namespace) -> str | None:
         if not suite_path.exists():
             return f"Error: Suite file not found: {args.suite}"
 
-    # Validate output path is safe (if output is specified)
-    if hasattr(args, "output") and args.output:
+    # Validate output path is safe (if output is specified).
+    # Use getattr because tests may construct partial Namespace objects.
+    if getattr(args, "output", None):
         output_error = validate_output_path(args.output)
         if output_error:
             return output_error

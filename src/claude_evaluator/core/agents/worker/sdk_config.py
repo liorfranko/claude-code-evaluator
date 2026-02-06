@@ -201,7 +201,7 @@ class ToolPermissionHandler:
         self,
         tool_name: str,
         input_data: dict[str, Any],
-        context: Any,
+        _context: Any,
     ) -> Any:
         """Handle tool permission requests.
 

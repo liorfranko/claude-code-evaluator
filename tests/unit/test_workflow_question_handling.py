@@ -645,9 +645,8 @@ class TestWorkflowResourceCleanup:
             workflow._worker = worker
             return (developer, worker)
 
-        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents):
-            with pytest.raises(RuntimeError):
-                asyncio.run(workflow.execute(evaluation))
+        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents), pytest.raises(RuntimeError):
+            asyncio.run(workflow.execute(evaluation))
 
         # Cleanup should still be called
         worker.clear_session.assert_called_once()
@@ -708,9 +707,8 @@ class TestWorkflowResourceCleanup:
             workflow._worker = worker
             return (developer, worker)
 
-        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents):
-            with pytest.raises(RuntimeError):
-                asyncio.run(workflow.execute(evaluation))
+        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents), pytest.raises(RuntimeError):
+            asyncio.run(workflow.execute(evaluation))
 
         worker.clear_session.assert_called_once()
 
@@ -756,9 +754,8 @@ class TestWorkflowResourceCleanup:
             workflow._worker = worker
             return (developer, worker)
 
-        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents):
-            with pytest.raises(RuntimeError, match="Implementation failed"):
-                asyncio.run(workflow.execute(evaluation))
+        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents), pytest.raises(RuntimeError, match="Implementation failed"):
+            asyncio.run(workflow.execute(evaluation))
 
         worker.clear_session.assert_called_once()
 

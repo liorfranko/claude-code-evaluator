@@ -7,6 +7,7 @@ It also provides centralized settings via pydantic-settings.
 
 from claude_evaluator.config.loader import (
     apply_defaults,
+    load_experiment,
     load_reviewer_configs,
     load_suite,
 )
@@ -15,8 +16,6 @@ from claude_evaluator.config.models import (
     EvaluationConfig,
     EvaluationSuite,
     Phase,
-    SuiteRunResult,
-    SuiteSummary,
 )
 from claude_evaluator.config.settings import (
     DeveloperSettings,
@@ -32,11 +31,10 @@ __all__ = [
     "EvaluationConfig",
     "EvaluationSuite",
     "get_settings",
+    "load_experiment",
     "load_reviewer_configs",
     "load_suite",
     "Phase",
     "Settings",
-    "SuiteRunResult",
-    "SuiteSummary",
     "WorkerSettings",
 ]

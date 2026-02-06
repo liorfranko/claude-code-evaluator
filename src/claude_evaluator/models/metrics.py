@@ -40,9 +40,8 @@ class Metrics(BaseSchema):
     @classmethod
     def convert_runtime_seconds_to_ms(cls, data: dict) -> dict:
         """Convert total_runtime_seconds to total_runtime_ms for backward compatibility."""
-        if isinstance(data, dict):
-            if "total_runtime_seconds" in data and "total_runtime_ms" not in data:
-                data["total_runtime_ms"] = int(data["total_runtime_seconds"] * 1000)
+        if isinstance(data, dict) and "total_runtime_seconds" in data and "total_runtime_ms" not in data:
+            data["total_runtime_ms"] = int(data["total_runtime_seconds"] * 1000)
         return data
 
     total_tokens: int

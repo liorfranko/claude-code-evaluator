@@ -1,0 +1,31 @@
+name: hello-world-experiment
+description: >
+  Simple experiment comparing two configs on a basic hello world task.
+  Uses 1 run per config to keep it quick.
+
+task:
+  prompt: >
+    Create a Python script called hello.py that:
+    1. Prints "Hello, World!" when run
+    2. Accepts an optional --name argument to personalize the greeting
+    3. Includes a main guard (if __name__ == "__main__")
+
+settings:
+  runs_per_config: 1
+  judge_model: sonnet
+  position_bias_mitigation: false
+  output_json: true
+  output_html: true
+  output_cli_summary: true
+
+defaults:
+  max_turns: 10
+  timeout_seconds: 120
+
+configs:
+  - id: sonnet
+    name: Sonnet
+    model: sonnet
+  - id: haiku
+    name: Haiku
+    model: haiku

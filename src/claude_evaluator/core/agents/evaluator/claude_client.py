@@ -224,6 +224,10 @@ class ClaudeClient:
             result = result_message.result
             if isinstance(result, str) and not result.startswith("ResultMessage("):
                 return result.strip()
+            # result may be a list of content blocks
+            text = self._extract_from_content(result)
+            if text:
+                return text
 
         # Second try: Assistant content from streaming
         assistant_content = query_result.assistant_content
@@ -237,6 +241,28 @@ class ClaudeClient:
             text = self._extract_from_content(result_message.content)
             if text:
                 return text
+
+        # Debug: log available attributes to diagnose extraction failures
+        attrs = {
+            attr: type(getattr(result_message, attr, None)).__name__
+            for attr in dir(result_message)
+            if not attr.startswith("_")
+        }
+        logger.error(
+            "text_extraction_failed",
+            subtype=getattr(result_message, "subtype", "unknown"),
+            result_type=type(getattr(result_message, "result", None)).__name__,
+            result_repr=repr(getattr(result_message, "result", None))[:500],
+            assistant_content_type=type(assistant_content).__name__
+            if assistant_content is not None
+            else "None",
+            assistant_content_repr=repr(assistant_content)[:500]
+            if assistant_content is not None
+            else "None",
+            content_type=type(getattr(result_message, "content", None)).__name__,
+            content_repr=repr(getattr(result_message, "content", None))[:500],
+            available_attrs=attrs,
+        )
 
         raise ValueError(
             f"Could not extract text from SDK response. "

@@ -8,11 +8,9 @@ This module tests the reviewer configuration functionality including:
 """
 
 import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-import yaml
 
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import load_reviewer_configs
@@ -175,7 +173,7 @@ version: "1.0.0"
             load_reviewer_configs("/nonexistent/path/config.yaml")
 
     def test_load_configs_invalid_yaml(self) -> None:
-        """Test that YAMLError is raised for invalid YAML."""
+        """Test that ConfigurationError is raised for invalid YAML."""
         yaml_content = """
 evaluator:
   reviewers:
@@ -187,7 +185,7 @@ evaluator:
             f.write(yaml_content)
             f.flush()
 
-            with pytest.raises(yaml.YAMLError):
+            with pytest.raises(ConfigurationError):
                 load_reviewer_configs(f.name)
 
     def test_load_configs_empty_file(self) -> None:

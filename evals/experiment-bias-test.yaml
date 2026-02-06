@@ -1,0 +1,32 @@
+name: position-bias-test
+description: >
+  Test position bias mitigation by running judgments in both orders.
+  Uses 2 runs to get some statistical data.
+
+task:
+  prompt: >
+    Create a Python script called fizzbuzz.py that:
+    1. Prints numbers from 1 to 100
+    2. For multiples of 3, print "Fizz" instead
+    3. For multiples of 5, print "Buzz" instead
+    4. For multiples of both, print "FizzBuzz"
+
+settings:
+  runs_per_config: 2
+  judge_model: haiku
+  position_bias_mitigation: true
+  output_json: true
+  output_html: true
+  output_cli_summary: true
+
+defaults:
+  max_turns: 10
+  timeout_seconds: 120
+
+configs:
+  - id: sonnet
+    name: Sonnet
+    model: sonnet
+  - id: haiku
+    name: Haiku
+    model: haiku

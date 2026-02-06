@@ -10,7 +10,7 @@ This module tests the base classes and models for phase reviewers including:
 - filter_by_confidence() filtering logic
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import ValidationError

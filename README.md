@@ -11,6 +11,8 @@ A CLI tool for evaluating Claude Code agent implementations with automated, inte
 - **Implicit Question Detection**: Detects and answers questions asked without the AskUserQuestion tool
 - **User Plugins Support**: Inherit user-level plugins, skills, and settings during evaluations
 - **Per-Evaluation Model Selection**: Configure different models for worker and developer agents
+- **Docker Sandbox**: Optional `--sandbox docker` flag for isolated evaluation execution with resource limits
+- **Experiment System**: Pairwise LLM-as-judge comparison of different configs (models, workflows, prompts) with statistical analysis and Elo ratings
 
 ## Installation
 
@@ -148,6 +150,161 @@ INFO:claude_evaluator.workflows.multi_command:Developer answered worker: continu
 ```
 
 For detailed examples and configuration options, see the [Quickstart Guide](docs/quickstart.md).
+
+## Docker Sandbox
+
+Run evaluations inside an isolated Docker container for process, filesystem, and network isolation. The container runs the exact same CLI — no special container-mode code paths.
+
+### Usage
+
+```bash
+# Ad-hoc evaluation in Docker
+claude-evaluator --workflow direct --task "Create hello.py" --sandbox docker
+
+# Suite evaluation in Docker
+claude-evaluator --suite evals/example-suite.yaml --sandbox docker --verbose
+
+# Dry-run validation in Docker
+claude-evaluator --suite evals/example-suite.yaml --dry-run --sandbox docker
+```
+
+### How It Works
+
+```
+Host: claude-evaluator --suite my-suite.yaml --sandbox docker
+  └─ DockerSandbox.run()
+       └─ docker run claude-evaluator:latest --suite /app/suite.yaml --output /app/output
+            └─ Inside container: normal evaluation flow (no --sandbox flag)
+            └─ Results written to /app/output (volume-mounted)
+       └─ Host reads results + streams container stdout in real-time
+```
+
+### Image Management
+
+The Docker image is auto-built on first use if it doesn't exist:
+
+```bash
+# Or build manually
+docker build -t claude-evaluator:latest .
+```
+
+### Environment & Credentials
+
+The sandbox automatically forwards relevant environment variables from the host:
+
+- `ANTHROPIC_*` — API keys, Vertex project IDs, model overrides
+- `CLAUDE_*` — `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_WORKER_MODEL`, etc.
+- `CLOUD_ML_REGION`
+
+For Vertex AI authentication, GCloud ADC credentials are mounted read-only into the container.
+
+### Resource Limits
+
+Default container limits: `--memory 4g --cpus 2`. These are configurable in the `DockerSandbox` constructor.
+
+## Experiments (Pairwise Comparison)
+
+Run the same task with different configurations and compare results using an LLM-as-judge with statistical analysis.
+
+### Usage
+
+```bash
+# Run an experiment
+claude-evaluator --experiment experiment.yaml
+
+# Override number of runs per config
+claude-evaluator --experiment experiment.yaml --runs 3 --verbose
+```
+
+### Experiment YAML
+
+```yaml
+name: model-comparison
+description: Compare Sonnet vs Haiku on a coding task
+version: "1.0.0"
+
+task:
+  prompt: |
+    Create a Python CLI task manager with add, list, complete, and delete commands.
+
+settings:
+  runs_per_config: 5
+  judge_model: opus
+  position_bias_mitigation: true
+  confidence_level: 0.95
+
+configs:
+  - id: sonnet
+    name: Claude Sonnet
+    model: sonnet
+    phases:
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt_template: "{task}"
+
+  - id: haiku
+    name: Claude Haiku
+    model: haiku
+    phases:
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt_template: "{task}"
+
+# Optional: customize judge dimensions (defaults provided)
+judge_dimensions:
+  - id: correctness
+    name: Correctness
+    weight: 0.30
+    description: Does the code work correctly and handle edge cases?
+  - id: code_quality
+    name: Code Quality
+    weight: 0.25
+    description: Is the code well-structured and readable?
+  - id: completeness
+    name: Completeness
+    weight: 0.20
+    description: Are all requirements addressed?
+  - id: robustness
+    name: Robustness
+    weight: 0.15
+    description: How well are errors and edge cases handled?
+  - id: best_practices
+    name: Best Practices
+    weight: 0.10
+    description: Does the code follow language conventions?
+```
+
+### How It Works
+
+1. **Evaluation phase** — runs each config N times, collecting code output and metrics
+2. **Comparison phase** — LLM judge compares every pair of outputs across configurable dimensions
+3. **Position bias mitigation** — each pair is judged twice (A vs B, then B vs A); inconsistent verdicts become ties
+4. **Statistical analysis** — Wilcoxon signed-rank test, bootstrap confidence intervals, Cohen's d effect size
+5. **Elo ratings** — chess-style ratings computed from pairwise outcomes
+
+### Output
+
+Reports are generated in JSON, HTML (with SVG charts), and CLI summary:
+
+```
+============================================================
+EXPERIMENT: model-comparison
+Task: Create a Python CLI task manager...
+Runs per config: 5 | Total comparisons: 25
+============================================================
+
+RANKINGS (by Elo Rating):
+  Rank  Config          Elo     W    L    T    Win%
+  1.    Claude Sonnet   1532    8    2    0    80%
+  2.    Claude Haiku    1468    2    8    0    20%
+
+HEAD-TO-HEAD:
+  sonnet vs haiku: 8W/2L (p=0.023, significant)
+
+Position Bias: 90% consistency (9/10 pairs)
+Total Cost: $1.24
+============================================================
+```
 
 ## User Plugins Support
 
@@ -382,11 +539,12 @@ registry.register(MyCustomCheck())
 
 ## Architecture
 
-The evaluator uses a two-agent architecture:
+The evaluator uses a multi-agent architecture:
 
 - **Worker Agent**: Executes Claude Code commands using ClaudeSDKClient for persistent session management. Supports configurable models, permission modes, and tool access.
 - **Developer Agent**: Orchestrates evaluations and uses an LLM (via `claude-agent-sdk` `query()`) to generate intelligent, context-aware answers when the Worker asks questions. Handles both explicit questions (AskUserQuestion) and implicit questions in plain text.
 - **Evaluator Agent**: Scores completed evaluations using AST analysis, static checks, and LLM-based assessment. Produces comprehensive score reports with multiple quality dimensions.
+- **Experiment System**: Orchestrates pairwise comparisons across configs using `ExperimentRunner`, `PairwiseJudge` (LLM-as-judge with position bias mitigation), and `ExperimentStatistician` (Wilcoxon, Elo, bootstrap CI). No external stats dependencies — uses stdlib `math`/`statistics`.
 
 ## Requirements
 

@@ -1,0 +1,28 @@
+name: multi-run-experiment
+description: >
+  Test with 3 runs per config for proper statistical analysis.
+
+task:
+  prompt: >
+    Create a Python function called is_palindrome in a file called palindrome.py.
+    The function should check if a string is a palindrome, ignoring case and spaces.
+
+settings:
+  runs_per_config: 3
+  judge_model: haiku
+  position_bias_mitigation: false
+  output_json: true
+  output_html: true
+  output_cli_summary: true
+
+defaults:
+  max_turns: 10
+  timeout_seconds: 120
+
+configs:
+  - id: sonnet
+    name: Sonnet
+    model: sonnet
+  - id: haiku
+    name: Haiku
+    model: haiku

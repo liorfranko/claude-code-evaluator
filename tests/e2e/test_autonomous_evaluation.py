@@ -89,6 +89,7 @@ class TestAutonomousEvaluationSC001:
             evaluation = Evaluation(
                 task_description=task,
                 workflow_type=workflow_type,
+                workspace_path="/tmp/test",
                 developer_agent=developer,
                 worker_agent=worker,
             )
@@ -230,6 +231,7 @@ class TestAutonomousEvaluationSC001:
             evaluation = Evaluation(
                 task_description=task,
                 workflow_type=WorkflowType.direct,
+                workspace_path="/tmp/test",
                 developer_agent=developer,
                 worker_agent=worker,
             )
@@ -291,6 +293,7 @@ class TestAutonomousEvaluationSequential:
             evaluation = Evaluation(
                 task_description=f"Task {i + 1}: Implement feature",
                 workflow_type=WorkflowType.direct,
+                workspace_path="/tmp/test",
                 developer_agent=developer,
                 worker_agent=worker,
             )
@@ -319,6 +322,7 @@ class TestAutonomousEvaluationSequential:
             evaluation = Evaluation(
                 task_description=f"Isolated task {i + 1}",
                 workflow_type=WorkflowType.direct,
+                workspace_path="/tmp/test",
                 developer_agent=developer,
                 worker_agent=worker,
             )

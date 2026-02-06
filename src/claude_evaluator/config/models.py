@@ -7,14 +7,12 @@ workflows with configurable permissions, tool access, and resource limits.
 
 from __future__ import annotations
 
-from datetime import datetime
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
 
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import PermissionMode, WorkflowType
-from claude_evaluator.models.report import EvaluationReport
 
 __all__ = [
     "RepositorySource",
@@ -22,8 +20,6 @@ __all__ = [
     "EvalDefaults",
     "EvaluationConfig",
     "EvaluationSuite",
-    "SuiteSummary",
-    "SuiteRunResult",
 ]
 
 
@@ -239,51 +235,3 @@ class EvaluationSuite(BaseSchema):
     defaults: EvalDefaults | None = None
 
 
-class SuiteSummary(BaseSchema):
-    """Aggregated summary statistics for a suite run.
-
-    Attributes:
-        total_evaluations: Total number of evaluations in the suite.
-        passed: Number of evaluations that passed.
-        failed: Number of evaluations that failed.
-        partial: Number of evaluations with partial success.
-        skipped: Number of evaluations that were skipped.
-        total_runtime_ms: Total execution time in milliseconds.
-        total_tokens: Total tokens consumed across all evaluations.
-        total_cost_usd: Total cost in USD across all evaluations.
-
-    """
-
-    total_evaluations: int
-    passed: int
-    failed: int
-    partial: int
-    skipped: int
-    total_runtime_ms: int
-    total_tokens: int
-    total_cost_usd: float
-
-
-class SuiteRunResult(BaseSchema):
-    """Complete result of running an evaluation suite.
-
-    Contains all individual evaluation results and aggregate summary.
-
-    Attributes:
-        suite_name: Name of the suite that was run.
-        run_id: Unique identifier for this run.
-        started_at: When the suite run started.
-        results: List of individual evaluation reports.
-        suite_version: Version of the suite that was run.
-        completed_at: When the suite run completed.
-        summary: Aggregated summary statistics.
-
-    """
-
-    suite_name: str
-    run_id: str
-    started_at: datetime
-    results: list[EvaluationReport] = Field(default_factory=list)
-    suite_version: str | None = None
-    completed_at: datetime | None = None
-    summary: SuiteSummary | None = None

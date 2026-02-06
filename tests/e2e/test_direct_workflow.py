@@ -66,8 +66,9 @@ class TestDirectWorkflowE2EExecution:
                 "Save it to factorial.py."
             ),
             workflow_type=WorkflowType.direct,
-            developer_agent=developer_agent,
+            workspace_path="/tmp/test",
             worker_agent=worker_agent,
+            developer_agent=developer_agent,
         )
 
     @pytest.fixture
@@ -274,8 +275,9 @@ class TestDirectWorkflowMetricsCapture:
         return Evaluation(
             task_description="Create a simple hello world script",
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=DeveloperAgent(),
         )
 
     def test_metrics_capture_token_usage(
@@ -480,8 +482,9 @@ class TestDirectWorkflowSinglePhaseVerification:
         return Evaluation(
             task_description="Implement a simple utility function",
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=DeveloperAgent(),
         )
 
     def test_no_planning_phase_in_direct_workflow(
@@ -596,8 +599,9 @@ class TestDirectWorkflowCompleteLifecycle:
                 "peek, and is_empty methods."
             ),
             workflow_type=WorkflowType.direct,
-            developer_agent=DeveloperAgent(),
+            workspace_path="/tmp/test",
             worker_agent=worker,
+            developer_agent=DeveloperAgent(),
         )
 
     def test_full_workflow_lifecycle(

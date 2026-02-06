@@ -30,7 +30,7 @@ pip install -e ".[dev]"
 ### Step 2: Set up your API key
 
 ```bash
-export ANTHROPIC_API_KEY="your-api-key-here"
+
 ```
 
 ### Step 3: Verify Installation
@@ -112,7 +112,6 @@ Output shows each reviewer phase executing:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Your Anthropic API key | Required |
 | `CLAUDE_EVALUATOR_MODEL` | Claude model to use | `claude-opus-4-5-20251101` |
 | `CLAUDE_EVALUATOR_TEMPERATURE` | Generation temperature | `0.1` |
 | `CLAUDE_EVALUATOR_TIMEOUT_SECONDS` | Evaluation timeout | `300` |
@@ -354,9 +353,7 @@ When all reviewers complete, results are aggregated:
 
 **Issue: API key not found**
 ```
-Error: ANTHROPIC_API_KEY environment variable not set
 ```
-**Solution**: Export your API key: `export ANTHROPIC_API_KEY="sk-..."`
 
 **Issue: Rate limit exceeded**
 ```

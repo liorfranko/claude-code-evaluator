@@ -34,7 +34,7 @@
 |--------|-------|
 | Target Platform | CLI tool (macOS, Linux) |
 | Minimum Requirements | Python 3.10+, claude-agent-sdk installed |
-| Environment Variables | None required (uses existing ANTHROPIC_API_KEY) |
+| Environment Variables | None required |
 
 ### Testing Approach
 

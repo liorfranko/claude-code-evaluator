@@ -14,7 +14,7 @@ For CI compatibility, API calls are mocked by default.
 import statistics
 import time
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -27,7 +27,6 @@ from claude_evaluator.core.agents.evaluator.reviewers.base import (
 from claude_evaluator.core.agents.evaluator.reviewers.registry import (
     ReviewerRegistry,
 )
-
 
 # ============================================================================
 # SC-001: Evaluation Quality Consistency Test Fixtures
@@ -193,7 +192,7 @@ def calculate_pearson_correlation(x: list[float], y: list[float]) -> float:
     mean_y = sum(y) / n
 
     # Calculate covariance and standard deviations
-    covariance = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y))
+    covariance = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y, strict=True))
     std_x = (sum((xi - mean_x) ** 2 for xi in x)) ** 0.5
     std_y = (sum((yi - mean_y) ** 2 for yi in y)) ** 0.5
 
@@ -222,7 +221,7 @@ def mock_reviewer_score(baseline: dict[str, Any]) -> int:
 
     # Add some noise based on quality indicators
     adjustment = 0
-    for indicator, level in indicators.items():
+    for _indicator, level in indicators.items():
         if level == "excellent":
             adjustment += 2
         elif level == "good":
@@ -333,7 +332,7 @@ class TestSC001EvaluationQualityConsistency:
             expected_scores.append(float(expected_score))
 
             # Create review context from baseline
-            context = ReviewContext(
+            ReviewContext(
                 task_description=baseline["task_description"],
                 code_files=baseline["code_files"],
             )
@@ -960,7 +959,7 @@ class TestSC003APICostEfficiency:
         # But we allow some buffer for edge cases
         max_reasonable_cost = MAX_COST_PER_EVALUATION_USD * 3  # $1.50 max
 
-        assert cost < max_reasonable_cost, (
+        assert cost <= max_reasonable_cost, (
             f"Large evaluation cost ${cost:.4f} exceeds reasonable limit "
             f"${max_reasonable_cost}"
         )
