@@ -11,14 +11,14 @@ import time
 from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
 from claude_evaluator.experiment.exceptions import JudgeError
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.config import JudgeDimension
+from claude_evaluator.models.experiment.results import (
     ComparisonVerdict,
     DimensionJudgment,
     JudgeVerdict,
     PairwiseComparison,
     PresentationOrder,
 )
-from claude_evaluator.models.experiment_models import JudgeDimension
 
 __all__ = ["PairwiseJudge"]
 

@@ -11,7 +11,7 @@ import pytest
 
 from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.models.enums import PermissionMode
-from claude_evaluator.models.tool_invocation import ToolInvocation
+from claude_evaluator.models.execution.tool_invocation import ToolInvocation
 
 
 class TestWorkerAgentInitialization:

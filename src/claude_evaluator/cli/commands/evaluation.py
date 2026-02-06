@@ -21,7 +21,7 @@ from claude_evaluator.core.git_operations import (
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import PermissionMode, WorkflowType
-from claude_evaluator.models.report import EvaluationReport
+from claude_evaluator.models.evaluation.report import EvaluationReport
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows import (
     DirectWorkflow,

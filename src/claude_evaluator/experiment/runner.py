@@ -20,16 +20,16 @@ from claude_evaluator.experiment.judge import PairwiseJudge
 from claude_evaluator.experiment.statistics import ExperimentStatistician
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import WorkflowType
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.config import (
+    ExperimentConfig,
+    ExperimentConfigEntry,
+)
+from claude_evaluator.models.experiment.results import (
     ConfigResult,
     EloRating,
     ExperimentReport,
     PairwiseComparison,
     RunResult,
-)
-from claude_evaluator.models.experiment_models import (
-    ExperimentConfig,
-    ExperimentConfigEntry,
 )
 
 __all__ = ["ExperimentRunner"]

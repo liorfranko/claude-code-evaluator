@@ -17,7 +17,7 @@ from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents import WorkerAgent
 from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
 from claude_evaluator.models.enums import PermissionMode
-from claude_evaluator.models.question import (
+from claude_evaluator.models.interaction.question import (
     QuestionContext,
 )
 
@@ -296,7 +296,9 @@ class TestCallbackInvocation:
         # Set the attempt counter to simulate first question
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, all_messages, mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, all_messages, mock_client.session_id
+        )
 
         assert isinstance(context, QuestionContext)
         assert len(context.questions) == 1
@@ -324,7 +326,9 @@ class TestCallbackInvocation:
         mock_client = MockClaudeSDKClient()
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert len(context.questions) == 3
         assert context.questions[0].question == "First question?"
@@ -339,7 +343,9 @@ class TestCallbackInvocation:
         mock_client = MockClaudeSDKClient()
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert len(context.questions) == 1
         assert "clarification" in context.questions[0].question.lower()
@@ -353,7 +359,9 @@ class TestCallbackInvocation:
         mock_client.session_id = "client-session-xyz"
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert context.session_id == "client-session-xyz"
 
@@ -370,7 +378,9 @@ class TestCallbackInvocation:
 
         # Simulate the fallback that WorkerAgent does at the call site
         session_id = "agent-session-abc"
-        context = base_agent._question_handler._build_question_context(block, [], session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], session_id
+        )
 
         assert context.session_id == "agent-session-abc"
 
@@ -384,7 +394,9 @@ class TestCallbackInvocation:
         base_agent.session_id = None
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert context.session_id == "unknown"
 
@@ -398,7 +410,9 @@ class TestCallbackInvocation:
         # Test with attempt counter > 2
         base_agent._question_handler._attempt_counter = 5
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert context.attempt_number == 2  # Clamped to max of 2
 
@@ -411,7 +425,9 @@ class TestCallbackInvocation:
         all_messages = [{"role": "user", "content": "Hello"}]
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, all_messages, mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, all_messages, mock_client.session_id
+        )
 
         # Modify original list
         all_messages.append({"role": "assistant", "content": "Hi"})
@@ -435,7 +451,9 @@ class TestCallbackInvocation:
         mock_client = MockClaudeSDKClient()
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert len(context.questions) == 1
         assert context.questions[0].question == "Object question?"
@@ -460,7 +478,9 @@ class TestCallbackInvocation:
         block = AskUserQuestionBlock(questions=[{"question": "What is the answer?"}])
         mock_client = MockClaudeSDKClient()
 
-        answer = await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+        answer = await agent._question_handler.handle_question_block(
+            block, [], mock_client.session_id
+        )
 
         assert answer == "user's answer"
         assert len(callback_received_context) == 1
@@ -477,7 +497,9 @@ class TestCallbackInvocation:
         mock_client = MockClaudeSDKClient()
 
         with pytest.raises(RuntimeError) as exc_info:
-            await base_agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+            await base_agent._question_handler.handle_question_block(
+                block, [], mock_client.session_id
+            )
 
         assert "no question callback is configured" in str(exc_info.value)
 
@@ -500,10 +522,14 @@ class TestCallbackInvocation:
 
         assert agent._question_handler._attempt_counter == 0
 
-        await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+        await agent._question_handler.handle_question_block(
+            block, [], mock_client.session_id
+        )
         assert agent._question_handler._attempt_counter == 1
 
-        await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+        await agent._question_handler.handle_question_block(
+            block, [], mock_client.session_id
+        )
         assert agent._question_handler._attempt_counter == 2
 
 
@@ -697,7 +723,9 @@ class TestTimeoutHandling:
         mock_client = MockClaudeSDKClient()
 
         with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
-            await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+            await agent._question_handler.handle_question_block(
+                block, [], mock_client.session_id
+            )
 
         error_msg = str(exc_info.value)
         assert "timed out after 1 seconds" in error_msg
@@ -728,7 +756,9 @@ class TestTimeoutHandling:
         mock_client = MockClaudeSDKClient()
 
         with pytest.raises(QuestionCallbackTimeoutError) as exc_info:
-            await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+            await agent._question_handler.handle_question_block(
+                block, [], mock_client.session_id
+            )
 
         error_msg = str(exc_info.value)
         assert "First important question?" in error_msg
@@ -752,7 +782,9 @@ class TestTimeoutHandling:
         block = AskUserQuestionBlock(questions=[{"question": "Quick question?"}])
         mock_client = MockClaudeSDKClient()
 
-        answer = await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+        answer = await agent._question_handler.handle_question_block(
+            block, [], mock_client.session_id
+        )
 
         assert answer == "quick answer"
 
@@ -892,7 +924,9 @@ class TestQuestionHandlingIntegration:
         mock_client = MockClaudeSDKClient()
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         # Single option should be converted to None
         assert context.questions[0].options is None
@@ -910,7 +944,9 @@ class TestQuestionHandlingIntegration:
         mock_client = MockClaudeSDKClient()
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert context.questions[0].options is None
 
@@ -1015,7 +1051,9 @@ class TestQuestionHandlingEdgeCases:
         mock_client = MockClaudeSDKClient()
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         # Only non-empty labels should remain, and we need >= 2
         assert context.questions[0].options is not None
@@ -1046,7 +1084,9 @@ class TestQuestionHandlingEdgeCases:
         mock_client = MockClaudeSDKClient()
         base_agent._question_handler._attempt_counter = 1
 
-        context = base_agent._question_handler._build_question_context(block, [], mock_client.session_id)
+        context = base_agent._question_handler._build_question_context(
+            block, [], mock_client.session_id
+        )
 
         assert context.questions[0].options is not None
         assert len(context.questions[0].options) == 2
@@ -1073,6 +1113,8 @@ class TestQuestionHandlingEdgeCases:
         mock_client = MockClaudeSDKClient()
 
         with pytest.raises(ValueError) as exc_info:
-            await agent._question_handler.handle_question_block(block, [], mock_client.session_id)
+            await agent._question_handler.handle_question_block(
+                block, [], mock_client.session_id
+            )
 
         assert "Callback failed intentionally" in str(exc_info.value)

@@ -235,8 +235,8 @@ class TestBrownfieldReportFields:
     def test_report_includes_workspace_path(self) -> None:
         """T050: Report includes workspace path for brownfield evaluations."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
-        from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.models.report import EvaluationReport
+        from claude_evaluator.models.evaluation.metrics import Metrics
+        from claude_evaluator.models.evaluation.report import EvaluationReport
 
         # Create a report with brownfield fields
         report = EvaluationReport(
@@ -263,8 +263,11 @@ class TestBrownfieldReportFields:
     def test_report_includes_change_summary(self) -> None:
         """T051: Report includes summary of modified/added/deleted files."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
-        from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.models.report import ChangeSummary, EvaluationReport
+        from claude_evaluator.models.evaluation.metrics import Metrics
+        from claude_evaluator.models.evaluation.report import (
+            ChangeSummary,
+            EvaluationReport,
+        )
 
         change_summary = ChangeSummary(
             files_modified=["src/main.py"],
@@ -293,15 +296,18 @@ class TestBrownfieldReportFields:
 
         assert report.change_summary is not None
         assert report.change_summary.files_modified == ["src/main.py"]
-        assert report.change_summary.files_added == ["src/new_feature.py", "tests/test_feature.py"]
+        assert report.change_summary.files_added == [
+            "src/new_feature.py",
+            "tests/test_feature.py",
+        ]
         assert report.change_summary.files_deleted == ["old_file.py"]
         assert report.change_summary.total_changes == 4
 
     def test_report_includes_ref_used(self) -> None:
         """Report includes the git ref that was used."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
-        from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.models.report import EvaluationReport
+        from claude_evaluator.models.evaluation.metrics import Metrics
+        from claude_evaluator.models.evaluation.report import EvaluationReport
 
         report = EvaluationReport(
             evaluation_id="test-789",
@@ -327,8 +333,11 @@ class TestBrownfieldReportFields:
     def test_report_json_includes_brownfield_fields(self) -> None:
         """JSON serialization includes brownfield fields."""
         from claude_evaluator.models.enums import Outcome, WorkflowType
-        from claude_evaluator.models.metrics import Metrics
-        from claude_evaluator.models.report import ChangeSummary, EvaluationReport
+        from claude_evaluator.models.evaluation.metrics import Metrics
+        from claude_evaluator.models.evaluation.report import (
+            ChangeSummary,
+            EvaluationReport,
+        )
         from claude_evaluator.report.generator import ReportGenerator
 
         change_summary = ChangeSummary(

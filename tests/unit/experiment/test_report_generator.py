@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from claude_evaluator.experiment.report_generator import ExperimentReportGenerator
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.results import (
     ComparisonVerdict,
     ConfigResult,
     DimensionJudgment,

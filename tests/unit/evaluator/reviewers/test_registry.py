@@ -562,7 +562,9 @@ class TestReviewerRegistryAggregateOutputs:
         assert result["reviewer_count"] == 0
         assert result["skipped_count"] == 0
 
-    def test_aggregate_outputs_single_reviewer(self, registry: ReviewerRegistry) -> None:
+    def test_aggregate_outputs_single_reviewer(
+        self, registry: ReviewerRegistry
+    ) -> None:
         """Test aggregating outputs from single reviewer."""
         outputs = [
             ReviewerOutput(

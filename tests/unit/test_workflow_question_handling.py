@@ -14,13 +14,13 @@ from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core import Evaluation
 from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
-from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.question import QuestionContext, QuestionItem
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
+from claude_evaluator.models.interaction.answer import AnswerResult
+from claude_evaluator.models.interaction.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import QuestionHandlingError
 from claude_evaluator.workflows.direct import DirectWorkflow
 from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
@@ -84,7 +84,9 @@ class TestBaseWorkflowQuestionCallback:
             attempt_number=1,
         )
 
-        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+        with patch.object(
+            DeveloperAgent, "answer_question", new_callable=AsyncMock
+        ) as mock_answer:
             mock_answer.return_value = mock_result
             result = asyncio.run(callback(context))
 
@@ -114,7 +116,9 @@ class TestBaseWorkflowQuestionCallback:
             attempt_number=1,
         )
 
-        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+        with patch.object(
+            DeveloperAgent, "answer_question", new_callable=AsyncMock
+        ) as mock_answer:
             mock_answer.return_value = mock_result
             result = asyncio.run(callback(context))
 
@@ -134,7 +138,9 @@ class TestBaseWorkflowQuestionCallback:
             attempt_number=1,
         )
 
-        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+        with patch.object(
+            DeveloperAgent, "answer_question", new_callable=AsyncMock
+        ) as mock_answer:
             mock_answer.side_effect = RuntimeError("SDK not available")
 
             with pytest.raises(QuestionHandlingError) as exc_info:
@@ -202,9 +208,7 @@ class TestWorkflowConfigurationPassing:
     def test_context_window_size_read_from_settings_at_runtime(self) -> None:
         """Test that context_window_size is read from settings, not set on agent."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(
-            collector, enable_question_handling=False
-        )
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -249,9 +253,7 @@ class TestWorkflowConfigurationPassing:
     def test_question_timeout_read_from_settings_at_runtime(self) -> None:
         """Test that question_timeout_seconds is read from settings, not set on agent."""
         collector = MetricsCollector()
-        workflow = DirectWorkflow(
-            collector, enable_question_handling=False
-        )
+        workflow = DirectWorkflow(collector, enable_question_handling=False)
 
         developer = DeveloperAgent()
         worker = WorkerAgent(
@@ -563,7 +565,9 @@ class TestQuestionHandlingErrorPropagation:
             attempt_number=1,
         )
 
-        with patch.object(DeveloperAgent, "answer_question", new_callable=AsyncMock) as mock_answer:
+        with patch.object(
+            DeveloperAgent, "answer_question", new_callable=AsyncMock
+        ) as mock_answer:
             mock_answer.side_effect = RuntimeError("Failed to generate answer")
 
             with pytest.raises(QuestionHandlingError) as exc_info:
@@ -645,7 +649,10 @@ class TestWorkflowResourceCleanup:
             workflow._worker = worker
             return (developer, worker)
 
-        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents), pytest.raises(RuntimeError):
+        with (
+            patch.object(workflow, "_create_agents", side_effect=mock_create_agents),
+            pytest.raises(RuntimeError),
+        ):
             asyncio.run(workflow.execute(evaluation))
 
         # Cleanup should still be called
@@ -707,7 +714,10 @@ class TestWorkflowResourceCleanup:
             workflow._worker = worker
             return (developer, worker)
 
-        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents), pytest.raises(RuntimeError):
+        with (
+            patch.object(workflow, "_create_agents", side_effect=mock_create_agents),
+            pytest.raises(RuntimeError),
+        ):
             asyncio.run(workflow.execute(evaluation))
 
         worker.clear_session.assert_called_once()
@@ -754,7 +764,10 @@ class TestWorkflowResourceCleanup:
             workflow._worker = worker
             return (developer, worker)
 
-        with patch.object(workflow, "_create_agents", side_effect=mock_create_agents), pytest.raises(RuntimeError, match="Implementation failed"):
+        with (
+            patch.object(workflow, "_create_agents", side_effect=mock_create_agents),
+            pytest.raises(RuntimeError, match="Implementation failed"),
+        ):
             asyncio.run(workflow.execute(evaluation))
 
         worker.clear_session.assert_called_once()

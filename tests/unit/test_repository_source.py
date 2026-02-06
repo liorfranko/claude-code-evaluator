@@ -162,32 +162,24 @@ class TestRepositorySourceRefField:
 
     def test_ref_with_branch(self) -> None:
         """Branch name should be accepted as ref."""
-        source = RepositorySource(
-            url="https://github.com/owner/repo",
-            ref="main"
-        )
+        source = RepositorySource(url="https://github.com/owner/repo", ref="main")
         assert source.ref == "main"
 
     def test_ref_with_tag(self) -> None:
         """Tag should be accepted as ref."""
-        source = RepositorySource(
-            url="https://github.com/owner/repo",
-            ref="v1.0.0"
-        )
+        source = RepositorySource(url="https://github.com/owner/repo", ref="v1.0.0")
         assert source.ref == "v1.0.0"
 
     def test_ref_with_commit_sha(self) -> None:
         """Commit SHA should be accepted as ref."""
         source = RepositorySource(
-            url="https://github.com/owner/repo",
-            ref="abc1234567890def"
+            url="https://github.com/owner/repo", ref="abc1234567890def"
         )
         assert source.ref == "abc1234567890def"
 
     def test_ref_with_feature_branch(self) -> None:
         """Feature branch with slashes should be accepted as ref."""
         source = RepositorySource(
-            url="https://github.com/owner/repo",
-            ref="feature/my-feature"
+            url="https://github.com/owner/repo", ref="feature/my-feature"
         )
         assert source.ref == "feature/my-feature"

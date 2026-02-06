@@ -19,8 +19,8 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 from claude_evaluator.workflows.direct import DirectWorkflow
 from claude_evaluator.workflows.multi_command import MultiCommandWorkflow
 from claude_evaluator.workflows.plan_then_implement import PlanThenImplementWorkflow
@@ -1681,7 +1681,9 @@ class TestMultiCommandWorkflowInitialization:
         phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
         defaults = EvalDefaults(max_turns=1500)
 
-        workflow = MultiCommandWorkflow(collector, phases, defaults=defaults, max_turns=2000)
+        workflow = MultiCommandWorkflow(
+            collector, phases, defaults=defaults, max_turns=2000
+        )
 
         assert workflow._max_turns == 2000
 

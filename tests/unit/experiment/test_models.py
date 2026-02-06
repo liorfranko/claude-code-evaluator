@@ -7,19 +7,19 @@ default dimension population, and serialization roundtrips.
 import pytest
 from pydantic import ValidationError
 
-from claude_evaluator.models.experiment import (
-    ComparisonVerdict,
-    DimensionJudgment,
-    EloRating,
-    RunResult,
-    StatisticalTest,
-)
-from claude_evaluator.models.experiment_models import (
+from claude_evaluator.models.experiment.config import (
     ExperimentConfig,
     ExperimentConfigEntry,
     ExperimentSettings,
     ExperimentTask,
     JudgeDimension,
+)
+from claude_evaluator.models.experiment.results import (
+    ComparisonVerdict,
+    DimensionJudgment,
+    EloRating,
+    RunResult,
+    StatisticalTest,
 )
 
 

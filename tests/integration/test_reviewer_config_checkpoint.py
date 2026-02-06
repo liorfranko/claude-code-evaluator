@@ -69,9 +69,7 @@ evaluator:
       min_confidence: 65
       timeout_seconds: 60
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             return f.name
@@ -88,9 +86,7 @@ evaluator:
             )
         return agent
 
-    def test_yaml_config_loads_reviewer_settings(
-        self, sample_yaml_config: str
-    ) -> None:
+    def test_yaml_config_loads_reviewer_settings(self, sample_yaml_config: str) -> None:
         """Test that YAML config correctly loads reviewer settings."""
         configs = load_reviewer_configs(sample_yaml_config)
 
@@ -186,16 +182,12 @@ evaluator:
         assert len(outputs) == 3
 
         # Find the error_handling output
-        error_output = next(
-            o for o in outputs if o.reviewer_name == "error_handling"
-        )
+        error_output = next(o for o in outputs if o.reviewer_name == "error_handling")
         assert error_output.skipped is True
         assert "disabled" in error_output.skip_reason.lower()
 
         # Enabled reviewers should not be skipped
-        task_output = next(
-            o for o in outputs if o.reviewer_name == "task_completion"
-        )
+        task_output = next(o for o in outputs if o.reviewer_name == "task_completion")
         assert task_output.skipped is False
 
     def test_min_confidence_override_is_applied(
@@ -272,9 +264,7 @@ evaluator:
         outputs = await registry.run_all(context)
 
         # Find code_quality output
-        quality_output = next(
-            o for o in outputs if o.reviewer_name == "code_quality"
-        )
+        quality_output = next(o for o in outputs if o.reviewer_name == "code_quality")
 
         # Only the high confidence issue (90) should remain
         # Issues at 75 and 50 should be filtered out by min_confidence=80
@@ -300,9 +290,7 @@ evaluator:
       enabled: true
       min_confidence: 75
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             config_path = f.name
@@ -365,18 +353,12 @@ evaluator:
         assert len(outputs) == 3
 
         # code_quality should be skipped
-        code_output = next(
-            o for o in outputs if o.reviewer_name == "code_quality"
-        )
+        code_output = next(o for o in outputs if o.reviewer_name == "code_quality")
         assert code_output.skipped is True
 
         # Others should execute
-        task_output = next(
-            o for o in outputs if o.reviewer_name == "task_completion"
-        )
-        error_output = next(
-            o for o in outputs if o.reviewer_name == "error_handling"
-        )
+        task_output = next(o for o in outputs if o.reviewer_name == "task_completion")
+        error_output = next(o for o in outputs if o.reviewer_name == "error_handling")
         assert task_output.skipped is False
         assert error_output.skipped is False
 

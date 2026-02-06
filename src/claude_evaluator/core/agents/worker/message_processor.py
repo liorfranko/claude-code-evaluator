@@ -8,8 +8,8 @@ from collections.abc import Callable
 from typing import Any
 
 from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
-from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-from claude_evaluator.models.tool_invocation import ToolInvocation
+from claude_evaluator.models.execution.progress import ProgressEvent, ProgressEventType
+from claude_evaluator.models.execution.tool_invocation import ToolInvocation
 
 __all__ = ["MessageProcessor"]
 

@@ -25,7 +25,7 @@ from claude_evaluator.core.agents.evaluator.reviewers.base import (
     ReviewerOutput,
 )
 from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.score_report import DimensionType, ScoreReport
+from claude_evaluator.models.evaluation.score_report import DimensionType, ScoreReport
 
 
 class TestFullEvaluationWorkflow:
@@ -373,9 +373,7 @@ class TestFullEvaluationWorkflow:
 
         # Aggregate should be weighted average of dimension scores
         total_weight = sum(ds.weight for ds in score_report.dimension_scores)
-        weighted_sum = sum(
-            ds.score * ds.weight for ds in score_report.dimension_scores
-        )
+        weighted_sum = sum(ds.score * ds.weight for ds in score_report.dimension_scores)
         expected_aggregate = int(weighted_sum / total_weight)
 
         assert score_report.aggregate_score == expected_aggregate
@@ -456,7 +454,10 @@ class TestFullEvaluationWorkflow:
         self, evaluator_agent: EvaluatorAgent, tmp_path: Path
     ) -> None:
         """Test that save_report writes a valid JSON file."""
-        from claude_evaluator.models.score_report import DimensionScore, DimensionType
+        from claude_evaluator.models.evaluation.score_report import (
+            DimensionScore,
+            DimensionType,
+        )
 
         report = ScoreReport(
             evaluation_id="test-001",

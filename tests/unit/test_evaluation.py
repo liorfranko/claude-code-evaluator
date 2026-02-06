@@ -15,7 +15,7 @@ import pytest
 
 from claude_evaluator.core import Evaluation, InvalidEvaluationStateError
 from claude_evaluator.models.enums import EvaluationStatus, WorkflowType
-from claude_evaluator.models.metrics import Metrics
+from claude_evaluator.models.evaluation.metrics import Metrics
 
 
 @pytest.fixture

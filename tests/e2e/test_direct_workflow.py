@@ -23,9 +23,9 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.tool_invocation import ToolInvocation
 from claude_evaluator.workflows.direct import DirectWorkflow
 
 
@@ -243,7 +243,9 @@ class TestDirectWorkflowE2EExecution:
         received_queries: list[str] = []
 
         async def capture_query(
-            query: str, phase: str = None, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str = None,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             received_queries.append(query)
             return realistic_query_metrics
@@ -555,7 +557,8 @@ class TestDirectWorkflowSinglePhaseVerification:
         permission_mode_at_execution = None
 
         async def capture_permission_mode(
-            query: str, phase: str = None  # noqa: ARG001
+            query: str,
+            phase: str = None,  # noqa: ARG001
         ) -> QueryMetrics:
             nonlocal permission_mode_at_execution
             permission_mode_at_execution = evaluation.worker_agent.permission_mode

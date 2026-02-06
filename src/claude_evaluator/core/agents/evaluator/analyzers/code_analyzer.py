@@ -14,7 +14,7 @@ from claude_evaluator.core.agents.evaluator.ast import (
     MetricsExtractor,
     detect_language,
 )
-from claude_evaluator.models.score_report import (
+from claude_evaluator.models.evaluation.score_report import (
     AnalysisStatus,
     ASTMetrics,
     CodeAnalysis,

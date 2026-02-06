@@ -7,7 +7,7 @@ during query execution.
 from datetime import datetime
 from typing import Any
 
-from claude_evaluator.models.tool_invocation import ToolInvocation
+from claude_evaluator.models.execution.tool_invocation import ToolInvocation
 
 __all__ = ["ToolTracker"]
 

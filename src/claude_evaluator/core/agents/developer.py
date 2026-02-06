@@ -23,11 +23,11 @@ from claude_evaluator.core.agents.exceptions import (
 )
 from claude_evaluator.core.formatters import QuestionFormatter
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import DeveloperState, Outcome
-from claude_evaluator.models.question import QuestionContext
+from claude_evaluator.models.execution.decision import Decision
+from claude_evaluator.models.interaction.answer import AnswerResult
+from claude_evaluator.models.interaction.question import QuestionContext
 
 # Callback type aliases for workflow execution
 SendPromptCallback: TypeAlias = Callable[[str], None]
@@ -583,8 +583,12 @@ class DeveloperAgent(BaseSchema):
             context_strategy = "full history (retry)"
         else:
             # First attempt: use last N messages based on context_window_size
-            messages_to_use = context.conversation_history[-get_settings().developer.context_window_size :]
-            context_strategy = f"last {get_settings().developer.context_window_size} messages"
+            messages_to_use = context.conversation_history[
+                -get_settings().developer.context_window_size :
+            ]
+            context_strategy = (
+                f"last {get_settings().developer.context_window_size} messages"
+            )
 
         # Build the prompt
         prompt = self._build_answer_prompt(

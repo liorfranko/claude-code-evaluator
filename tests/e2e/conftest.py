@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from claude_evaluator.core.agents import DeveloperAgent
-from claude_evaluator.models.answer import AnswerResult
+from claude_evaluator.models.interaction.answer import AnswerResult
 
 
 @pytest.fixture(autouse=True)

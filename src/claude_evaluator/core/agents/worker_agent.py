@@ -31,10 +31,10 @@ from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import PermissionMode
-from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.question import QuestionContext
-from claude_evaluator.models.tool_invocation import ToolInvocation
+from claude_evaluator.models.execution.progress import ProgressEvent, ProgressEventType
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.tool_invocation import ToolInvocation
+from claude_evaluator.models.interaction.question import QuestionContext
 
 logger = get_logger(__name__)
 

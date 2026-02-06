@@ -13,7 +13,7 @@ from pathlib import Path
 from string import Template
 
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.results import (
     ConfigResult,
     ExperimentReport,
     PositionBiasAnalysis,

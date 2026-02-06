@@ -349,7 +349,11 @@ class IneffectiveLoopCheck(ASTCheck):
 
                 if self.APPEND_IN_LOOP_PATTERN.search(text):
                     findings.append(("append", line_num))
-                elif self.STRING_CONCAT_PATTERN.search(text) and "+" in text and ("'" in text or '"' in text):
+                elif (
+                    self.STRING_CONCAT_PATTERN.search(text)
+                    and "+" in text
+                    and ("'" in text or '"' in text)
+                ):
                     findings.append(("string_concat", line_num))
 
             for child in n.children:

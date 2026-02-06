@@ -10,8 +10,8 @@ from typing import Any
 
 from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
 from claude_evaluator.core.formatters import QuestionFormatter
-from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-from claude_evaluator.models.question import (
+from claude_evaluator.models.execution.progress import ProgressEvent, ProgressEventType
+from claude_evaluator.models.interaction.question import (
     QuestionContext,
     QuestionItem,
     QuestionOption,

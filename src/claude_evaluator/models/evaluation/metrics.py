@@ -7,7 +7,7 @@ usage data collected during an evaluation.
 from pydantic import Field, model_validator
 
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 
 __all__ = ["Metrics"]
 
@@ -40,7 +40,11 @@ class Metrics(BaseSchema):
     @classmethod
     def convert_runtime_seconds_to_ms(cls, data: dict) -> dict:
         """Convert total_runtime_seconds to total_runtime_ms for backward compatibility."""
-        if isinstance(data, dict) and "total_runtime_seconds" in data and "total_runtime_ms" not in data:
+        if (
+            isinstance(data, dict)
+            and "total_runtime_seconds" in data
+            and "total_runtime_ms" not in data
+        ):
             data["total_runtime_ms"] = int(data["total_runtime_seconds"] * 1000)
         return data
 

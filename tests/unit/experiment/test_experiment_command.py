@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from claude_evaluator.cli.commands.experiment import RunExperimentCommand
-from claude_evaluator.models.experiment import ExperimentReport
+from claude_evaluator.models.experiment.results import ExperimentReport
 
 __all__: list[str] = []
 

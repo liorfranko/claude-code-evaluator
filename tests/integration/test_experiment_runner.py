@@ -11,18 +11,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.experiment import (
-    ComparisonVerdict,
-    DimensionJudgment,
-    ExperimentReport,
-    JudgeVerdict,
-)
-from claude_evaluator.models.experiment_models import (
+from claude_evaluator.models.experiment.config import (
     ExperimentConfig,
     ExperimentConfigEntry,
     ExperimentSettings,
     ExperimentTask,
     JudgeDimension,
+)
+from claude_evaluator.models.experiment.results import (
+    ComparisonVerdict,
+    DimensionJudgment,
+    ExperimentReport,
+    JudgeVerdict,
 )
 
 

@@ -18,7 +18,7 @@ from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.core.formatters import QuestionFormatter
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode
-from claude_evaluator.models.progress import ProgressEvent
+from claude_evaluator.models.execution.progress import ProgressEvent
 from claude_evaluator.workflows.exceptions import (
     QuestionHandlingError,
     WorkflowTimeoutError,
@@ -28,8 +28,8 @@ if TYPE_CHECKING:
     from claude_evaluator.config.models import EvalDefaults
     from claude_evaluator.core import Evaluation
     from claude_evaluator.metrics.collector import MetricsCollector
-    from claude_evaluator.models.metrics import Metrics
-    from claude_evaluator.models.question import QuestionContext
+    from claude_evaluator.models.evaluation.metrics import Metrics
+    from claude_evaluator.models.interaction.question import QuestionContext
 
 __all__ = ["BaseWorkflow", "WorkflowTimeoutError", "QuestionHandlingError"]
 

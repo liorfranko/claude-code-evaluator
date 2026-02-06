@@ -8,7 +8,7 @@ import structlog
 
 from claude_evaluator.core.agents.evaluator.ast.languages import Language
 from claude_evaluator.core.agents.evaluator.ast.parser import ParseResult
-from claude_evaluator.models.score_report import ASTMetrics
+from claude_evaluator.models.evaluation.score_report import ASTMetrics
 
 __all__ = [
     "MetricsExtractor",

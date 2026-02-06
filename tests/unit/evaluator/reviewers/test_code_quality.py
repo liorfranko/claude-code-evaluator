@@ -36,7 +36,9 @@ class TestCodeQualityReviewerInitialization:
         reviewer = CodeQualityReviewer(client=mock_client)
 
         assert reviewer.reviewer_id == "code_quality"
-        assert reviewer.focus_area == "Code quality, maintainability, and best practices"
+        assert (
+            reviewer.focus_area == "Code quality, maintainability, and best practices"
+        )
         assert reviewer.client is mock_client
         assert reviewer.min_confidence == 60
 
@@ -92,7 +94,11 @@ class TestCodeQualityReviewerBuildPrompt:
         context = ReviewContext(
             task_description="Review code",
             code_files=[
-                ("src/processor.py", "python", "class Processor:\n    def run(self):\n        pass"),
+                (
+                    "src/processor.py",
+                    "python",
+                    "class Processor:\n    def run(self):\n        pass",
+                ),
             ],
         )
         prompt = reviewer.build_prompt(context)
@@ -347,9 +353,7 @@ class TestCodeQualityReviewerFilterByConfidence:
         """Create a mock ClaudeClient."""
         return MagicMock()
 
-    def test_filter_removes_low_confidence_issues(
-        self, mock_client: MagicMock
-    ) -> None:
+    def test_filter_removes_low_confidence_issues(self, mock_client: MagicMock) -> None:
         """Test that filter removes issues below min_confidence threshold."""
         reviewer = CodeQualityReviewer(client=mock_client, min_confidence=65)
 

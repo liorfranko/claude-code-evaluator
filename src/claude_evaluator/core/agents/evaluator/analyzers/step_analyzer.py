@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 
-from claude_evaluator.models.score_report import EfficiencyFlag, StepAnalysis
+from claude_evaluator.models.evaluation.score_report import EfficiencyFlag, StepAnalysis
 
 __all__ = [
     "StepAnalyzer",

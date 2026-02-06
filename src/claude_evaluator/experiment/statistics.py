@@ -13,7 +13,7 @@ import statistics as stats
 from itertools import combinations
 
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.results import (
     ComparisonVerdict,
     EloRating,
     PairwiseComparison,

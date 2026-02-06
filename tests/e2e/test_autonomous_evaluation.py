@@ -18,7 +18,7 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows import (
     DirectWorkflow,
@@ -39,7 +39,9 @@ class TestAutonomousEvaluationSC001:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -262,7 +264,9 @@ class TestAutonomousEvaluationSequential:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,

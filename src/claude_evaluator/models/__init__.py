@@ -1,19 +1,17 @@
 """Models module for claude-evaluator.
 
-This module contains data models including:
-- Base: BaseSchema for Pydantic models
-- Enums: WorkflowType, EvaluationStatus, PermissionMode, Outcome, DeveloperState
-- Models: Decision, ToolInvocation, QueryMetrics, Metrics, TimelineEvent,
-          QuestionOption, QuestionItem, QuestionContext, AnswerResult,
-          ProgressEvent, ProgressEventType
-- Score Report: ScoreReport, DimensionScore, StepAnalysis, FileAnalysis, CodeAnalysis, CodeIssue
-- Score Report Enums: DimensionType, EfficiencyFlag, AnalysisStatus, IssueSeverity, TaskComplexityTier
-- Exceptions: ModelValidationError
+This module contains data models organized by domain:
+- base: BaseSchema for Pydantic models
+- enums: WorkflowType, EvaluationStatus, PermissionMode, Outcome, DeveloperState
+- evaluation/: EvaluationReport, ScoreReport, Metrics, TimelineEvent
+- execution/: Decision, ToolInvocation, QueryMetrics, Progress
+- interaction/: Question, Answer models
+- experiment/: Experiment config and result models
+- reviewer: Reviewer output models
+- exceptions: ModelValidationError
 """
 
-from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
@@ -21,8 +19,40 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
+
+# Re-export from evaluation/
+from claude_evaluator.models.evaluation import (
+    AnalysisStatus,
+    ASTMetrics,
+    ChangeSummary,
+    CheckFinding,
+    CodeAnalysis,
+    CodeIssue,
+    DimensionScore,
+    DimensionType,
+    EfficiencyFlag,
+    EvaluationReport,
+    FileAnalysis,
+    IssueSeverity,
+    Metrics,
+    ScoreReport,
+    StepAnalysis,
+    TaskComplexityTier,
+    TimelineEvent,
+)
 from claude_evaluator.models.exceptions import ModelValidationError
-from claude_evaluator.models.experiment import (
+
+# Re-export from execution/
+from claude_evaluator.models.execution import (
+    Decision,
+    ProgressEvent,
+    ProgressEventType,
+    QueryMetrics,
+    ToolInvocation,
+)
+
+# Re-export from experiment/results (not config to avoid circular import)
+from claude_evaluator.models.experiment.results import (
     ComparisonVerdict,
     ConfigResult,
     DimensionJudgment,
@@ -35,15 +65,16 @@ from claude_evaluator.models.experiment import (
     RunResult,
     StatisticalTest,
 )
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.question import (
+
+# Re-export from interaction/
+from claude_evaluator.models.interaction import (
+    AnswerResult,
     QuestionContext,
     QuestionItem,
     QuestionOption,
 )
-from claude_evaluator.models.report import ChangeSummary, EvaluationReport
+
+# Re-export from reviewer (stays at top level)
 from claude_evaluator.models.reviewer import (
     CodeFile,
     ExecutionMode,
@@ -52,22 +83,6 @@ from claude_evaluator.models.reviewer import (
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.models.score_report import (
-    AnalysisStatus,
-    ASTMetrics,
-    CodeAnalysis,
-    CodeIssue,
-    DimensionScore,
-    DimensionType,
-    EfficiencyFlag,
-    FileAnalysis,
-    IssueSeverity,
-    ScoreReport,
-    StepAnalysis,
-    TaskComplexityTier,
-)
-from claude_evaluator.models.timeline_event import TimelineEvent
-from claude_evaluator.models.tool_invocation import ToolInvocation
 
 __all__ = [
     # Base
@@ -78,37 +93,38 @@ __all__ = [
     "Outcome",
     "PermissionMode",
     "WorkflowType",
-    # Models
-    "AnswerResult",
-    "Decision",
-    "Metrics",
-    "ProgressEvent",
-    "ProgressEventType",
-    "QueryMetrics",
-    "QuestionContext",
-    "QuestionItem",
-    "QuestionOption",
-    "TimelineEvent",
-    "ToolInvocation",
     # Exceptions
     "ModelValidationError",
-    # Score Report Models
+    # Evaluation models
     "AnalysisStatus",
     "ASTMetrics",
+    "ChangeSummary",
+    "CheckFinding",
     "CodeAnalysis",
     "CodeIssue",
     "DimensionScore",
     "DimensionType",
     "EfficiencyFlag",
+    "EvaluationReport",
     "FileAnalysis",
     "IssueSeverity",
+    "Metrics",
     "ScoreReport",
     "StepAnalysis",
     "TaskComplexityTier",
-    # Report Models
-    "ChangeSummary",
-    "EvaluationReport",
-    # Experiment Models
+    "TimelineEvent",
+    # Execution models
+    "Decision",
+    "ProgressEvent",
+    "ProgressEventType",
+    "QueryMetrics",
+    "ToolInvocation",
+    # Interaction models
+    "AnswerResult",
+    "QuestionContext",
+    "QuestionItem",
+    "QuestionOption",
+    # Experiment result models (config models imported separately to avoid circular import)
     "ComparisonVerdict",
     "ConfigResult",
     "DimensionJudgment",
@@ -120,7 +136,7 @@ __all__ = [
     "PresentationOrder",
     "RunResult",
     "StatisticalTest",
-    # Reviewer Models
+    # Reviewer models
     "CodeFile",
     "ExecutionMode",
     "ReviewContext",

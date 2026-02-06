@@ -491,6 +491,7 @@ class TestMultiPhaseEvaluationEndToEnd:
         self, mock_claude_client: MagicMock
     ) -> None:
         """Test the complete multi-phase evaluation flow from start to finish."""
+
         # Create mock outputs for each reviewer type
         def create_mock_output(call_args: tuple) -> ReviewerOutput:
             """Create appropriate mock output based on the prompt."""

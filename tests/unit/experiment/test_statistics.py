@@ -11,7 +11,7 @@ from claude_evaluator.experiment.statistics import (
     _cohens_d_one_sample,
     _wilcoxon_signed_rank,
 )
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.results import (
     ComparisonVerdict,
     DimensionJudgment,
     PairwiseComparison,

@@ -11,7 +11,7 @@ from claude_evaluator.cli.commands.base import BaseCommand, CommandResult
 from claude_evaluator.config.settings import DEFAULT_OUTPUT_DIR
 from claude_evaluator.core.agents.evaluator import EvaluatorAgent
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.score_report import ScoreReport
+from claude_evaluator.models.evaluation.score_report import ScoreReport
 
 __all__ = ["ScoreCommand"]
 
@@ -140,7 +140,7 @@ class ScoreCommand(BaseCommand):
                 print(f"  Languages: {langs}")
 
         if report.step_analysis:
-            from claude_evaluator.models.score_report import EfficiencyFlag
+            from claude_evaluator.models.evaluation.score_report import EfficiencyFlag
 
             redundant = sum(
                 1

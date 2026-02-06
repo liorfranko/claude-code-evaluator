@@ -97,9 +97,7 @@ evaluator:
       min_confidence: 65
       timeout_seconds: 60
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -128,9 +126,7 @@ evaluator:
   model: "claude-opus-4-5-20251101"
   reviewers: {}
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -143,9 +139,7 @@ evaluator:
 evaluator:
   model: "claude-opus-4-5-20251101"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -158,9 +152,7 @@ evaluator:
 name: "some-suite"
 version: "1.0.0"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -179,9 +171,7 @@ evaluator:
   reviewers:
     - this: is: not: valid
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -190,9 +180,7 @@ evaluator:
 
     def test_load_configs_empty_file(self) -> None:
         """Test that ConfigurationError is raised for empty file."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("")
             f.flush()
 
@@ -207,9 +195,7 @@ evaluator:
     minimal_reviewer:
       enabled: true
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -227,9 +213,7 @@ evaluator:
   reviewers:
     null_config_reviewer:
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -247,9 +231,7 @@ evaluator:
     invalid_reviewer:
       min_confidence: 150
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -264,9 +246,7 @@ evaluator:
     invalid_reviewer:
       timeout_seconds: 0
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
 
@@ -287,9 +267,7 @@ class TestApplyConfig:
         """Create a ReviewerRegistry instance."""
         return ReviewerRegistry(client=mock_client)
 
-    def test_apply_config_updates_registry(
-        self, registry: ReviewerRegistry
-    ) -> None:
+    def test_apply_config_updates_registry(self, registry: ReviewerRegistry) -> None:
         """Test that apply_config() updates the registry's configs."""
         configs = {
             "task_completion": ReviewerConfig(
@@ -310,9 +288,7 @@ class TestApplyConfig:
         assert registry.configs["task_completion"].min_confidence == 70
         assert registry.configs["error_handling"].enabled is False
 
-    def test_apply_config_overwrites_existing(
-        self, registry: ReviewerRegistry
-    ) -> None:
+    def test_apply_config_overwrites_existing(self, registry: ReviewerRegistry) -> None:
         """Test that apply_config() overwrites existing configs."""
         # Set initial config
         registry.configs["task_completion"] = ReviewerConfig(
@@ -379,12 +355,14 @@ class TestDisabledReviewerFiltering:
         registry.register(disabled_reviewer)
 
         # Apply config to disable one reviewer
-        registry.apply_config({
-            "disabled": ReviewerConfig(
-                reviewer_id="disabled",
-                enabled=False,
-            ),
-        })
+        registry.apply_config(
+            {
+                "disabled": ReviewerConfig(
+                    reviewer_id="disabled",
+                    enabled=False,
+                ),
+            }
+        )
 
         outputs = await registry.run_all(sample_context)
 
@@ -422,9 +400,11 @@ class TestDisabledReviewerFiltering:
         registry.register(reviewer2)
         registry.register(reviewer3)
 
-        registry.apply_config({
-            "disabled1": ReviewerConfig(reviewer_id="disabled1", enabled=False),
-        })
+        registry.apply_config(
+            {
+                "disabled1": ReviewerConfig(reviewer_id="disabled1", enabled=False),
+            }
+        )
 
         enabled = registry.get_enabled_reviewers()
         disabled = registry.get_disabled_reviewers()
@@ -466,12 +446,14 @@ class TestMinConfidenceOverride:
         registry.register(reviewer)
 
         # Apply config with override
-        registry.apply_config({
-            "test_reviewer": ReviewerConfig(
-                reviewer_id="test_reviewer",
-                min_confidence=80,  # Config override
-            ),
-        })
+        registry.apply_config(
+            {
+                "test_reviewer": ReviewerConfig(
+                    reviewer_id="test_reviewer",
+                    min_confidence=80,  # Config override
+                ),
+            }
+        )
 
         effective = registry.get_effective_min_confidence(reviewer)
         assert effective == 80
@@ -538,12 +520,14 @@ class TestMinConfidenceOverride:
         registry.register(reviewer)
 
         # Apply config to set higher min_confidence threshold
-        registry.apply_config({
-            "test_reviewer": ReviewerConfig(
-                reviewer_id="test_reviewer",
-                min_confidence=75,  # Should filter out medium and low
-            ),
-        })
+        registry.apply_config(
+            {
+                "test_reviewer": ReviewerConfig(
+                    reviewer_id="test_reviewer",
+                    min_confidence=75,  # Should filter out medium and low
+                ),
+            }
+        )
 
         outputs = await registry.run_all(sample_context)
 
@@ -590,12 +574,14 @@ class TestMinConfidenceOverride:
         registry.register(reviewer)
 
         # Apply config with min_confidence=None
-        registry.apply_config({
-            "test_reviewer": ReviewerConfig(
-                reviewer_id="test_reviewer",
-                min_confidence=None,  # Should use reviewer's 60
-            ),
-        })
+        registry.apply_config(
+            {
+                "test_reviewer": ReviewerConfig(
+                    reviewer_id="test_reviewer",
+                    min_confidence=None,  # Should use reviewer's 60
+                ),
+            }
+        )
 
         outputs = await registry.run_all(sample_context)
 

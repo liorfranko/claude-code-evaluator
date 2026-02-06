@@ -123,7 +123,9 @@ class TestClaudeClientGenerate:
             return ClaudeClient(max_retries=3, retry_delay=0.01)
 
     @pytest.mark.asyncio
-    async def test_generate_returns_text_response(self, mock_client: ClaudeClient) -> None:
+    async def test_generate_returns_text_response(
+        self, mock_client: ClaudeClient
+    ) -> None:
         """Test that generate() returns extracted text from SDK response."""
         mock_result = MagicMock()
         mock_result.result = "Hello, world!"
@@ -275,13 +277,14 @@ class TestClaudeClientGenerateStructured:
             msg.result = invalid_response
             yield msg
 
-        with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
-            side_effect=mock_sdk_query,
-        ), pytest.raises(Exception):  # JSON parse error
-            await mock_client.generate_structured(
-                "Generate a sample", SampleResponse
-            )
+        with (
+            patch(
+                "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+                side_effect=mock_sdk_query,
+            ),
+            pytest.raises(Exception),
+        ):  # JSON parse error
+            await mock_client.generate_structured("Generate a sample", SampleResponse)
 
 
 class TestClaudeClientRetryLogic:
@@ -351,7 +354,8 @@ class TestClaudeClientRetryLogic:
             patch(
                 "claude_evaluator.core.agents.evaluator.claude_client.asyncio.sleep",
                 side_effect=mock_sleep,
-            ), pytest.raises(ClaudeAPIError)
+            ),
+            pytest.raises(ClaudeAPIError),
         ):
             await mock_client.generate("Test prompt")
 
@@ -411,7 +415,9 @@ class TestClaudeClientRetryLogic:
             assert "Specific error message" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_immediate_success_no_retries(self, mock_client: ClaudeClient) -> None:
+    async def test_immediate_success_no_retries(
+        self, mock_client: ClaudeClient
+    ) -> None:
         """Test that no retries occur on immediate success."""
         call_count = 0
 
@@ -461,7 +467,9 @@ class TestClaudeClientExtractText:
         query_result.assistant_content = assistant_content
         return query_result
 
-    def test_extract_text_from_result_attribute(self, mock_client: ClaudeClient) -> None:
+    def test_extract_text_from_result_attribute(
+        self, mock_client: ClaudeClient
+    ) -> None:
         """Test extraction from result attribute."""
         msg = MagicMock()
         msg.result = "  Text from result  "

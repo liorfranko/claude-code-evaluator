@@ -17,7 +17,7 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows import DirectWorkflow, MultiCommandWorkflow
 
@@ -91,7 +91,9 @@ class TestMetricsSchemaValidation:
         ]
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             return QueryMetrics(
                 query_index=0,
@@ -370,7 +372,9 @@ class TestMultiPhaseMetricsCompleteness:
         self.call_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             self.call_count += 1
             return QueryMetrics(

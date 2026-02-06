@@ -19,8 +19,8 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.tool_invocation import ToolInvocation
 from claude_evaluator.workflows import (
     DirectWorkflow,
     MultiCommandWorkflow,
@@ -40,7 +40,9 @@ class TestDeveloperWorkerCommunication:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -222,7 +224,9 @@ class TestAgentCoordinationInWorkflows:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(
@@ -333,7 +337,9 @@ class TestAgentCoordinationInWorkflows:
         )
 
         async def capture_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             received_queries.append(query)
             return QueryMetrics(

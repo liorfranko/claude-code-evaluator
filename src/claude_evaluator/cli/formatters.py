@@ -7,8 +7,8 @@ and progress output.
 import json
 from collections.abc import Callable
 
-from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-from claude_evaluator.models.report import EvaluationReport
+from claude_evaluator.models.evaluation.report import EvaluationReport
+from claude_evaluator.models.execution.progress import ProgressEvent, ProgressEventType
 
 __all__ = [
     "format_results",

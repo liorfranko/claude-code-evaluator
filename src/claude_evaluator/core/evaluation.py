@@ -15,9 +15,9 @@ from pydantic import ConfigDict, Field
 from claude_evaluator.core.exceptions import InvalidEvaluationStateError
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, WorkflowType
-from claude_evaluator.models.metrics import Metrics
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.execution.decision import Decision
 
 logger = get_logger(__name__)
 

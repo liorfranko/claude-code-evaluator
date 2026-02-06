@@ -496,7 +496,9 @@ class InsecureRandomCheck(ASTCheck):
             return results
 
         # Also check for random module import
-        if lang == Language.python and ("import random" in source_code or "from random import" in source_code):
+        if lang == Language.python and (
+            "import random" in source_code or "from random import" in source_code
+        ):
             # Find random function calls
             lines = source_code.split("\n")
             for line_num, line in enumerate(lines, 1):

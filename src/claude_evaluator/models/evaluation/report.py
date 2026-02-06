@@ -10,10 +10,10 @@ from datetime import datetime
 from pydantic import Field, model_validator
 
 from claude_evaluator.models.base import BaseSchema
-from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.timeline_event import TimelineEvent
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.evaluation.timeline_event import TimelineEvent
+from claude_evaluator.models.execution.decision import Decision
 
 __all__ = ["ChangeSummary", "EvaluationReport"]
 

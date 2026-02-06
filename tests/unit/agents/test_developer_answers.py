@@ -14,9 +14,9 @@ import pytest
 
 from claude_evaluator.config.settings import get_settings
 from claude_evaluator.core.agents import DeveloperAgent
-from claude_evaluator.models.answer import AnswerResult
 from claude_evaluator.models.enums import DeveloperState
-from claude_evaluator.models.question import (
+from claude_evaluator.models.interaction.answer import AnswerResult
+from claude_evaluator.models.interaction.question import (
     QuestionContext,
     QuestionItem,
     QuestionOption,
@@ -140,23 +140,22 @@ class TestAnswerQuestionGeneratesResponse:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=mock_sdk_query,
         ):
-                # Transition to awaiting_response first (required for answering_question transition)
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            # Transition to awaiting_response first (required for answering_question transition)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(
-                    sample_question_context
-                )
+            result = await base_developer_agent.answer_question(sample_question_context)
 
-                assert isinstance(result, AnswerResult)
-                assert result.answer == "I recommend using React for this project."
-                assert result.attempt_number == 1
-                assert result.context_size == len(
-                    sample_question_context.conversation_history
-                )
-                assert result.generation_time_ms >= 0
+            assert isinstance(result, AnswerResult)
+            assert result.answer == "I recommend using React for this project."
+            assert result.attempt_number == 1
+            assert result.context_size == len(
+                sample_question_context.conversation_history
+            )
+            assert result.generation_time_ms >= 0
 
     @pytest.mark.asyncio
     async def test_answer_question_includes_conversation_context(
@@ -169,26 +168,28 @@ class TestAnswerQuestionGeneratesResponse:
 
         def capture_prompt(**kwargs):
             captured_prompts.append(kwargs.get("prompt", ""))
-            return create_async_generator(ResultMessage(result="Answer based on context"))
+            return create_async_generator(
+                ResultMessage(result="Answer based on context")
+            )
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_prompt,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                await base_developer_agent.answer_question(sample_question_context)
+            await base_developer_agent.answer_question(sample_question_context)
 
-                assert len(captured_prompts) == 1
-                prompt = captured_prompts[0]
+            assert len(captured_prompts) == 1
+            prompt = captured_prompts[0]
 
-                # Verify conversation context is included
-                assert "Create a web application" in prompt
-                assert "Use TypeScript" in prompt
+            # Verify conversation context is included
+            assert "Create a web application" in prompt
+            assert "Use TypeScript" in prompt
 
-                # Verify question is included
-                assert "What framework should I use" in prompt
+            # Verify question is included
+            assert "What framework should I use" in prompt
 
     @pytest.mark.asyncio
     async def test_answer_question_respects_context_window_size(
@@ -216,25 +217,25 @@ class TestAnswerQuestionGeneratesResponse:
                 "claude_evaluator.core.agents.developer.sdk_query",
                 side_effect=capture_prompt,
             ):
-                    agent.transition_to(DeveloperState.prompting)
-                    agent.transition_to(DeveloperState.awaiting_response)
+                agent.transition_to(DeveloperState.prompting)
+                agent.transition_to(DeveloperState.awaiting_response)
 
-                    result = await agent.answer_question(question_context)
+                result = await agent.answer_question(question_context)
 
-                    # Context size should be the window size (5 messages)
-                    assert result.context_size == 5
+                # Context size should be the window size (5 messages)
+                assert result.context_size == 5
 
-                    # Verify the prompt content - early messages should NOT be included
-                    assert len(captured_prompts) == 1
-                    prompt = captured_prompts[0]
-                    # Only last 5 messages should be included, not early ones
-                    assert "USER_MSG_INDEX_0_CONTENT" not in prompt
-                    assert "USER_MSG_INDEX_1_CONTENT" not in prompt
-                    # Later messages should be present
-                    assert (
-                        "USER_MSG_INDEX_19_CONTENT" in prompt
-                        or "ASST_MSG_INDEX_19_CONTENT" in prompt
-                    )
+                # Verify the prompt content - early messages should NOT be included
+                assert len(captured_prompts) == 1
+                prompt = captured_prompts[0]
+                # Only last 5 messages should be included, not early ones
+                assert "USER_MSG_INDEX_0_CONTENT" not in prompt
+                assert "USER_MSG_INDEX_1_CONTENT" not in prompt
+                # Later messages should be present
+                assert (
+                    "USER_MSG_INDEX_19_CONTENT" in prompt
+                    or "ASST_MSG_INDEX_19_CONTENT" in prompt
+                )
 
     @pytest.mark.asyncio
     async def test_answer_question_logs_decision(
@@ -249,21 +250,22 @@ class TestAnswerQuestionGeneratesResponse:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=mock_sdk_query,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                initial_decision_count = len(base_developer_agent.decisions_log)
+            initial_decision_count = len(base_developer_agent.decisions_log)
 
-                await base_developer_agent.answer_question(sample_question_context)
+            await base_developer_agent.answer_question(sample_question_context)
 
-                # Should have logged at least 2 decisions (start and complete)
-                assert len(base_developer_agent.decisions_log) > initial_decision_count
+            # Should have logged at least 2 decisions (start and complete)
+            assert len(base_developer_agent.decisions_log) > initial_decision_count
 
-                # Check that decisions contain relevant information
-                decision_texts = [d.action for d in base_developer_agent.decisions_log]
-                assert any("Generating LLM answer" in text for text in decision_texts)
+            # Check that decisions contain relevant information
+            decision_texts = [d.action for d in base_developer_agent.decisions_log]
+            assert any("Generating LLM answer" in text for text in decision_texts)
 
     @pytest.mark.asyncio
     async def test_answer_question_transitions_state(
@@ -278,18 +280,19 @@ class TestAnswerQuestionGeneratesResponse:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=mock_sdk_query,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                await base_developer_agent.answer_question(sample_question_context)
+            await base_developer_agent.answer_question(sample_question_context)
 
-                # Should end up back in awaiting_response after answering
-                assert (
-                    base_developer_agent.current_state
-                    == DeveloperState.awaiting_response
-                )
+            # Should end up back in awaiting_response after answering
+            assert (
+                base_developer_agent.current_state == DeveloperState.awaiting_response
+            )
+
 
 # =============================================================================
 # T416: Test developer_qa_model is Used When Specified
@@ -316,16 +319,16 @@ class TestDeveloperQAModelSelection:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_model,
         ):
-                agent_with_custom_model.transition_to(DeveloperState.prompting)
-                agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
+            agent_with_custom_model.transition_to(DeveloperState.prompting)
+            agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
 
-                result = await agent_with_custom_model.answer_question(
-                    sample_question_context
-                )
+            result = await agent_with_custom_model.answer_question(
+                sample_question_context
+            )
 
-                assert len(captured_options) == 1
-                assert captured_options[0].model == "claude-sonnet-4-5@20251001"
-                assert result.model_used == "claude-sonnet-4-5@20251001"
+            assert len(captured_options) == 1
+            assert captured_options[0].model == "claude-sonnet-4-5@20251001"
+            assert result.model_used == "claude-sonnet-4-5@20251001"
 
     @pytest.mark.asyncio
     async def test_default_model_used_when_not_specified(
@@ -344,16 +347,14 @@ class TestDeveloperQAModelSelection:
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_model,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(
-                    sample_question_context
-                )
+            result = await base_developer_agent.answer_question(sample_question_context)
 
-                assert len(captured_options) == 1
-                assert captured_options[0].model == get_settings().developer.qa_model
-                assert result.model_used == get_settings().developer.qa_model
+            assert len(captured_options) == 1
+            assert captured_options[0].model == get_settings().developer.qa_model
+            assert result.model_used == get_settings().developer.qa_model
 
     @pytest.mark.asyncio
     async def test_model_used_recorded_in_result(
@@ -368,16 +369,17 @@ class TestDeveloperQAModelSelection:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=mock_sdk_query,
         ):
-                agent_with_custom_model.transition_to(DeveloperState.prompting)
-                agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
+            agent_with_custom_model.transition_to(DeveloperState.prompting)
+            agent_with_custom_model.transition_to(DeveloperState.awaiting_response)
 
-                result = await agent_with_custom_model.answer_question(
-                    sample_question_context
-                )
+            result = await agent_with_custom_model.answer_question(
+                sample_question_context
+            )
 
-                assert result.model_used == "claude-sonnet-4-5@20251001"
+            assert result.model_used == "claude-sonnet-4-5@20251001"
 
     def test_developer_qa_model_attribute_stored(self) -> None:
         """Test that developer_qa_model attribute is correctly stored."""
@@ -408,28 +410,28 @@ class TestRetryUsesFullHistory:
 
         def capture_prompt(**kwargs):
             captured_prompts.append(kwargs.get("prompt", ""))
-            return create_async_generator(ResultMessage(result="Retry answer with full context"))
+            return create_async_generator(
+                ResultMessage(result="Retry answer with full context")
+            )
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_prompt,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(
-                    retry_question_context
-                )
+            result = await base_developer_agent.answer_question(retry_question_context)
 
-                assert len(captured_prompts) == 1
-                prompt = captured_prompts[0]
+            assert len(captured_prompts) == 1
+            prompt = captured_prompts[0]
 
-                # Full history should be included (messages from the beginning)
-                assert "USER_MSG_INDEX_0_CONTENT" in prompt
-                assert "USER_MSG_INDEX_1_CONTENT" in prompt
+            # Full history should be included (messages from the beginning)
+            assert "USER_MSG_INDEX_0_CONTENT" in prompt
+            assert "USER_MSG_INDEX_1_CONTENT" in prompt
 
-                # Context size should be full history length
-                assert result.context_size == len(long_conversation_history)
+            # Context size should be full history length
+            assert result.context_size == len(long_conversation_history)
 
     @pytest.mark.asyncio
     async def test_first_attempt_uses_context_window(
@@ -450,24 +452,26 @@ class TestRetryUsesFullHistory:
 
             def capture_prompt(**kwargs):
                 captured_prompts.append(kwargs.get("prompt", ""))
-                return create_async_generator(ResultMessage(result="First attempt answer"))
+                return create_async_generator(
+                    ResultMessage(result="First attempt answer")
+                )
 
             with patch(
                 "claude_evaluator.core.agents.developer.sdk_query",
                 side_effect=capture_prompt,
             ):
-                    agent.transition_to(DeveloperState.prompting)
-                    agent.transition_to(DeveloperState.awaiting_response)
+                agent.transition_to(DeveloperState.prompting)
+                agent.transition_to(DeveloperState.awaiting_response)
 
-                    result = await agent.answer_question(question_context)
+                result = await agent.answer_question(question_context)
 
-                    assert result.context_size == 5
-                    assert result.attempt_number == 1
+                assert result.context_size == 5
+                assert result.attempt_number == 1
 
-                    # Verify early messages are NOT in prompt
-                    assert len(captured_prompts) == 1
-                    prompt = captured_prompts[0]
-                    assert "USER_MSG_INDEX_0_CONTENT" not in prompt
+                # Verify early messages are NOT in prompt
+                assert len(captured_prompts) == 1
+                prompt = captured_prompts[0]
+                assert "USER_MSG_INDEX_0_CONTENT" not in prompt
 
     @pytest.mark.asyncio
     async def test_retry_logs_full_history_strategy(
@@ -482,16 +486,17 @@ class TestRetryUsesFullHistory:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=mock_sdk_query,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                await base_developer_agent.answer_question(retry_question_context)
+            await base_developer_agent.answer_question(retry_question_context)
 
-                # Check decisions log for retry strategy
-                decision_texts = [d.action for d in base_developer_agent.decisions_log]
-                assert any("full history" in text.lower() for text in decision_texts)
+            # Check decisions log for retry strategy
+            decision_texts = [d.action for d in base_developer_agent.decisions_log]
+            assert any("full history" in text.lower() for text in decision_texts)
 
     @pytest.mark.asyncio
     async def test_attempt_number_preserved_in_result(
@@ -506,16 +511,15 @@ class TestRetryUsesFullHistory:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=mock_sdk_query,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(
-                    retry_question_context
-                )
+            result = await base_developer_agent.answer_question(retry_question_context)
 
-                assert result.attempt_number == 2
+            assert result.attempt_number == 2
 
 
 # =============================================================================
@@ -545,16 +549,16 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-                mock_query.side_effect = Exception("SDK query failed")
+            mock_query.side_effect = Exception("SDK query failed")
 
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                with pytest.raises(RuntimeError) as exc_info:
-                    await base_developer_agent.answer_question(sample_question_context)
+            with pytest.raises(RuntimeError) as exc_info:
+                await base_developer_agent.answer_question(sample_question_context)
 
-                assert "Failed to generate answer" in str(exc_info.value)
-                assert base_developer_agent.current_state == DeveloperState.failed
+            assert "Failed to generate answer" in str(exc_info.value)
+            assert base_developer_agent.current_state == DeveloperState.failed
 
     @pytest.mark.asyncio
     async def test_sdk_failure_logs_error_decision(
@@ -566,17 +570,17 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-                mock_query.side_effect = Exception("Connection timeout")
+            mock_query.side_effect = Exception("Connection timeout")
 
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                with pytest.raises(RuntimeError):
-                    await base_developer_agent.answer_question(sample_question_context)
+            with pytest.raises(RuntimeError):
+                await base_developer_agent.answer_question(sample_question_context)
 
-                # Check that failure was logged
-                decision_texts = [d.action for d in base_developer_agent.decisions_log]
-                assert any("failed" in text.lower() for text in decision_texts)
+            # Check that failure was logged
+            decision_texts = [d.action for d in base_developer_agent.decisions_log]
+            assert any("failed" in text.lower() for text in decision_texts)
 
     @pytest.mark.asyncio
     async def test_empty_response_raises_error(
@@ -589,15 +593,15 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-                mock_query.return_value = ""  # Empty string response
+            mock_query.return_value = ""  # Empty string response
 
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                with pytest.raises(RuntimeError) as exc_info:
-                    await base_developer_agent.answer_question(sample_question_context)
+            with pytest.raises(RuntimeError) as exc_info:
+                await base_developer_agent.answer_question(sample_question_context)
 
-                assert "Failed to generate answer" in str(exc_info.value)
+            assert "Failed to generate answer" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_none_response_raises_error(
@@ -609,15 +613,15 @@ class TestMaxRetriesExceeded:
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query", new_callable=AsyncMock
         ) as mock_query:
-                mock_query.return_value = None
+            mock_query.return_value = None
 
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                with pytest.raises(RuntimeError) as exc_info:
-                    await base_developer_agent.answer_question(sample_question_context)
+            with pytest.raises(RuntimeError) as exc_info:
+                await base_developer_agent.answer_question(sample_question_context)
 
-                assert "Failed to generate answer" in str(exc_info.value)
+            assert "Failed to generate answer" in str(exc_info.value)
 
 
 # =============================================================================
@@ -874,29 +878,29 @@ class TestAnswerGenerationIntegration:
             return create_async_generator(mock_response)
 
         with patch(
-            "claude_evaluator.core.agents.developer.sdk_query", side_effect=mock_sdk_query
+            "claude_evaluator.core.agents.developer.sdk_query",
+            side_effect=mock_sdk_query,
         ):
-                base_developer_agent.transition_to(DeveloperState.prompting)
-                base_developer_agent.transition_to(DeveloperState.awaiting_response)
+            base_developer_agent.transition_to(DeveloperState.prompting)
+            base_developer_agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await base_developer_agent.answer_question(question_context)
+            result = await base_developer_agent.answer_question(question_context)
 
-                # Verify complete result
-                assert result.answer == "Use async for better concurrency."
-                assert result.model_used == get_settings().developer.qa_model
-                assert result.attempt_number == 1
-                assert result.context_size == 2
-                assert result.generation_time_ms >= 0
+            # Verify complete result
+            assert result.answer == "Use async for better concurrency."
+            assert result.model_used == get_settings().developer.qa_model
+            assert result.attempt_number == 1
+            assert result.context_size == 2
+            assert result.generation_time_ms >= 0
 
-                # Verify state management
-                assert (
-                    base_developer_agent.current_state
-                    == DeveloperState.awaiting_response
-                )
+            # Verify state management
+            assert (
+                base_developer_agent.current_state == DeveloperState.awaiting_response
+            )
 
-                # Verify SDK was called correctly
-                assert len(captured_options) == 1
-                assert captured_options[0].model == get_settings().developer.qa_model
+            # Verify SDK was called correctly
+            assert len(captured_options) == 1
+            assert captured_options[0].model == get_settings().developer.qa_model
 
     @pytest.mark.asyncio
     async def test_full_answer_flow_retry_attempt(self) -> None:
@@ -920,22 +924,24 @@ class TestAnswerGenerationIntegration:
 
         def capture_and_respond(**kwargs):
             captured_prompts.append(kwargs.get("prompt", ""))
-            return create_async_generator(ResultMessage(result="Here is more detail based on full context."))
+            return create_async_generator(
+                ResultMessage(result="Here is more detail based on full context.")
+            )
 
         with patch(
             "claude_evaluator.core.agents.developer.sdk_query",
             side_effect=capture_and_respond,
         ):
-                agent.transition_to(DeveloperState.prompting)
-                agent.transition_to(DeveloperState.awaiting_response)
+            agent.transition_to(DeveloperState.prompting)
+            agent.transition_to(DeveloperState.awaiting_response)
 
-                result = await agent.answer_question(question_context)
+            result = await agent.answer_question(question_context)
 
-                # Verify full history was used (not just context_window_size)
-                assert result.context_size == 10  # Full history
-                assert result.attempt_number == 2
+            # Verify full history was used (not just context_window_size)
+            assert result.context_size == 10  # Full history
+            assert result.attempt_number == 2
 
-                # Verify early messages are in prompt
-                prompt = captured_prompts[0]
-                assert "HISTORY_ENTRY_INDEX_0_CONTENT" in prompt
-                assert "HISTORY_ENTRY_INDEX_1_CONTENT" in prompt
+            # Verify early messages are in prompt
+            prompt = captured_prompts[0]
+            assert "HISTORY_ENTRY_INDEX_0_CONTENT" in prompt
+            assert "HISTORY_ENTRY_INDEX_1_CONTENT" in prompt

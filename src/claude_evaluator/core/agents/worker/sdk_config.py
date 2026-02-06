@@ -18,7 +18,7 @@ from claude_agent_sdk import (  # pyright: ignore[reportMissingImports]
 from claude_evaluator.config.settings import get_settings
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode
-from claude_evaluator.models.question import (
+from claude_evaluator.models.interaction.question import (
     QuestionContext,
     QuestionItem,
     QuestionOption,
@@ -114,7 +114,9 @@ class SDKConfigBuilder:
         )
 
         # Build the additional dirs list with the correct union type
-        add_dirs: list[str | Path] = list(self._additional_dirs) if self._additional_dirs else []
+        add_dirs: list[str | Path] = (
+            list(self._additional_dirs) if self._additional_dirs else []
+        )
 
         # Map internal permission mode to SDK permission mode literal
         sdk_permission_mode = permission_map.get(self._permission_mode, "plan")
