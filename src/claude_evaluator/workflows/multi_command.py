@@ -251,7 +251,7 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         # Log warning if response is None and we may have hit max_turns
         if response is None:
-            effective_max_turns = phase.max_turns or self._max_turns
+            effective_max_turns = phase.max_turns or self._agent_factory.max_turns
             if (
                 effective_max_turns is not None
                 and query_metrics.num_turns >= effective_max_turns
