@@ -6,23 +6,40 @@ reorganized as follows:
 - Evaluation, exceptions, formatters, git_operations, state_machine:
   Moved to claude_evaluator.evaluation
 
-- DeveloperAgent, WorkerAgent:
-  Still available here from core/agents/ (will move to agents/ in Phase 4)
+- WorkerAgent:
+  Moved to claude_evaluator.agents.worker
+
+- DeveloperAgent:
+  Still available here from core/agents/ (will move to agents/ in Phase 5)
 
 New code should import from claude_evaluator.evaluation for evaluation-related
-functionality.
+functionality and claude_evaluator.agents for agent classes.
 """
 
-# Import agents from core/agents/ (these will move in Phase 4)
-from claude_evaluator.core.agents.developer import DeveloperAgent
-from claude_evaluator.core.agents.worker_agent import WorkerAgent
+def __getattr__(name: str):
+    """Lazy import for backward compatibility to avoid circular imports."""
+    if name == "WorkerAgent":
+        from claude_evaluator.agents.worker import WorkerAgent
 
-# Re-export evaluation functionality from new location for backward compatibility
-from claude_evaluator.evaluation import Evaluation
-from claude_evaluator.evaluation.exceptions import (
-    EvaluationError,
-    InvalidEvaluationStateError,
-)
+        return WorkerAgent
+    if name == "DeveloperAgent":
+        from claude_evaluator.core.agents.developer import DeveloperAgent
+
+        return DeveloperAgent
+    if name == "Evaluation":
+        from claude_evaluator.evaluation import Evaluation
+
+        return Evaluation
+    if name == "EvaluationError":
+        from claude_evaluator.evaluation.exceptions import EvaluationError
+
+        return EvaluationError
+    if name == "InvalidEvaluationStateError":
+        from claude_evaluator.evaluation.exceptions import InvalidEvaluationStateError
+
+        return InvalidEvaluationStateError
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "DeveloperAgent",

@@ -13,8 +13,8 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.core.agents.developer import DeveloperAgent
-from claude_evaluator.core.agents.worker_agent import WorkerAgent
 from claude_evaluator.evaluation.formatters import QuestionFormatter
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode

@@ -12,8 +12,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
-from claude_evaluator.core.agents.worker.exceptions import QuestionCallbackTimeoutError
+from claude_evaluator.agents.worker import WorkerAgent
+from claude_evaluator.core.agents import DeveloperAgent
+from claude_evaluator.agents.worker.exceptions import QuestionCallbackTimeoutError
 from claude_evaluator.models.enums import (
     DeveloperState,
     PermissionMode,
@@ -528,7 +529,7 @@ class TestT700ErrorHandling:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -3608,7 +3609,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
 
         # Patch the SDK client class
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             TrackingClaudeSDKClient,
         ):
             # Execute query - this should create a new client
@@ -3657,7 +3658,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             SequenceTrackingClient,
         ):
             await worker.execute_query("Sequence test query")
@@ -3720,7 +3721,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         assert worker._client is None, "Client should be None before evaluation"
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             StorageTestClient,
         ):
             await worker.execute_query("Storage test query")
@@ -3768,7 +3769,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             ConnectionStateClient,
         ):
             await worker.execute_query("Connection state test")
@@ -3820,7 +3821,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", CountingClient
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient", CountingClient
         ):
             # First evaluation
             await worker.execute_query("First evaluation", resume_session=False)
@@ -3875,7 +3876,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             ReuseTrackingClient,
         ):
             # First query creates a client
@@ -3929,7 +3930,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
 
         with (
             patch(
-                "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+                "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
                 FailingConnectClient,
             ),
             pytest.raises(ConnectionError, match="Simulated connection failure"),
@@ -3994,7 +3995,7 @@ class TestT706ClientConnectionEstablishedAtEvaluationStart:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             VerificationClient,
         ):
             await worker.execute_query("T706 verification query")
@@ -4092,7 +4093,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             DisconnectTrackingClient,
         ):
             # Execute a successful query
@@ -4150,7 +4151,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
 
         with (
             patch(
-                "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+                "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
                 FailingConnectClient,
             ),
             pytest.raises(ConnectionError, match="T707: Connection failed"),
@@ -4210,7 +4211,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
 
         with (
             patch(
-                "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+                "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
                 FailingStreamClient,
             ),
             pytest.raises(RuntimeError, match="T707: Streaming failed"),
@@ -4266,7 +4267,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             DoubleFailureClient,
         ):
             try:
@@ -4346,7 +4347,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", TrackingClient
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient", TrackingClient
         ):
             # First query - creates client 1
             await worker.execute_query("First query", resume_session=False)
@@ -4407,7 +4408,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             LeakTrackingClient,
         ):
             # Run 5 sequential evaluations with cleanup
@@ -4472,7 +4473,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             IdempotentTestClient,
         ):
             await worker.execute_query("Test query")
@@ -4526,7 +4527,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         assert worker.has_active_client() is False, "No client before query"
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", StateTestClient
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient", StateTestClient
         ):
             await worker.execute_query("Test query")
 
@@ -4595,7 +4596,7 @@ class TestT707ConnectionProperlyClosedOnCompletionOrFailure:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             ComprehensiveVerificationClient,
         ):
             # SCENARIO 1: Successful query with explicit cleanup
@@ -4708,7 +4709,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             LeakTrackingSequentialClient,
         ):
             # Run 50 sequential evaluations
@@ -4775,7 +4776,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             AccumulationTrackingClient,
         ):
             # Run 10 sequential evaluations
@@ -4850,7 +4851,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             QuestionLeakTrackingClient,
         ):
             # Run 10 sequential evaluations, each with a question
@@ -4923,7 +4924,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         failure_count = 0
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             FailureLeakTrackingClient,
         ):
             # Run 30 sequential evaluations with some failures
@@ -4986,7 +4987,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient", SimpleClient
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient", SimpleClient
         ):
             for i in range(10):
                 # Before query, add some tool invocations to simulate previous state
@@ -5062,7 +5063,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             CounterCheckClient,
         ):
             # Run 5 sequential evaluations, each with a question
@@ -5132,7 +5133,7 @@ class TestT708MultipleSequentialEvaluationsNoLeaks:
         )
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.ClaudeSDKClient",
+            "claude_evaluator.agents.worker.agent.ClaudeSDKClient",
             ComprehensiveT708Client,
         ):
             # Run 55 sequential evaluations (exceeding 50 requirement)
@@ -5871,7 +5872,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -5937,7 +5938,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -5997,7 +5998,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -6097,7 +6098,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 2
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -6142,7 +6143,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -6199,7 +6200,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -6266,7 +6267,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(
@@ -6400,7 +6401,7 @@ class TestT710TimeoutTriggersGracefulFailure:
         mock_settings.worker.question_timeout_seconds = 1
 
         with patch(
-            "claude_evaluator.core.agents.worker_agent.get_settings",
+            "claude_evaluator.agents.worker.agent.get_settings",
             return_value=mock_settings,
         ):
             worker = WorkerAgent(

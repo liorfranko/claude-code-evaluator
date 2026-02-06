@@ -9,7 +9,7 @@ from datetime import datetime
 
 import pytest
 
-from claude_evaluator.core.agents import WorkerAgent
+from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.execution.tool_invocation import ToolInvocation
 
@@ -530,7 +530,7 @@ class TestOnToolUse:
 
     def test_on_tool_use_creates_invocation(self) -> None:
         """Test that on_tool_use creates a ToolInvocation."""
-        from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
+        from claude_evaluator.agents.worker.tool_tracker import ToolTracker
 
         tracker = ToolTracker()
         tracker.on_tool_use(
@@ -549,7 +549,7 @@ class TestOnToolUse:
 
     def test_on_tool_use_multiple_calls(self) -> None:
         """Test multiple on_tool_use calls accumulate invocations."""
-        from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
+        from claude_evaluator.agents.worker.tool_tracker import ToolTracker
 
         tracker = ToolTracker()
         tracker.on_tool_use("Read", "id-1", {"path": "/file1.txt"})
@@ -568,7 +568,7 @@ class TestSummarizeToolInput:
 
     def test_summarize_short_input(self) -> None:
         """Test summarizing input shorter than max length."""
-        from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
+        from claude_evaluator.agents.worker.tool_tracker import ToolTracker
 
         tracker = ToolTracker()
         input_dict = {"path": "/tmp/file.txt"}
@@ -579,7 +579,7 @@ class TestSummarizeToolInput:
 
     def test_summarize_long_input_truncated(self) -> None:
         """Test that long input is truncated."""
-        from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
+        from claude_evaluator.agents.worker.tool_tracker import ToolTracker
 
         tracker = ToolTracker()
         # Create input longer than default 200 chars
@@ -592,7 +592,7 @@ class TestSummarizeToolInput:
 
     def test_summarize_with_custom_max_length(self) -> None:
         """Test summarizing with custom max length."""
-        from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
+        from claude_evaluator.agents.worker.tool_tracker import ToolTracker
 
         tracker = ToolTracker()
         input_dict = {"data": "a" * 100}
@@ -603,7 +603,7 @@ class TestSummarizeToolInput:
 
     def test_summarize_exactly_at_max_length(self) -> None:
         """Test input exactly at max length is not truncated."""
-        from claude_evaluator.core.agents.worker.tool_tracker import ToolTracker
+        from claude_evaluator.agents.worker.tool_tracker import ToolTracker
 
         tracker = ToolTracker()
         # Create input that will be exactly 50 chars when converted to string
