@@ -18,7 +18,7 @@ repository:
   depth: 1
 
 defaults:
-  model: "claude-sonnet-4-20250514"
+  model: "sonnet"
   max_turns: 2000
   max_budget_usd: 50.0
   timeout_seconds: 36000
