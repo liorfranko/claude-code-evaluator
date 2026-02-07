@@ -76,12 +76,14 @@ For more information, see the documentation.
         help="Path to YAML suite file to execute",
     )
 
-    # Ad-hoc evaluation
+    # Ad-hoc evaluation / Benchmark workflow
     parser.add_argument(
         "--workflow",
         type=str,
-        choices=["direct", "plan_then_implement", "multi_command"],
-        help="Workflow type for ad-hoc evaluation (requires --task)",
+        help=(
+            "Workflow to use. For ad-hoc evaluation: direct, plan_then_implement, "
+            "multi_command. For benchmarks: use workflow names from config file."
+        ),
     )
 
     parser.add_argument(

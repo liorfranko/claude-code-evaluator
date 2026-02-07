@@ -37,6 +37,18 @@ class RunEvaluationCommand(BaseCommand):
             CommandResult with the evaluation report.
 
         """
+        # Validate workflow type
+        valid_workflows = [wt.value for wt in WorkflowType]
+        if args.workflow not in valid_workflows:
+            return CommandResult(
+                exit_code=1,
+                reports=[],
+                message=(
+                    f"Error: Invalid workflow '{args.workflow}'. "
+                    f"Valid options: {', '.join(valid_workflows)}"
+                ),
+            )
+
         # Create progress callback for verbose output
         progress_callback = (
             create_progress_callback() if getattr(args, "verbose", False) else None
