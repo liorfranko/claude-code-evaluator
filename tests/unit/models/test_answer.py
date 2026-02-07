@@ -6,7 +6,7 @@ verifying valid construction, field validation, and error handling.
 
 import pytest
 
-from claude_evaluator.models.answer import AnswerResult
+from claude_evaluator.models.interaction.answer import AnswerResult
 
 
 class TestAnswerResultValidConstruction:

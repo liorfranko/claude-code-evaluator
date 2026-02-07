@@ -30,14 +30,16 @@ ruff format --check src/                 # Format check
 ```
 src/claude_evaluator/
   cli/              # CLI entry point, parser, commands, validators
-  config/           # Settings (pydantic-settings), YAML loader
-  core/agents/      # Worker, Developer, Evaluator agents
-  experiment/       # Pairwise experiment runner, judge, statistics, report generator
-  metrics/          # Token/cost metrics
-  models/           # Pydantic data models (evaluation, experiment result/config models)
+  config/           # Settings, YAML loaders (config/loaders/)
+  models/           # Pydantic models (evaluation/, execution/, interaction/, experiment/)
+  agents/           # Execution agents (developer/, worker/)
+  scoring/          # Scoring and analysis (analyzers/, checks/, reviewers/)
+  evaluation/       # Evaluation orchestration, state, git operations
+  workflows/        # Workflow strategies (direct, plan, multi_command)
+  experiment/       # Pairwise experiment system (runner, judge, statistics)
+  sandbox/          # Execution isolation (docker, local)
   report/           # Report generation
-  sandbox/          # Docker sandbox (DockerSandbox)
-  workflows/        # Workflow orchestration (direct, plan_then_implement, multi_command)
+  metrics/          # Token/cost metrics collection
 ```
 
 ## Code Conventions

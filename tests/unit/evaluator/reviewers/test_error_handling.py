@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.error_handling import (
+from claude_evaluator.scoring.reviewers.error_handling import (
     ErrorHandlingReviewer,
 )
 
@@ -94,7 +94,11 @@ class TestErrorHandlingReviewerBuildPrompt:
         context = ReviewContext(
             task_description="Review code",
             code_files=[
-                ("src/handler.py", "python", "def handle_request():\n    try:\n        pass\n    except Exception:\n        pass"),
+                (
+                    "src/handler.py",
+                    "python",
+                    "def handle_request():\n    try:\n        pass\n    except Exception:\n        pass",
+                ),
             ],
         )
         prompt = reviewer.build_prompt(context)
@@ -167,7 +171,13 @@ class TestErrorHandlingReviewerReview:
         """Create a sample ReviewContext."""
         return ReviewContext(
             task_description="Implement database connection handler",
-            code_files=[("src/db.py", "python", "def connect():\n    try:\n        pass\n    except:\n        pass")],
+            code_files=[
+                (
+                    "src/db.py",
+                    "python",
+                    "def connect():\n    try:\n        pass\n    except:\n        pass",
+                )
+            ],
         )
 
     @pytest.mark.asyncio
@@ -392,9 +402,7 @@ class TestErrorHandlingReviewerFilterByConfidence:
         """Create a mock ClaudeClient."""
         return MagicMock()
 
-    def test_filter_removes_low_confidence_issues(
-        self, mock_client: MagicMock
-    ) -> None:
+    def test_filter_removes_low_confidence_issues(self, mock_client: MagicMock) -> None:
         """Test that filter removes issues below min_confidence threshold."""
         reviewer = ErrorHandlingReviewer(client=mock_client, min_confidence=75)
 

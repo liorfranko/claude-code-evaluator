@@ -9,12 +9,12 @@ from unittest.mock import AsyncMock
 import pytest
 
 from claude_evaluator.experiment.judge import PairwiseJudge, _format_code_files
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.config import JudgeDimension
+from claude_evaluator.models.experiment.results import (
     ComparisonVerdict,
     DimensionJudgment,
     JudgeVerdict,
 )
-from claude_evaluator.models.experiment_models import JudgeDimension
 
 
 def _make_dimensions() -> list[JudgeDimension]:

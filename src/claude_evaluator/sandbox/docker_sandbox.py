@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 
 from claude_evaluator.logging_config import get_logger
+from claude_evaluator.sandbox.base import BaseSandbox
 
 __all__ = ["DockerSandbox"]
 
@@ -42,7 +43,7 @@ _VALUE_FLAGS = [
 ]
 
 
-class DockerSandbox:
+class DockerSandbox(BaseSandbox):
     """Runs evaluations inside a Docker container.
 
     The container runs the same ``claude-evaluator`` CLI without the
@@ -65,6 +66,15 @@ class DockerSandbox:
         self._image = image
         self._memory_limit = memory_limit
         self._cpu_limit = cpu_limit
+
+    @property
+    def name(self) -> str:
+        """Return the sandbox identifier."""
+        return "docker"
+
+    def is_available(self) -> bool:
+        """Check if Docker is available on the host."""
+        return shutil.which("docker") is not None
 
     async def run(self, args: argparse.Namespace) -> int:
         """Run the evaluation inside a Docker container.

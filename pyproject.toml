@@ -83,7 +83,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "B017"]
-"src/claude_evaluator/core/agents/evaluator/checks/**/*.py" = ["ARG002"]
+"src/claude_evaluator/scoring/checks/**/*.py" = ["ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["claude_evaluator", "task_manager"]

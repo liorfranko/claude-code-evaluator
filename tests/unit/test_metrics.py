@@ -7,7 +7,7 @@ covering initialization, adding metrics, phase tracking, aggregation, and reset.
 import pytest
 
 from claude_evaluator.metrics.collector import MetricsCollector
-from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 
 
 class TestMetricsCollectorInitialization:

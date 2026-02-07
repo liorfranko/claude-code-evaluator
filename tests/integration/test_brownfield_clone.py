@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.exceptions import BranchNotFoundError, CloneError
-from claude_evaluator.core.git_operations import (
+from claude_evaluator.evaluation.exceptions import BranchNotFoundError, CloneError
+from claude_evaluator.evaluation.git_operations import (
     GitStatusError,
     clone_repository,
     get_change_summary,
@@ -142,7 +142,10 @@ class TestCloneSpecificRef:
 
             # Verify we're on the correct branch
             process = await asyncio.create_subprocess_exec(
-                "git", "rev-parse", "--abbrev-ref", "HEAD",
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "HEAD",
                 cwd=target,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -289,7 +292,9 @@ class TestGetChangeSummary:
 
             # Use git rm to properly stage deletion
             process = await asyncio.create_subprocess_exec(
-                "git", "rm", "README",
+                "git",
+                "rm",
+                "README",
                 cwd=target,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -354,7 +359,9 @@ class TestGetChangeSummary:
 
             # Get raw git status
             process = await asyncio.create_subprocess_exec(
-                "git", "status", "--porcelain",
+                "git",
+                "status",
+                "--porcelain",
                 cwd=target,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

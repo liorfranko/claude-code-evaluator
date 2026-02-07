@@ -10,14 +10,14 @@ from unittest.mock import patch
 
 import pytest
 
-from claude_evaluator.config.settings import get_settings
-from claude_evaluator.core.agents import DeveloperAgent
-from claude_evaluator.core.agents.exceptions import (
+from claude_evaluator.agents.developer import DeveloperAgent
+from claude_evaluator.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
-from claude_evaluator.models.decision import Decision
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.models.enums import DeveloperState, Outcome
+from claude_evaluator.models.execution.decision import Decision
 
 
 class TestDeveloperAgentInitialization:
@@ -404,10 +404,14 @@ class TestLoopDetection:
 
             # First two iterations should succeed
             agent.handle_response({}, is_complete=False)
-            agent.current_state = DeveloperState.awaiting_response  # Reset for next call
+            agent.current_state = (
+                DeveloperState.awaiting_response
+            )  # Reset for next call
 
             agent.handle_response({}, is_complete=False)
-            agent.current_state = DeveloperState.awaiting_response  # Reset for next call
+            agent.current_state = (
+                DeveloperState.awaiting_response
+            )  # Reset for next call
 
             # Third iteration should raise LoopDetectedError
             with pytest.raises(LoopDetectedError) as exc_info:
@@ -430,7 +434,9 @@ class TestLoopDetection:
                 agent.handle_response({}, is_complete=True)
 
             # Should have logged loop detection decision
-            loop_decisions = [d for d in agent.decisions_log if "loop" in d.action.lower()]
+            loop_decisions = [
+                d for d in agent.decisions_log if "loop" in d.action.lower()
+            ]
             assert len(loop_decisions) >= 1
 
     def test_loop_detected_transitions_to_failed(self) -> None:

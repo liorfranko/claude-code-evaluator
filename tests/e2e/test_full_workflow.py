@@ -11,10 +11,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from claude_evaluator.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.config import load_suite
 from claude_evaluator.config.models import EvaluationConfig, Phase
-from claude_evaluator.core import Evaluation
-from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
+from claude_evaluator.evaluation import Evaluation
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
@@ -22,8 +22,8 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.query_metrics import QueryMetrics
-from claude_evaluator.models.tool_invocation import ToolInvocation
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.tool_invocation import ToolInvocation
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows import (
     DirectWorkflow,
@@ -46,7 +46,9 @@ class TestFullWorkflowExecution:
         self.query_count = 0
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             self.query_count += 1
             return QueryMetrics(
@@ -233,7 +235,9 @@ class TestFullWorkflowWithYAMLConfig:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -330,7 +334,9 @@ class TestFullWorkflowReportPersistence:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             return QueryMetrics(
                 query_index=0,
@@ -502,7 +508,9 @@ class TestFullWorkflowErrorScenarios:
         call_count = [0]
 
         async def sometimes_failing_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:  # noqa: ARG001
             call_count[0] += 1
             if call_count[0] == 2:  # Fail on second call

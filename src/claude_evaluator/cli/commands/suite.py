@@ -12,8 +12,8 @@ from claude_evaluator.config import load_suite
 from claude_evaluator.config.models import EvaluationConfig
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.report import EvaluationReport
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.evaluation.report import EvaluationReport
 
 __all__ = ["RunSuiteCommand"]
 

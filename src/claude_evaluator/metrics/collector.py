@@ -4,8 +4,8 @@ This module defines the MetricsCollector class which aggregates metrics
 from multiple queries and tool invocations during an evaluation run.
 """
 
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 
 __all__ = ["MetricsCollector"]
 

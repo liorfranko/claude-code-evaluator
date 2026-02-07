@@ -260,7 +260,9 @@ name: test-suite
         suite_file = tmp_path / "missing-evaluations.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ConfigurationError, match="Missing required field 'evaluations'"):
+        with pytest.raises(
+            ConfigurationError, match="Missing required field 'evaluations'"
+        ):
             load_suite(suite_file)
 
     def test_empty_evaluations_list(self, tmp_path: Path) -> None:
@@ -411,7 +413,9 @@ evaluations:
         suite_file = tmp_path / "invalid-defaults.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ConfigurationError, match="Invalid.*defaults|expected mapping"):
+        with pytest.raises(
+            ConfigurationError, match="Invalid.*defaults|expected mapping"
+        ):
             load_suite(suite_file)
 
 
@@ -641,7 +645,9 @@ class TestApplyDefaults:
         assert result.evaluations[0].max_turns == settings.worker.max_turns  # Mandatory
         assert result.evaluations[0].max_budget_usd is None
         # timeout_seconds is mandatory and always set
-        assert result.evaluations[0].timeout_seconds == settings.workflow.timeout_seconds
+        assert (
+            result.evaluations[0].timeout_seconds == settings.workflow.timeout_seconds
+        )
 
     def test_apply_defaults_with_empty_defaults(self) -> None:
         """Test that apply_defaults handles suite with empty defaults gracefully."""
@@ -666,7 +672,9 @@ class TestApplyDefaults:
         assert result.evaluations[0].max_turns == settings.worker.max_turns
         assert result.evaluations[0].max_budget_usd is None
         # timeout_seconds is mandatory and always set
-        assert result.evaluations[0].timeout_seconds == settings.workflow.timeout_seconds
+        assert (
+            result.evaluations[0].timeout_seconds == settings.workflow.timeout_seconds
+        )
 
     def test_apply_defaults_multiple_evaluations(self) -> None:
         """Test that defaults are applied to all evaluations in the suite."""
@@ -974,7 +982,9 @@ evaluations:
         suite_file = tmp_path / "invalid-qa-timeout.yaml"
         suite_file.write_text(suite_content)
 
-        with pytest.raises(ConfigurationError, match="Invalid 'question_timeout_seconds'"):
+        with pytest.raises(
+            ConfigurationError, match="Invalid 'question_timeout_seconds'"
+        ):
             load_suite(suite_file)
 
     def test_invalid_context_window_size_type(self, tmp_path: Path) -> None:

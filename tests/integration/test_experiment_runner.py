@@ -11,18 +11,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.experiment import (
-    ComparisonVerdict,
-    DimensionJudgment,
-    ExperimentReport,
-    JudgeVerdict,
-)
-from claude_evaluator.models.experiment_models import (
+from claude_evaluator.models.experiment.config import (
     ExperimentConfig,
     ExperimentConfigEntry,
     ExperimentSettings,
     ExperimentTask,
     JudgeDimension,
+)
+from claude_evaluator.models.experiment.results import (
+    ComparisonVerdict,
+    DimensionJudgment,
+    ExperimentReport,
+    JudgeVerdict,
 )
 
 
@@ -122,7 +122,7 @@ class TestExperimentRunnerPipeline:
 
         config = _make_experiment_config(runs_per_config=2)
         runner = ExperimentRunner()
-        runner._eval_command.run_evaluation = mock_run_evaluation
+        runner._executor.run_evaluation = mock_run_evaluation
 
         report, experiment_dir = await runner.run(
             config, output_dir=tmp_path, verbose=False
@@ -155,7 +155,7 @@ class TestExperimentRunnerPipeline:
 
         config = _make_experiment_config(runs_per_config=1)
         runner = ExperimentRunner()
-        runner._eval_command.run_evaluation = mock_run_eval
+        runner._executor.run_evaluation = mock_run_eval
 
         _, experiment_dir = await runner.run(config, output_dir=tmp_path)
 
@@ -183,7 +183,7 @@ class TestExperimentRunnerPipeline:
 
         config = _make_experiment_config(runs_per_config=1)
         runner = ExperimentRunner()
-        runner._eval_command.run_evaluation = mock_run_eval
+        runner._executor.run_evaluation = mock_run_eval
 
         report, _ = await runner.run(config, output_dir=tmp_path)
 

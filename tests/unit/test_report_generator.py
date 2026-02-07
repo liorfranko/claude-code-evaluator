@@ -7,11 +7,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from claude_evaluator.models.decision import Decision
 from claude_evaluator.models.enums import EvaluationStatus, Outcome, WorkflowType
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.report import EvaluationReport
-from claude_evaluator.models.timeline_event import TimelineEvent
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.evaluation.report import EvaluationReport
+from claude_evaluator.models.evaluation.timeline_event import TimelineEvent
+from claude_evaluator.models.execution.decision import Decision
 from claude_evaluator.report.generator import ReportGenerationError, ReportGenerator
 
 

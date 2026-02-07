@@ -13,24 +13,24 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from claude_evaluator.cli.commands.evaluation import RunEvaluationCommand
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
+from claude_evaluator.evaluation import EvaluationExecutor
 from claude_evaluator.experiment.judge import PairwiseJudge
 from claude_evaluator.experiment.statistics import ExperimentStatistician
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import WorkflowType
-from claude_evaluator.models.experiment import (
+from claude_evaluator.models.experiment.config import (
+    ExperimentConfig,
+    ExperimentConfigEntry,
+)
+from claude_evaluator.models.experiment.results import (
     ConfigResult,
     EloRating,
     ExperimentReport,
     PairwiseComparison,
     RunResult,
 )
-from claude_evaluator.models.experiment_models import (
-    ExperimentConfig,
-    ExperimentConfigEntry,
-)
+from claude_evaluator.scoring import ClaudeClient
 
 __all__ = ["ExperimentRunner"]
 
@@ -44,13 +44,13 @@ class ExperimentRunner:
     """Orchestrates experiment execution, comparison, and analysis.
 
     Attributes:
-        _eval_command: Command instance for running evaluations.
+        _executor: EvaluationExecutor for running evaluations.
 
     """
 
     def __init__(self) -> None:
         """Initialize the experiment runner."""
-        self._eval_command = RunEvaluationCommand()
+        self._executor = EvaluationExecutor()
 
     async def run(
         self,
@@ -231,7 +231,7 @@ class ExperimentRunner:
         workflow_type = self._determine_workflow_type(config_entry)
 
         try:
-            report = await self._eval_command.run_evaluation(
+            report = await self._executor.run_evaluation(
                 task=task_prompt,
                 workflow_type=workflow_type,
                 output_dir=run_dir,

@@ -9,8 +9,8 @@ from claude_evaluator.cli import (
     validate_args,
 )
 from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.metrics import Metrics
-from claude_evaluator.models.report import EvaluationReport
+from claude_evaluator.models.evaluation.metrics import Metrics
+from claude_evaluator.models.evaluation.report import EvaluationReport
 
 
 class TestCreateParser:
@@ -80,6 +80,7 @@ class TestCreateParser:
         parser = create_parser()
         args = parser.parse_args(["--suite", "test.yaml", "--dry-run"])
         assert args.dry_run is True
+
 
 class TestValidateArgs:
     """Tests for validate_args function."""

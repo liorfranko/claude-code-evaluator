@@ -12,15 +12,15 @@ from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
 from claude_evaluator.logging_config import get_logger
-from claude_evaluator.models.progress import ProgressEvent, ProgressEventType
-from claude_evaluator.models.question import QuestionContext, QuestionItem
+from claude_evaluator.models.execution.progress import ProgressEvent, ProgressEventType
+from claude_evaluator.models.interaction.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
 if TYPE_CHECKING:
     from claude_evaluator.config.models import EvalDefaults
-    from claude_evaluator.core import Evaluation
+    from claude_evaluator.evaluation import Evaluation
     from claude_evaluator.metrics.collector import MetricsCollector
-    from claude_evaluator.models.metrics import Metrics
+    from claude_evaluator.models.evaluation.metrics import Metrics
 
 __all__ = ["MultiCommandWorkflow"]
 
@@ -251,7 +251,7 @@ class MultiCommandWorkflow(BaseWorkflow):
 
         # Log warning if response is None and we may have hit max_turns
         if response is None:
-            effective_max_turns = phase.max_turns or self._max_turns
+            effective_max_turns = phase.max_turns or self._agent_factory.max_turns
             if (
                 effective_max_turns is not None
                 and query_metrics.num_turns >= effective_max_turns

@@ -16,16 +16,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.agent import EvaluatorAgent
-from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.models.enums import Outcome, WorkflowType
+from claude_evaluator.models.evaluation.score_report import DimensionType, ScoreReport
+from claude_evaluator.scoring.agent import EvaluatorAgent
+from claude_evaluator.scoring.claude_client import ClaudeClient
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.score_report import DimensionType, ScoreReport
+from claude_evaluator.scoring.score_builder import ScoreReportBuilder
 
 
 class TestFullEvaluationWorkflow:
@@ -373,9 +374,7 @@ class TestFullEvaluationWorkflow:
 
         # Aggregate should be weighted average of dimension scores
         total_weight = sum(ds.weight for ds in score_report.dimension_scores)
-        weighted_sum = sum(
-            ds.score * ds.weight for ds in score_report.dimension_scores
-        )
+        weighted_sum = sum(ds.score * ds.weight for ds in score_report.dimension_scores)
         expected_aggregate = int(weighted_sum / total_weight)
 
         assert score_report.aggregate_score == expected_aggregate
@@ -456,7 +455,10 @@ class TestFullEvaluationWorkflow:
         self, evaluator_agent: EvaluatorAgent, tmp_path: Path
     ) -> None:
         """Test that save_report writes a valid JSON file."""
-        from claude_evaluator.models.score_report import DimensionScore, DimensionType
+        from claude_evaluator.models.evaluation.score_report import (
+            DimensionScore,
+            DimensionType,
+        )
 
         report = ScoreReport(
             evaluation_id="test-001",
@@ -625,22 +627,13 @@ class TestEfficiencyScoreCalculation:
     """Test efficiency score calculations for various metrics."""
 
     @pytest.fixture
-    def evaluator_agent(self, tmp_path: Path) -> EvaluatorAgent:
-        """Create an EvaluatorAgent for testing efficiency calculation."""
-        with patch.object(ClaudeClient, "__init__", return_value=None):
-            mock_client = MagicMock(spec=ClaudeClient)
-            mock_client.model = "claude-3-5-sonnet-20241022"
-            agent = EvaluatorAgent(
-                workspace_path=tmp_path,
-                enable_ast=False,
-                claude_client=mock_client,
-                enable_checks=False,
-            )
-        return agent
+    def score_builder(self) -> ScoreReportBuilder:
+        """Create a ScoreReportBuilder for testing efficiency calculation."""
+        return ScoreReportBuilder()
 
-    def test_low_token_usage_high_score(self, evaluator_agent: EvaluatorAgent) -> None:
+    def test_low_token_usage_high_score(self, score_builder: ScoreReportBuilder) -> None:
         """Test that low token usage produces high efficiency score."""
-        score = evaluator_agent._calculate_efficiency_score(
+        score = score_builder._calculate_efficiency_score(
             total_tokens=10000,
             turn_count=3,
             total_cost=0.02,
@@ -649,10 +642,10 @@ class TestEfficiencyScoreCalculation:
         assert score.score >= 90
 
     def test_high_token_usage_lower_score(
-        self, evaluator_agent: EvaluatorAgent
+        self, score_builder: ScoreReportBuilder
     ) -> None:
         """Test that high token usage produces lower efficiency score."""
-        score = evaluator_agent._calculate_efficiency_score(
+        score = score_builder._calculate_efficiency_score(
             total_tokens=300000,
             turn_count=30,
             total_cost=1.50,
@@ -661,10 +654,10 @@ class TestEfficiencyScoreCalculation:
         assert score.score <= 50
 
     def test_efficiency_score_has_correct_dimension(
-        self, evaluator_agent: EvaluatorAgent
+        self, score_builder: ScoreReportBuilder
     ) -> None:
         """Test that efficiency score has correct dimension type."""
-        score = evaluator_agent._calculate_efficiency_score(
+        score = score_builder._calculate_efficiency_score(
             total_tokens=50000,
             turn_count=10,
             total_cost=0.10,
@@ -673,10 +666,10 @@ class TestEfficiencyScoreCalculation:
         assert score.dimension_name == DimensionType.efficiency
 
     def test_efficiency_score_has_rationale(
-        self, evaluator_agent: EvaluatorAgent
+        self, score_builder: ScoreReportBuilder
     ) -> None:
         """Test that efficiency score includes informative rationale."""
-        score = evaluator_agent._calculate_efficiency_score(
+        score = score_builder._calculate_efficiency_score(
             total_tokens=25000,
             turn_count=8,
             total_cost=0.05,
@@ -686,10 +679,10 @@ class TestEfficiencyScoreCalculation:
         assert "turns" in score.rationale.lower()
         assert "cost" in score.rationale.lower()
 
-    def test_efficiency_score_bounds(self, evaluator_agent: EvaluatorAgent) -> None:
+    def test_efficiency_score_bounds(self, score_builder: ScoreReportBuilder) -> None:
         """Test that efficiency score is always between 0 and 100."""
         # Test with extreme low values
-        low_score = evaluator_agent._calculate_efficiency_score(
+        low_score = score_builder._calculate_efficiency_score(
             total_tokens=100,
             turn_count=1,
             total_cost=0.001,
@@ -697,7 +690,7 @@ class TestEfficiencyScoreCalculation:
         assert 0 <= low_score.score <= 100
 
         # Test with extreme high values
-        high_score = evaluator_agent._calculate_efficiency_score(
+        high_score = score_builder._calculate_efficiency_score(
             total_tokens=1000000,
             turn_count=100,
             total_cost=10.0,

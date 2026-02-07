@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerBase,
@@ -468,9 +468,7 @@ class TestReviewerBaseFilterByConfidence:
             min_confidence=60,
         )
 
-    def test_filter_removes_low_confidence_issues(
-        self, reviewer: MockReviewer
-    ) -> None:
+    def test_filter_removes_low_confidence_issues(self, reviewer: MockReviewer) -> None:
         """Test that filter removes issues below min_confidence threshold."""
         issues = [
             ReviewerIssue(

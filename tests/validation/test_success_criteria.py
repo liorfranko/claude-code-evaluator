@@ -18,13 +18,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.registry import (
+from claude_evaluator.scoring.reviewers.registry import (
     ReviewerRegistry,
 )
 
@@ -40,7 +40,10 @@ BASELINE_EVALUATIONS: list[dict[str, Any]] = [
         "task_description": "Implement user authentication with JWT",
         "expected_score": 92,
         "code_files": [
-            ("src/auth.py", "python", '''
+            (
+                "src/auth.py",
+                "python",
+                '''
 def authenticate(username: str, password: str) -> str:
     """Authenticate user and return JWT token."""
     if not username or not password:
@@ -51,7 +54,8 @@ def authenticate(username: str, password: str) -> str:
         raise AuthenticationError("Invalid credentials")
 
     return generate_jwt(user.id, expiry=3600)
-'''),
+''',
+            ),
         ],
         "quality_indicators": {
             "error_handling": "good",
@@ -64,7 +68,10 @@ def authenticate(username: str, password: str) -> str:
         "task_description": "Create database connection pool",
         "expected_score": 78,
         "code_files": [
-            ("src/db.py", "python", '''
+            (
+                "src/db.py",
+                "python",
+                """
 import sqlite3
 
 conn = None
@@ -77,7 +84,8 @@ def get_connection():
 
 def query(sql):
     return get_connection().execute(sql).fetchall()
-'''),
+""",
+            ),
         ],
         "quality_indicators": {
             "error_handling": "poor",
@@ -90,7 +98,10 @@ def query(sql):
         "task_description": "Implement REST API endpoint for user profile",
         "expected_score": 85,
         "code_files": [
-            ("src/routes/user.py", "python", '''
+            (
+                "src/routes/user.py",
+                "python",
+                '''
 from flask import Blueprint, jsonify, request
 
 user_bp = Blueprint("user", __name__)
@@ -105,7 +116,8 @@ def get_profile(user_id: int):
         return jsonify(user.to_dict()), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-'''),
+''',
+            ),
         ],
         "quality_indicators": {
             "error_handling": "good",
@@ -118,14 +130,18 @@ def get_profile(user_id: int):
         "task_description": "Create file upload handler",
         "expected_score": 65,
         "code_files": [
-            ("src/upload.py", "python", '''
+            (
+                "src/upload.py",
+                "python",
+                """
 import os
 
 def handle_upload(file):
     filename = file.filename
     file.save(os.path.join("/uploads", filename))
     return filename
-'''),
+""",
+            ),
         ],
         "quality_indicators": {
             "error_handling": "poor",
@@ -138,7 +154,10 @@ def handle_upload(file):
         "task_description": "Implement data validation layer",
         "expected_score": 88,
         "code_files": [
-            ("src/validators.py", "python", '''
+            (
+                "src/validators.py",
+                "python",
+                '''
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 
@@ -157,7 +176,8 @@ class UserCreateRequest(BaseModel):
         if not any(c.isdigit() for c in v):
             raise ValueError("Password must contain digit")
         return v
-'''),
+''',
+            ),
         ],
         "quality_indicators": {
             "error_handling": "good",
@@ -301,9 +321,7 @@ class TestSC001EvaluationQualityConsistency:
             expected_scores.append(float(baseline["expected_score"]))
             evaluator_scores.append(float(mock_reviewer_score(baseline)))
 
-        correlation = calculate_pearson_correlation(
-            expected_scores, evaluator_scores
-        )
+        correlation = calculate_pearson_correlation(expected_scores, evaluator_scores)
 
         # SC-001 Target: Pearson correlation >= 0.85
         assert correlation >= 0.85, (
@@ -354,9 +372,7 @@ class TestSC001EvaluationQualityConsistency:
             score = aggregated["average_confidence"]
             evaluator_scores.append(float(score))
 
-        correlation = calculate_pearson_correlation(
-            expected_scores, evaluator_scores
-        )
+        correlation = calculate_pearson_correlation(expected_scores, evaluator_scores)
 
         # SC-001 Target: Pearson correlation >= 0.85
         assert correlation >= 0.85, (
@@ -384,9 +400,7 @@ class TestSC001EvaluationQualityConsistency:
 
             # Validate expected_score range
             score = baseline["expected_score"]
-            assert 0 <= score <= 100, (
-                f"Expected score {score} is out of range [0, 100]"
-            )
+            assert 0 <= score <= 100, f"Expected score {score} is out of range [0, 100]"
 
 
 # ============================================================================
@@ -400,7 +414,10 @@ MAX_EVALUATION_TIME_SECONDS = 180
 PERFORMANCE_BENCHMARK_FIXTURE: dict[str, Any] = {
     "task_description": "Implement a RESTful API for user management",
     "code_files": [
-        ("src/models/user.py", "python", '''
+        (
+            "src/models/user.py",
+            "python",
+            """
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -413,8 +430,12 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(256), nullable=False)
-'''),
-        ("src/routes/users.py", "python", '''
+""",
+        ),
+        (
+            "src/routes/users.py",
+            "python",
+            """
 from flask import Blueprint, jsonify, request
 from src.models.user import User
 
@@ -429,8 +450,12 @@ def list_users():
 def get_user(user_id):
     user = User.query.get_or_404(user_id)
     return jsonify(user.to_dict())
-'''),
-        ("src/auth/jwt.py", "python", '''
+""",
+        ),
+        (
+            "src/auth/jwt.py",
+            "python",
+            """
 import jwt
 from datetime import datetime, timedelta
 
@@ -445,8 +470,12 @@ def generate_token(user_id: int) -> str:
 
 def verify_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-'''),
-        ("src/validators.py", "python", '''
+""",
+        ),
+        (
+            "src/validators.py",
+            "python",
+            """
 from pydantic import BaseModel, Field, validator
 
 class CreateUserRequest(BaseModel):
@@ -459,8 +488,12 @@ class CreateUserRequest(BaseModel):
         if "@" not in v:
             raise ValueError("Invalid email address")
         return v
-'''),
-        ("tests/test_users.py", "python", '''
+""",
+        ),
+        (
+            "tests/test_users.py",
+            "python",
+            """
 import pytest
 from src.routes.users import users_bp
 
@@ -471,7 +504,8 @@ def test_list_users(client):
 def test_get_user_not_found(client):
     response = client.get("/users/999")
     assert response.status_code == 404
-'''),
+""",
+        ),
     ],
 }
 
@@ -504,7 +538,9 @@ def calculate_percentile(values: list[float], percentile: int) -> float:
     upper = min(lower + 1, n - 1)
     fraction = index - lower
 
-    return sorted_values[lower] + fraction * (sorted_values[upper] - sorted_values[lower])
+    return sorted_values[lower] + fraction * (
+        sorted_values[upper] - sorted_values[lower]
+    )
 
 
 class TestSC002EvaluationPerformance:
@@ -663,10 +699,7 @@ class TestSC002EvaluationPerformance:
     def test_execution_time_statistics(self) -> None:
         """Test calculation of execution time statistics."""
         # Sample execution times (in seconds)
-        times = [
-            10.5, 12.3, 15.7, 18.2, 22.1,
-            25.4, 30.8, 45.2, 60.1, 120.0
-        ]
+        times = [10.5, 12.3, 15.7, 18.2, 22.1, 25.4, 30.8, 45.2, 60.1, 120.0]
 
         p95 = calculate_percentile(times, 95)
         mean_time = statistics.mean(times)
@@ -691,7 +724,7 @@ MAX_COST_PER_EVALUATION_USD = 0.50
 # Claude Opus pricing (approximate, as of 2025)
 # These are estimates; actual pricing may vary
 CLAUDE_OPUS_PRICING = {
-    "input_tokens_per_million": 15.00,   # $15 per million input tokens
+    "input_tokens_per_million": 15.00,  # $15 per million input tokens
     "output_tokens_per_million": 75.00,  # $75 per million output tokens
 }
 
@@ -709,8 +742,12 @@ class CostEstimator:
 
     def __init__(
         self,
-        input_price_per_million: float = CLAUDE_OPUS_PRICING["input_tokens_per_million"],
-        output_price_per_million: float = CLAUDE_OPUS_PRICING["output_tokens_per_million"],
+        input_price_per_million: float = CLAUDE_OPUS_PRICING[
+            "input_tokens_per_million"
+        ],
+        output_price_per_million: float = CLAUDE_OPUS_PRICING[
+            "output_tokens_per_million"
+        ],
     ) -> None:
         """Initialize the cost estimator.
 
@@ -760,10 +797,10 @@ class CostEstimator:
 
 # Sample token usage data for cost estimation
 SAMPLE_EVALUATION_TOKEN_USAGE: list[dict[str, int]] = [
-    {"input_tokens": 5000, "output_tokens": 1500},   # Small task
-    {"input_tokens": 8000, "output_tokens": 2000},   # Medium task
+    {"input_tokens": 5000, "output_tokens": 1500},  # Small task
+    {"input_tokens": 8000, "output_tokens": 2000},  # Medium task
     {"input_tokens": 12000, "output_tokens": 3000},  # Larger task
-    {"input_tokens": 6000, "output_tokens": 1800},   # Medium task
+    {"input_tokens": 6000, "output_tokens": 1800},  # Medium task
     {"input_tokens": 10000, "output_tokens": 2500},  # Medium-large task
 ]
 
@@ -855,9 +892,7 @@ class TestSC003APICostEfficiency:
         )
 
     @pytest.mark.slow
-    def test_individual_costs_under_limit(
-        self, cost_estimator: CostEstimator
-    ) -> None:
+    def test_individual_costs_under_limit(self, cost_estimator: CostEstimator) -> None:
         """Test that individual evaluation costs are reasonable."""
         for i, usage in enumerate(SAMPLE_EVALUATION_TOKEN_USAGE):
             cost = cost_estimator.estimate_cost(
@@ -867,12 +902,10 @@ class TestSC003APICostEfficiency:
 
             # Individual costs should also be under limit
             assert cost <= MAX_COST_PER_EVALUATION_USD * 2, (
-                f"Evaluation {i+1} cost ${cost:.4f} is too high"
+                f"Evaluation {i + 1} cost ${cost:.4f} is too high"
             )
 
-    def test_cost_breakdown_by_component(
-        self, cost_estimator: CostEstimator
-    ) -> None:
+    def test_cost_breakdown_by_component(self, cost_estimator: CostEstimator) -> None:
         """Test cost breakdown between input and output."""
         usage = SAMPLE_EVALUATION_TOKEN_USAGE[0]
 

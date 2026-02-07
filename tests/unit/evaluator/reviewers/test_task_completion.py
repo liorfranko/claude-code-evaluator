@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.task_completion import (
+from claude_evaluator.scoring.reviewers.task_completion import (
     TaskCompletionReviewer,
 )
 
@@ -36,7 +36,9 @@ class TestTaskCompletionReviewerInitialization:
         reviewer = TaskCompletionReviewer(client=mock_client)
 
         assert reviewer.reviewer_id == "task_completion"
-        assert reviewer.focus_area == "Whether the task requirements were fully satisfied"
+        assert (
+            reviewer.focus_area == "Whether the task requirements were fully satisfied"
+        )
         assert reviewer.client is mock_client
         assert reviewer.min_confidence == 60
 
@@ -316,9 +318,7 @@ class TestTaskCompletionReviewerFilterByConfidence:
         """Create a mock ClaudeClient."""
         return MagicMock()
 
-    def test_filter_removes_low_confidence_issues(
-        self, mock_client: MagicMock
-    ) -> None:
+    def test_filter_removes_low_confidence_issues(self, mock_client: MagicMock) -> None:
         """Test that filter removes issues below min_confidence threshold."""
         reviewer = TaskCompletionReviewer(client=mock_client, min_confidence=70)
 

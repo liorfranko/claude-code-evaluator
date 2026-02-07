@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from claude_evaluator.agents import DeveloperAgent, WorkerAgent
 from claude_evaluator.config.models import Phase
-from claude_evaluator.core import Evaluation
-from claude_evaluator.core.agents import DeveloperAgent, WorkerAgent
+from claude_evaluator.evaluation import Evaluation
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (
     EvaluationStatus,
@@ -18,7 +18,7 @@ from claude_evaluator.models.enums import (
     PermissionMode,
     WorkflowType,
 )
-from claude_evaluator.models.query_metrics import QueryMetrics
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 from claude_evaluator.report.generator import ReportGenerator
 from claude_evaluator.workflows import (
     DirectWorkflow,
@@ -39,7 +39,9 @@ class TestWorkflowCoverageSC003:
         )
 
         async def mock_execute_query(
-            query: str, phase: str, resume_session: bool = False  # noqa: ARG001
+            query: str,
+            phase: str,
+            resume_session: bool = False,  # noqa: ARG001
         ) -> QueryMetrics:
             call_counter[0] += 1
             return QueryMetrics(

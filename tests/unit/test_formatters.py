@@ -10,14 +10,14 @@ This module tests the formatting utilities for ReviewerOutput including:
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.evaluation.formatters import (
+    ReviewerOutputFormatter,
+    format_reviewer_outputs,
+)
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewerIssue,
     ReviewerOutput,
-)
-from claude_evaluator.core.formatters import (
-    ReviewerOutputFormatter,
-    format_reviewer_outputs,
 )
 
 

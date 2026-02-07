@@ -6,7 +6,7 @@ including QuestionOption, QuestionItem, and QuestionContext.
 
 import pytest
 
-from claude_evaluator.models.question import (
+from claude_evaluator.models.interaction.question import (
     QuestionContext,
     QuestionItem,
     QuestionOption,

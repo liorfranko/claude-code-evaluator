@@ -6,7 +6,7 @@ Tests for build_clone_command, parse_git_status, and is_network_error functions.
 from pathlib import Path
 
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.git_operations import (
+from claude_evaluator.evaluation.git_operations import (
     build_clone_command,
     is_branch_not_found_error,
     is_network_error,
@@ -31,10 +31,7 @@ class TestBuildCloneCommand:
 
     def test_with_ref(self) -> None:
         """Command should include --branch when ref specified."""
-        source = RepositorySource(
-            url="https://github.com/owner/repo",
-            ref="main"
-        )
+        source = RepositorySource(url="https://github.com/owner/repo", ref="main")
         cmd = build_clone_command(source, Path("/tmp/workspace"))
 
         assert "--branch" in cmd
@@ -42,10 +39,7 @@ class TestBuildCloneCommand:
 
     def test_with_tag_ref(self) -> None:
         """Tag should work as ref."""
-        source = RepositorySource(
-            url="https://github.com/owner/repo",
-            ref="v1.0.0"
-        )
+        source = RepositorySource(url="https://github.com/owner/repo", ref="v1.0.0")
         cmd = build_clone_command(source, Path("/tmp/workspace"))
 
         assert "--branch" in cmd
@@ -53,10 +47,7 @@ class TestBuildCloneCommand:
 
     def test_with_custom_depth(self) -> None:
         """Custom depth should be used."""
-        source = RepositorySource(
-            url="https://github.com/owner/repo",
-            depth=10
-        )
+        source = RepositorySource(url="https://github.com/owner/repo", depth=10)
         cmd = build_clone_command(source, Path("/tmp/workspace"))
 
         assert "--depth" in cmd
@@ -65,10 +56,7 @@ class TestBuildCloneCommand:
 
     def test_with_full_depth(self) -> None:
         """Full depth should not include --depth flag."""
-        source = RepositorySource(
-            url="https://github.com/owner/repo",
-            depth="full"
-        )
+        source = RepositorySource(url="https://github.com/owner/repo", depth="full")
         cmd = build_clone_command(source, Path("/tmp/workspace"))
 
         assert "--depth" not in cmd
@@ -76,9 +64,7 @@ class TestBuildCloneCommand:
     def test_with_all_options(self) -> None:
         """All options together should work correctly."""
         source = RepositorySource(
-            url="https://github.com/owner/repo",
-            ref="develop",
-            depth=5
+            url="https://github.com/owner/repo", ref="develop", depth=5
         )
         cmd = build_clone_command(source, Path("/tmp/workspace"))
 
@@ -272,11 +258,15 @@ class TestIsBranchNotFoundError:
 
     def test_remote_branch_not_found(self) -> None:
         """'Remote branch not found' should be detected."""
-        assert is_branch_not_found_error("fatal: Remote branch 'nonexistent' not found in upstream origin")
+        assert is_branch_not_found_error(
+            "fatal: Remote branch 'nonexistent' not found in upstream origin"
+        )
 
     def test_did_not_match_any(self) -> None:
         """'did not match any' should be detected."""
-        assert is_branch_not_found_error("error: pathspec 'feature' did not match any file(s) known to git")
+        assert is_branch_not_found_error(
+            "error: pathspec 'feature' did not match any file(s) known to git"
+        )
 
     def test_couldnt_find_remote_ref(self) -> None:
         """'couldn't find remote ref' should be detected."""
@@ -284,11 +274,15 @@ class TestIsBranchNotFoundError:
 
     def test_could_not_find_remote_branch(self) -> None:
         """'Could not find remote branch' should be detected."""
-        assert is_branch_not_found_error("fatal: Could not find remote branch feature-x to clone")
+        assert is_branch_not_found_error(
+            "fatal: Could not find remote branch feature-x to clone"
+        )
 
     def test_network_error_not_branch_error(self) -> None:
         """Network errors should NOT be branch errors."""
-        assert not is_branch_not_found_error("fatal: Could not resolve host: github.com")
+        assert not is_branch_not_found_error(
+            "fatal: Could not resolve host: github.com"
+        )
 
     def test_permission_denied_not_branch_error(self) -> None:
         """Permission errors should NOT be branch errors."""

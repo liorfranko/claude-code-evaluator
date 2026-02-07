@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import BaseModel
 
-from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from claude_evaluator.core.agents.evaluator.exceptions import ClaudeAPIError
+from claude_evaluator.scoring.claude_client import ClaudeClient
+from claude_evaluator.scoring.exceptions import ClaudeAPIError
 
 
 class SampleResponse(BaseModel):
@@ -32,7 +32,7 @@ class TestClaudeClientInitialization:
     def test_initialization_with_default_values(self) -> None:
         """Test that ClaudeClient initializes with default values from settings."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -49,7 +49,7 @@ class TestClaudeClientInitialization:
     def test_initialization_with_custom_model(self) -> None:
         """Test that custom model overrides default settings."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -64,7 +64,7 @@ class TestClaudeClientInitialization:
     def test_initialization_with_custom_temperature(self) -> None:
         """Test that custom temperature overrides default settings."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -79,7 +79,7 @@ class TestClaudeClientInitialization:
     def test_initialization_with_zero_temperature(self) -> None:
         """Test that temperature can be set to zero explicitly."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -93,7 +93,7 @@ class TestClaudeClientInitialization:
     def test_initialization_with_custom_retry_params(self) -> None:
         """Test that custom retry parameters are stored correctly."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -113,7 +113,7 @@ class TestClaudeClientGenerate:
     def mock_client(self) -> ClaudeClient:
         """Create a ClaudeClient with mocked settings."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -123,7 +123,9 @@ class TestClaudeClientGenerate:
             return ClaudeClient(max_retries=3, retry_delay=0.01)
 
     @pytest.mark.asyncio
-    async def test_generate_returns_text_response(self, mock_client: ClaudeClient) -> None:
+    async def test_generate_returns_text_response(
+        self, mock_client: ClaudeClient
+    ) -> None:
         """Test that generate() returns extracted text from SDK response."""
         mock_result = MagicMock()
         mock_result.result = "Hello, world!"
@@ -136,7 +138,7 @@ class TestClaudeClientGenerate:
             yield msg
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             result = await mock_client.generate("Test prompt")
@@ -162,7 +164,7 @@ class TestClaudeClientGenerate:
             yield msg
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             result = await mock_client.generate("Test prompt")
@@ -184,7 +186,7 @@ class TestClaudeClientGenerate:
             yield msg
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             result = await mock_client.generate("Test prompt")
@@ -199,7 +201,7 @@ class TestClaudeClientGenerateStructured:
     def mock_client(self) -> ClaudeClient:
         """Create a ClaudeClient with mocked settings."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -223,7 +225,7 @@ class TestClaudeClientGenerateStructured:
             yield msg
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             result = await mock_client.generate_structured(
@@ -250,7 +252,7 @@ class TestClaudeClientGenerateStructured:
             yield msg
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             result = await mock_client.generate_structured(
@@ -275,13 +277,14 @@ class TestClaudeClientGenerateStructured:
             msg.result = invalid_response
             yield msg
 
-        with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
-            side_effect=mock_sdk_query,
-        ), pytest.raises(Exception):  # JSON parse error
-            await mock_client.generate_structured(
-                "Generate a sample", SampleResponse
-            )
+        with (
+            patch(
+                "claude_evaluator.scoring.claude_client.sdk_query",
+                side_effect=mock_sdk_query,
+            ),
+            pytest.raises(Exception),
+        ):  # JSON parse error
+            await mock_client.generate_structured("Generate a sample", SampleResponse)
 
 
 class TestClaudeClientRetryLogic:
@@ -291,7 +294,7 @@ class TestClaudeClientRetryLogic:
     def mock_client(self) -> ClaudeClient:
         """Create a ClaudeClient with mocked settings and short retry delay."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -320,7 +323,7 @@ class TestClaudeClientRetryLogic:
             yield msg
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             result = await mock_client.generate("Test prompt")
@@ -345,13 +348,14 @@ class TestClaudeClientRetryLogic:
 
         with (
             patch(
-                "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+                "claude_evaluator.scoring.claude_client.sdk_query",
                 side_effect=mock_sdk_query,
             ),
             patch(
-                "claude_evaluator.core.agents.evaluator.claude_client.asyncio.sleep",
+                "claude_evaluator.scoring.claude_client.asyncio.sleep",
                 side_effect=mock_sleep,
-            ), pytest.raises(ClaudeAPIError)
+            ),
+            pytest.raises(ClaudeAPIError),
         ):
             await mock_client.generate("Test prompt")
 
@@ -378,7 +382,7 @@ class TestClaudeClientRetryLogic:
             yield  # pragma: no cover
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             with pytest.raises(ClaudeAPIError) as exc_info:
@@ -400,7 +404,7 @@ class TestClaudeClientRetryLogic:
             yield  # pragma: no cover
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             with pytest.raises(ClaudeAPIError) as exc_info:
@@ -411,7 +415,9 @@ class TestClaudeClientRetryLogic:
             assert "Specific error message" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_immediate_success_no_retries(self, mock_client: ClaudeClient) -> None:
+    async def test_immediate_success_no_retries(
+        self, mock_client: ClaudeClient
+    ) -> None:
         """Test that no retries occur on immediate success."""
         call_count = 0
 
@@ -425,7 +431,7 @@ class TestClaudeClientRetryLogic:
             yield msg
 
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.sdk_query",
+            "claude_evaluator.scoring.claude_client.sdk_query",
             side_effect=mock_sdk_query,
         ):
             result = await mock_client.generate("Test prompt")
@@ -441,7 +447,7 @@ class TestClaudeClientExtractText:
     def mock_client(self) -> ClaudeClient:
         """Create a ClaudeClient with mocked settings."""
         with patch(
-            "claude_evaluator.core.agents.evaluator.claude_client.get_settings"
+            "claude_evaluator.scoring.claude_client.get_settings"
         ) as mock_settings:
             mock_evaluator = MagicMock()
             mock_evaluator.model = "claude-3-opus-20240229"
@@ -461,7 +467,9 @@ class TestClaudeClientExtractText:
         query_result.assistant_content = assistant_content
         return query_result
 
-    def test_extract_text_from_result_attribute(self, mock_client: ClaudeClient) -> None:
+    def test_extract_text_from_result_attribute(
+        self, mock_client: ClaudeClient
+    ) -> None:
         """Test extraction from result attribute."""
         msg = MagicMock()
         msg.result = "  Text from result  "

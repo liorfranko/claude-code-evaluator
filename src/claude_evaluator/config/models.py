@@ -233,5 +233,3 @@ class EvaluationSuite(BaseSchema):
     description: str | None = None
     version: str | None = None
     defaults: EvalDefaults | None = None
-
-
