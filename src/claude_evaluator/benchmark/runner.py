@@ -216,13 +216,15 @@ class BenchmarkRunner:
             evaluation = self._create_evaluation(workspace, workflow_def.type)
 
             # Execute workflow
+            # Note: workflow.execute_with_timeout() calls on_execution_complete()
+            # which already calls evaluation.complete(metrics), so we don't need
+            # to call it again here.
             metrics = await workflow.execute_with_timeout(
                 evaluation=evaluation,
                 timeout_seconds=self.config.defaults.timeout_seconds,
             )
 
-            # Mark evaluation complete and generate report
-            evaluation.complete(metrics)
+            # Generate report from the completed evaluation
             report_path = await self._generate_report(evaluation, workspace)
 
             # Score the result

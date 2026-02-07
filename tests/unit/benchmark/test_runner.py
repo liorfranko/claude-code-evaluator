@@ -434,3 +434,157 @@ class TestBenchmarkRunnerScoringIntegration:
         assert "evaluation_id" in content
         assert "outcome" in content
         assert "timeline" in content
+
+
+class TestBenchmarkRunnerWorkflowIntegration:
+    """Tests for workflow integration.
+
+    These tests verify that the runner correctly handles the workflow lifecycle,
+    particularly around evaluation state transitions.
+    """
+
+    @pytest.mark.asyncio
+    async def test_runner_does_not_double_complete_evaluation(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that runner doesn't call evaluation.complete() after workflow.
+
+        BUG: The workflow's execute_with_timeout -> execute -> on_execution_complete
+        already calls evaluation.complete(metrics). The runner should NOT call
+        evaluation.complete() again, as it causes InvalidEvaluationStateError.
+
+        The workflow is responsible for completing the evaluation. The runner
+        should only use the metrics returned by the workflow and generate the
+        report from the already-completed evaluation.
+
+        This test will fail until the bug is fixed.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from claude_evaluator.evaluation import Evaluation
+        from claude_evaluator.evaluation.exceptions import InvalidEvaluationStateError
+        from claude_evaluator.models.evaluation.metrics import Metrics
+
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        # Create a mock workflow that simulates what real workflows do:
+        # They complete the evaluation internally via on_execution_complete()
+        mock_workflow = MagicMock()
+        mock_metrics = Metrics(
+            total_runtime_ms=1000,
+            total_tokens=100,
+            input_tokens=50,
+            output_tokens=50,
+            total_cost_usd=0.01,
+            prompt_count=1,
+            turn_count=5,
+        )
+
+        async def execute_with_timeout_that_completes_evaluation(
+            evaluation: Evaluation, timeout_seconds: int
+        ) -> Metrics:
+            """Simulate what real workflows do - they complete the evaluation."""
+            evaluation.start()
+            evaluation.complete(mock_metrics)  # Workflow completes it!
+            return mock_metrics
+
+        mock_workflow.execute_with_timeout = AsyncMock(
+            side_effect=execute_with_timeout_that_completes_evaluation
+        )
+
+        # Mock other dependencies
+        with (
+            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(runner, "_create_workflow", return_value=mock_workflow),
+            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
+            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+        ):
+            mock_repo.return_value = tmp_path / "workspace"
+            (tmp_path / "workspace").mkdir(exist_ok=True)
+            mock_report.return_value = tmp_path / "report.json"
+            mock_score.return_value = MagicMock(aggregate_score=85)
+
+            workflow_def = minimal_config.workflows["direct"]
+
+            # This should NOT raise InvalidEvaluationStateError
+            # If the runner tries to call evaluation.complete() again, it will fail
+            try:
+                result = await runner._execute_single_run(
+                    workflow_def=workflow_def,
+                    workflow_name="direct",
+                    run_index=0,
+                )
+                # If we get here, the bug is fixed
+                assert result.score == 85
+            except InvalidEvaluationStateError as e:
+                # This is the bug - runner is calling complete() on already-completed evaluation
+                pytest.fail(
+                    f"BUG: Runner called evaluation.complete() after workflow already "
+                    f"completed it. Error: {e}"
+                )
+
+    @pytest.mark.asyncio
+    async def test_runner_uses_workflow_returned_metrics(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that runner uses metrics returned by workflow, not re-collected.
+
+        The workflow returns Metrics from execute_with_timeout(). The runner
+        should use these metrics directly rather than trying to recollect them.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from claude_evaluator.evaluation import Evaluation
+        from claude_evaluator.models.evaluation.metrics import Metrics
+
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        # Create metrics with specific values we can verify
+        expected_metrics = Metrics(
+            total_runtime_ms=5000,
+            total_tokens=500,
+            input_tokens=200,
+            output_tokens=300,
+            total_cost_usd=0.25,
+            prompt_count=3,
+            turn_count=15,
+        )
+
+        mock_workflow = MagicMock()
+
+        async def execute_and_complete(
+            evaluation: Evaluation, timeout_seconds: int
+        ) -> Metrics:
+            evaluation.start()
+            evaluation.complete(expected_metrics)
+            return expected_metrics
+
+        mock_workflow.execute_with_timeout = AsyncMock(side_effect=execute_and_complete)
+
+        with (
+            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(runner, "_create_workflow", return_value=mock_workflow),
+            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
+            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+        ):
+            mock_repo.return_value = tmp_path / "workspace"
+            (tmp_path / "workspace").mkdir(exist_ok=True)
+            mock_report.return_value = tmp_path / "report.json"
+            mock_score.return_value = MagicMock(aggregate_score=90)
+
+            workflow_def = minimal_config.workflows["direct"]
+
+            try:
+                result = await runner._execute_single_run(
+                    workflow_def=workflow_def,
+                    workflow_name="direct",
+                    run_index=0,
+                )
+
+                # Verify the run metrics match what the workflow returned
+                assert result.metrics is not None
+                assert result.metrics.total_tokens == expected_metrics.total_tokens
+                assert result.metrics.total_cost_usd == expected_metrics.total_cost_usd
+                assert result.metrics.turn_count == expected_metrics.turn_count
+            except Exception as e:
+                pytest.fail(f"Runner failed to use workflow metrics: {e}")
