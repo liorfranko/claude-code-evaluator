@@ -10,12 +10,12 @@ from unittest.mock import patch
 
 import pytest
 
-from claude_evaluator.config.settings import get_settings
 from claude_evaluator.agents.developer import DeveloperAgent
 from claude_evaluator.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.models.enums import DeveloperState, Outcome
 from claude_evaluator.models.execution.decision import Decision
 

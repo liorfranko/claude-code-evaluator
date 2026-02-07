@@ -16,6 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from claude_evaluator.models.enums import Outcome, WorkflowType
+from claude_evaluator.models.evaluation.score_report import DimensionType, ScoreReport
 from claude_evaluator.scoring.agent import EvaluatorAgent
 from claude_evaluator.scoring.claude_client import ClaudeClient
 from claude_evaluator.scoring.reviewers.base import (
@@ -25,8 +27,6 @@ from claude_evaluator.scoring.reviewers.base import (
     ReviewerOutput,
 )
 from claude_evaluator.scoring.score_builder import ScoreReportBuilder
-from claude_evaluator.models.enums import Outcome, WorkflowType
-from claude_evaluator.models.evaluation.score_report import DimensionType, ScoreReport
 
 
 class TestFullEvaluationWorkflow:

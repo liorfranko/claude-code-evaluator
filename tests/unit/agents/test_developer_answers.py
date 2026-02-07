@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from claude_evaluator.config.settings import get_settings
 from claude_evaluator.agents.developer import DeveloperAgent
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.models.enums import DeveloperState
 from claude_evaluator.models.interaction.answer import AnswerResult
 from claude_evaluator.models.interaction.question import (

@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from claude_evaluator.config.settings import get_settings
 from claude_evaluator.agents.worker import WorkerAgent
+from claude_evaluator.config.settings import get_settings
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import PermissionMode
 from claude_evaluator.models.execution.query_metrics import QueryMetrics
