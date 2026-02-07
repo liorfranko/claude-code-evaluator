@@ -224,6 +224,15 @@ class BenchmarkRunner:
                 timeout_seconds=self.config.defaults.timeout_seconds,
             )
 
+            # Check if evaluation failed - don't proceed to scoring if it did
+            from claude_evaluator.models.enums import EvaluationStatus
+
+            if evaluation.status == EvaluationStatus.failed:
+                error_msg = evaluation.error or "Workflow execution failed"
+                raise WorkflowExecutionError(
+                    f"Evaluation failed for run {run_id}: {error_msg}"
+                )
+
             # Generate report from the completed evaluation
             report_path = await self._generate_report(evaluation, workspace)
 

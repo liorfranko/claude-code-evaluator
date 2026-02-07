@@ -588,3 +588,162 @@ class TestBenchmarkRunnerWorkflowIntegration:
                 assert result.metrics.turn_count == expected_metrics.turn_count
             except Exception as e:
                 pytest.fail(f"Runner failed to use workflow metrics: {e}")
+
+
+class TestBenchmarkRunnerErrorHandling:
+    """Tests for error handling in benchmark runner.
+
+    These tests verify that the runner correctly handles API errors,
+    failed evaluations, and should NOT proceed to score failed runs.
+    """
+
+    @pytest.mark.asyncio
+    async def test_runner_should_not_score_failed_evaluation(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that runner does not score evaluations that failed.
+
+        BUG: When the workflow fails (e.g., API error), the runner still
+        proceeds to score the evaluation. This is wrong - failed evaluations
+        should not be scored, they should be marked as failures.
+
+        This test will fail until the bug is fixed.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from claude_evaluator.evaluation import Evaluation
+        from claude_evaluator.models.evaluation.metrics import Metrics
+
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        # Create metrics that indicate a failure (e.g., 0 tokens, 1 turn = immediate fail)
+        failed_metrics = Metrics(
+            total_runtime_ms=1000,
+            total_tokens=0,  # No tokens used = nothing happened
+            input_tokens=0,
+            output_tokens=0,
+            total_cost_usd=0.0,
+            prompt_count=1,
+            turn_count=1,  # Only 1 turn = immediate failure
+        )
+
+        mock_workflow = MagicMock()
+
+        async def execute_and_fail(
+            evaluation: Evaluation, timeout_seconds: int
+        ) -> Metrics:
+            """Simulate a workflow that fails (API error, etc.)."""
+            evaluation.start()
+            evaluation.fail("API Error: 404 - Model not found")
+            return failed_metrics
+
+        mock_workflow.execute_with_timeout = AsyncMock(side_effect=execute_and_fail)
+
+        with (
+            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(runner, "_create_workflow", return_value=mock_workflow),
+            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
+            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+        ):
+            mock_repo.return_value = tmp_path / "workspace"
+            (tmp_path / "workspace").mkdir(exist_ok=True)
+            mock_report.return_value = tmp_path / "report.json"
+            mock_score.return_value = MagicMock(aggregate_score=0)
+
+            workflow_def = minimal_config.workflows["direct"]
+
+            # The runner should detect the failed evaluation and NOT call score
+            # OR it should raise an error
+            from claude_evaluator.benchmark.exceptions import WorkflowExecutionError
+
+            try:
+                result = await runner._execute_single_run(
+                    workflow_def=workflow_def,
+                    workflow_name="direct",
+                    run_index=0,
+                )
+                # If we get here, check that _score_evaluation was NOT called
+                # for a failed evaluation
+                if mock_score.called:
+                    pytest.fail(
+                        "BUG: Runner called _score_evaluation on a failed evaluation. "
+                        "Failed evaluations should not be scored."
+                    )
+            except WorkflowExecutionError:
+                # This is acceptable - runner detected the failure
+                pass
+
+    @pytest.mark.asyncio
+    async def test_runner_should_check_evaluation_outcome_before_scoring(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that runner checks evaluation outcome before scoring.
+
+        The runner should verify that evaluation.status is 'completed' (success)
+        before proceeding to generate report and score. If status is 'failed',
+        it should raise an error.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from claude_evaluator.evaluation import Evaluation
+        from claude_evaluator.models.evaluation.metrics import Metrics
+
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        # Metrics indicating success but evaluation will be marked failed
+        metrics = Metrics(
+            total_runtime_ms=5000,
+            total_tokens=100,
+            input_tokens=50,
+            output_tokens=50,
+            total_cost_usd=0.01,
+            prompt_count=1,
+            turn_count=5,
+        )
+
+        mock_workflow = MagicMock()
+
+        async def execute_but_mark_failed(
+            evaluation: Evaluation, timeout_seconds: int
+        ) -> Metrics:
+            """Simulate workflow that completes but evaluation is failed."""
+            evaluation.start()
+            # Workflow marks it as failed due to some error detection
+            evaluation.fail("No code files were created")
+            return metrics
+
+        mock_workflow.execute_with_timeout = AsyncMock(
+            side_effect=execute_but_mark_failed
+        )
+
+        with (
+            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(runner, "_create_workflow", return_value=mock_workflow),
+            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
+            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+        ):
+            mock_repo.return_value = tmp_path / "workspace"
+            (tmp_path / "workspace").mkdir(exist_ok=True)
+            mock_report.return_value = tmp_path / "report.json"
+            mock_score.return_value = MagicMock(aggregate_score=0)
+
+            workflow_def = minimal_config.workflows["direct"]
+
+            # Runner should detect failed evaluation and raise
+            from claude_evaluator.benchmark.exceptions import WorkflowExecutionError
+
+            try:
+                await runner._execute_single_run(
+                    workflow_def=workflow_def,
+                    workflow_name="direct",
+                    run_index=0,
+                )
+                # If we get here without error, check that score was not called
+                if mock_score.called:
+                    pytest.fail(
+                        "BUG: Runner scored a failed evaluation. "
+                        "Should have raised WorkflowExecutionError."
+                    )
+            except WorkflowExecutionError:
+                # This is the expected behavior
+                pass
