@@ -338,15 +338,57 @@ class BenchmarkRunner:
             workflow_type=workflow_type,
         )
 
-    async def _score_evaluation(
+    async def _generate_report(
         self,
         evaluation: Evaluation,
+        workspace: Path,
+    ) -> Path:
+        """Generate an EvaluationReport from an Evaluation.
+
+        The EvaluatorAgent expects EvaluationReport format, not Evaluation.
+        This method uses ReportGenerator to convert the Evaluation to
+        EvaluationReport before saving it.
+
+        Args:
+            evaluation: The completed Evaluation to convert.
+            workspace: Path to the workspace.
+
+        Returns:
+            Path to the saved evaluation report JSON file.
+
+        """
+        from claude_evaluator.report.generator import ReportGenerator
+
+        generator = ReportGenerator()
+        report = generator.generate(evaluation)
+
+        # Save report to workspace
+        report_dir = workspace / "evaluations" / str(evaluation.id)
+        report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = report_dir / "evaluation.json"
+
+        report_path.write_text(
+            report.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+
+        logger.debug(
+            "evaluation_report_generated",
+            evaluation_id=str(evaluation.id),
+            report_path=str(report_path),
+        )
+
+        return report_path
+
+    async def _score_evaluation(
+        self,
+        report_path: Path,
         workspace: Path,
     ) -> ScoreReport:
         """Score the evaluation using EvaluatorAgent.
 
         Args:
-            evaluation: The evaluation to score.
+            report_path: Path to the EvaluationReport JSON file.
             workspace: Path to the workspace.
 
         Returns:
@@ -355,23 +397,12 @@ class BenchmarkRunner:
         """
         from claude_evaluator.scoring import EvaluatorAgent
 
-        # Find the evaluation.json file
-        evaluation_path = workspace / "evaluations" / str(evaluation.id) / "evaluation.json"
-
-        # If evaluation file doesn't exist, save it first
-        if not evaluation_path.exists():
-            evaluation_path.parent.mkdir(parents=True, exist_ok=True)
-            evaluation_path.write_text(
-                evaluation.model_dump_json(indent=2),
-                encoding="utf-8",
-            )
-
         evaluator = EvaluatorAgent(
             workspace_path=workspace,
             enable_ast=True,
         )
 
-        return await evaluator.evaluate(evaluation_path=evaluation_path)
+        return await evaluator.evaluate(evaluation_path=report_path)
 
     def _compute_stats(self, runs: list[BenchmarkRun]) -> BaselineStats:
         """Compute statistics from run results.

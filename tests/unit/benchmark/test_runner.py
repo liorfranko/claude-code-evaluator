@@ -375,28 +375,62 @@ class TestBenchmarkRunnerScoringIntegration:
         assert not hasattr(evaluation, "outcome")
         assert not hasattr(evaluation, "timeline")
 
-    def test_runner_needs_generate_report_method(
+    def test_runner_has_generate_report_method(
         self, minimal_config: BenchmarkConfig, tmp_path: Path
     ) -> None:
-        """Test that BenchmarkRunner needs _generate_report method.
+        """Test that BenchmarkRunner has _generate_report method.
 
-        BUG: The current runner saves Evaluation.model_dump_json() to file,
-        but EvaluatorAgent expects EvaluationReport format.
-
-        FIX: Add _generate_report method that uses ReportGenerator to
-        convert Evaluation to EvaluationReport before saving.
-
-        This test will fail until the bug is fixed.
+        The _generate_report method uses ReportGenerator to convert
+        Evaluation to EvaluationReport before saving, which is the
+        format that EvaluatorAgent expects.
         """
         runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
 
-        # This assertion documents the bug - it will pass once fixed
-        has_method = hasattr(runner, "_generate_report")
+        # Verify the method exists
+        assert hasattr(runner, "_generate_report")
+        assert callable(runner._generate_report)
 
-        # For now, we mark this as an expected failure
-        # Once fixed, change xfail to a regular assertion
-        if not has_method:
-            pytest.skip(
-                "BUG: _generate_report method not implemented. "
-                "Runner saves Evaluation instead of EvaluationReport."
-            )
+    @pytest.mark.asyncio
+    async def test_generate_report_creates_file(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that _generate_report creates an EvaluationReport file."""
+        from claude_evaluator.evaluation import Evaluation
+        from claude_evaluator.models.evaluation.metrics import Metrics
+
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        # Create a completed evaluation
+        evaluation = Evaluation(
+            task_description="Test task",
+            workspace_path=str(workspace),
+            workflow_type=WorkflowType.direct,
+        )
+        evaluation.start()
+        metrics = Metrics(
+            total_runtime_ms=1000,
+            total_tokens=100,
+            input_tokens=50,
+            output_tokens=50,
+            total_cost_usd=0.01,
+            prompt_count=1,
+            turn_count=5,
+        )
+        evaluation.complete(metrics)
+
+        # Generate the report
+        report_path = await runner._generate_report(evaluation, workspace)
+
+        # Verify the file was created
+        assert report_path.exists()
+        assert report_path.name == "evaluation.json"
+
+        # Verify it contains EvaluationReport format (has 'outcome' field)
+        import json
+
+        content = json.loads(report_path.read_text())
+        assert "evaluation_id" in content
+        assert "outcome" in content
+        assert "timeline" in content
