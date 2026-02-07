@@ -5,13 +5,13 @@
 ## Progress
 
 ```
-Phase 1: Foundation     [░░░░░░░░░░] 0%  (0/5 tasks)
-Phase 2: Execution      [░░░░░░░░░░] 0%  (0/4 tasks)
-Phase 3: Scoring        [░░░░░░░░░░] 0%  (0/2 tasks)
-Phase 4: CLI            [░░░░░░░░░░] 0%  (0/5 tasks)
-Phase 5: Comparison     [░░░░░░░░░░] 0%  (0/3 tasks)
+Phase 1: Foundation     [██████████] 100% (5/5 tasks) ✓
+Phase 2: Execution      [██░░░░░░░░] 25%  (1/4 tasks) - exceptions.py done
+Phase 3: Scoring        [░░░░░░░░░░] 0%   (0/2 tasks)
+Phase 4: CLI            [░░░░░░░░░░] 0%   (0/5 tasks)
+Phase 5: Comparison     [███░░░░░░░] 33%  (1/3 tasks) - storage.py done
 ─────────────────────────────────────────────────────
-Overall                 [░░░░░░░░░░] 0%  (0/19 tasks)
+Overall                 [███░░░░░░░] 37%  (7/19 tasks)
 ```
 
 ## Code Quality Standards
@@ -253,10 +253,10 @@ src/claude_evaluator/
 
 ### Tasks
 
-- [ ] **1.1** Create `models/benchmark/__init__.py`
+- [x] **1.1** Create `models/benchmark/__init__.py`
   - Export all config and results models
   - Add to main `models/__init__.py` exports
-- [ ] **1.2** Create `models/benchmark/config.py`
+- [x] **1.2** Create `models/benchmark/config.py`
   - `BenchmarkConfig` - main config model
   - `BenchmarkCriterion` - scoring criterion
   - `BenchmarkEvaluation` - criteria container
@@ -264,15 +264,15 @@ src/claude_evaluator/
   - `BenchmarkDefaults` - default settings
   - **Reuse**: `RepositorySource`, `Phase` from `config/models.py`
   - **Reuse**: `WorkflowType` from `models/enums.py`
-- [ ] **1.3** Create `models/benchmark/results.py`
+- [x] **1.3** Create `models/benchmark/results.py`
   - `BenchmarkRun` - single run result
   - `RunMetrics` - tokens, cost, duration
   - `BaselineStats` - mean, std, CI
   - `BenchmarkBaseline` - stored baseline with runs
-- [ ] **1.4** Create `config/loaders/benchmark.py` with `load_benchmark()`
+- [x] **1.4** Create `config/loaders/benchmark.py` with `load_benchmark()`
   - Follow pattern of existing `suite.py` and `experiment.py`
   - Add export to `config/loaders/__init__.py`
-- [ ] **1.5** Create example benchmark config `benchmarks/task-cli.yaml`
+- [x] **1.5** Create example benchmark config `benchmarks/task-cli.yaml`
 
 ### Models Detail
 
@@ -491,7 +491,7 @@ class BenchmarkBaseline(BaseSchema):
 
 - [ ] **2.1** Create `benchmark/__init__.py`
   - Export `BenchmarkRunner`, exceptions
-- [ ] **2.2** Create `benchmark/exceptions.py`
+- [x] **2.2** Create `benchmark/exceptions.py`
   - `BenchmarkError` - base exception (inherits `ClaudeEvaluatorError`)
   - `RepositoryError` - git operations failed
   - `WorkflowExecutionError` - workflow failed
@@ -871,7 +871,7 @@ claude-evaluator --benchmark task-cli.yaml --compare
 
 ### Tasks
 
-- [ ] **5.1** Create `benchmark/storage.py`
+- [x] **5.1** Create `benchmark/storage.py`
   - `BenchmarkStorage` class
   - `save_baseline()` - write to JSON (use `model_dump_json()`)
   - `load_baseline()` - read from JSON (use `model_validate()`)
