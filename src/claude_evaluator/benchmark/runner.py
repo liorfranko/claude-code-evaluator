@@ -7,7 +7,6 @@ repository setup, workflow execution, scoring, and baseline storage.
 from __future__ import annotations
 
 import statistics as stats_lib
-import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -157,19 +156,28 @@ class BenchmarkRunner:
 
         return baseline
 
-    async def _setup_repository(self) -> Path:
-        """Clone repository to temporary directory.
+    async def _setup_repository(self, run_id: str) -> Path:
+        """Clone repository to workspace under results directory.
+
+        Creates a workspace structure like regular evaluations:
+        results/{benchmark_name}/runs/{run_id}/workspace/
+
+        Args:
+            run_id: Unique identifier for this run.
 
         Returns:
-            Path to cloned repository.
+            Path to cloned repository workspace.
 
         Raises:
             RepositoryError: If clone fails.
 
         """
-        temp_dir = Path(tempfile.mkdtemp(prefix="benchmark_"))
-        workspace = temp_dir / "workspace"
-        workspace.mkdir()
+        # Create workspace under results_dir like regular evaluations
+        run_dir = self.results_dir / self.config.name / "runs" / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        workspace = run_dir / "workspace"
+        workspace.mkdir(exist_ok=True)
 
         try:
             await clone_repository(
@@ -207,8 +215,8 @@ class BenchmarkRunner:
         run_id = f"{workflow_name}-{run_index}-{uuid4().hex[:8]}"
         start_time = time.time()
 
-        # Setup fresh repository for this run
-        workspace = await self._setup_repository()
+        # Setup fresh repository for this run under results directory
+        workspace = await self._setup_repository(run_id=run_id)
 
         try:
             # Create and execute workflow

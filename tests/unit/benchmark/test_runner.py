@@ -277,9 +277,7 @@ class TestBenchmarkRunnerExecuteMocked:
                 duration_seconds=100,
             )
 
-        with patch.object(
-            runner, "_execute_single_run", side_effect=mock_single_run
-        ):
+        with patch.object(runner, "_execute_single_run", side_effect=mock_single_run):
             baseline = await runner.execute(workflow_name="direct", runs=3)
 
             assert len(baseline.runs) == 3
@@ -494,10 +492,16 @@ class TestBenchmarkRunnerWorkflowIntegration:
 
         # Mock other dependencies
         with (
-            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(
+                runner, "_setup_repository", new_callable=AsyncMock
+            ) as mock_repo,
             patch.object(runner, "_create_workflow", return_value=mock_workflow),
-            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
-            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+            patch.object(
+                runner, "_generate_report", new_callable=AsyncMock
+            ) as mock_report,
+            patch.object(
+                runner, "_score_evaluation", new_callable=AsyncMock
+            ) as mock_score,
         ):
             mock_repo.return_value = tmp_path / "workspace"
             (tmp_path / "workspace").mkdir(exist_ok=True)
@@ -562,10 +566,16 @@ class TestBenchmarkRunnerWorkflowIntegration:
         mock_workflow.execute_with_timeout = AsyncMock(side_effect=execute_and_complete)
 
         with (
-            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(
+                runner, "_setup_repository", new_callable=AsyncMock
+            ) as mock_repo,
             patch.object(runner, "_create_workflow", return_value=mock_workflow),
-            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
-            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+            patch.object(
+                runner, "_generate_report", new_callable=AsyncMock
+            ) as mock_report,
+            patch.object(
+                runner, "_score_evaluation", new_callable=AsyncMock
+            ) as mock_score,
         ):
             mock_repo.return_value = tmp_path / "workspace"
             (tmp_path / "workspace").mkdir(exist_ok=True)
@@ -640,10 +650,16 @@ class TestBenchmarkRunnerErrorHandling:
         mock_workflow.execute_with_timeout = AsyncMock(side_effect=execute_and_fail)
 
         with (
-            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(
+                runner, "_setup_repository", new_callable=AsyncMock
+            ) as mock_repo,
             patch.object(runner, "_create_workflow", return_value=mock_workflow),
-            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
-            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+            patch.object(
+                runner, "_generate_report", new_callable=AsyncMock
+            ) as mock_report,
+            patch.object(
+                runner, "_score_evaluation", new_callable=AsyncMock
+            ) as mock_score,
         ):
             mock_repo.return_value = tmp_path / "workspace"
             (tmp_path / "workspace").mkdir(exist_ok=True)
@@ -657,7 +673,7 @@ class TestBenchmarkRunnerErrorHandling:
             from claude_evaluator.benchmark.exceptions import WorkflowExecutionError
 
             try:
-                result = await runner._execute_single_run(
+                await runner._execute_single_run(
                     workflow_def=workflow_def,
                     workflow_name="direct",
                     run_index=0,
@@ -717,10 +733,16 @@ class TestBenchmarkRunnerErrorHandling:
         )
 
         with (
-            patch.object(runner, "_setup_repository", new_callable=AsyncMock) as mock_repo,
+            patch.object(
+                runner, "_setup_repository", new_callable=AsyncMock
+            ) as mock_repo,
             patch.object(runner, "_create_workflow", return_value=mock_workflow),
-            patch.object(runner, "_generate_report", new_callable=AsyncMock) as mock_report,
-            patch.object(runner, "_score_evaluation", new_callable=AsyncMock) as mock_score,
+            patch.object(
+                runner, "_generate_report", new_callable=AsyncMock
+            ) as mock_report,
+            patch.object(
+                runner, "_score_evaluation", new_callable=AsyncMock
+            ) as mock_score,
         ):
             mock_repo.return_value = tmp_path / "workspace"
             (tmp_path / "workspace").mkdir(exist_ok=True)
@@ -747,3 +769,90 @@ class TestBenchmarkRunnerErrorHandling:
             except WorkflowExecutionError:
                 # This is the expected behavior
                 pass
+
+
+class TestBenchmarkRunnerWorkspaceLocation:
+    """Tests for workspace location.
+
+    Workspaces should be created under the results directory (like regular
+    evaluations), not in system temp directories.
+    """
+
+    @pytest.mark.asyncio
+    async def test_workspace_created_under_results_dir(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that workspace is created under results_dir, not in temp.
+
+        Expected structure:
+        results/{benchmark_name}/runs/{run_id}/workspace/
+        """
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        # Mock clone_repository to avoid actual git clone
+        with patch(
+            "claude_evaluator.benchmark.runner.clone_repository",
+            new_callable=AsyncMock,
+        ):
+            # Call _setup_repository which should create workspace under results_dir
+            workspace = await runner._setup_repository(run_id="test-run-123")
+
+        # Workspace should be under results_dir, not system temp
+        assert str(tmp_path) in str(workspace), (
+            f"Workspace {workspace} should be under results_dir {tmp_path}, "
+            f"not in system temp directory"
+        )
+
+        # Workspace should follow the expected structure
+        expected_base = tmp_path / minimal_config.name / "runs"
+        assert str(expected_base) in str(workspace), (
+            f"Workspace should be under {expected_base}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_includes_run_id(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that workspace path includes the run ID for traceability."""
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        run_id = "direct-0-abc123"
+
+        # Mock clone_repository to avoid actual git clone
+        with patch(
+            "claude_evaluator.benchmark.runner.clone_repository",
+            new_callable=AsyncMock,
+        ):
+            workspace = await runner._setup_repository(run_id=run_id)
+
+        # Workspace path should include the run ID
+        assert run_id in str(workspace), (
+            f"Workspace path {workspace} should include run_id {run_id}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_persists_after_benchmark(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that workspace is preserved after benchmark completes.
+
+        Unlike temp directories which may be cleaned up, workspaces under
+        results_dir should persist for later inspection.
+        """
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        # Mock clone_repository to avoid actual git clone
+        with patch(
+            "claude_evaluator.benchmark.runner.clone_repository",
+            new_callable=AsyncMock,
+        ):
+            workspace = await runner._setup_repository(run_id="test-run-456")
+
+        # Create a file in the workspace
+        test_file = workspace / "test.txt"
+        test_file.write_text("test content")
+
+        # Workspace should still exist (not in temp that gets cleaned)
+        assert workspace.exists()
+        assert test_file.exists()
+        assert test_file.read_text() == "test content"
