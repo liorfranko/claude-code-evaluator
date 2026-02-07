@@ -16,9 +16,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from claude_evaluator.config.loader import load_reviewer_configs
-from claude_evaluator.core.agents.evaluator.agent import EvaluatorAgent
-from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.agent import EvaluatorAgent
+from claude_evaluator.scoring.claude_client import ClaudeClient
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerIssue,

@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerBase,

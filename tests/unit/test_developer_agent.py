@@ -12,7 +12,7 @@ import pytest
 
 from claude_evaluator.config.settings import get_settings
 from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.core.agents.exceptions import (
+from claude_evaluator.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )

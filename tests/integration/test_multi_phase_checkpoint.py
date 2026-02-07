@@ -14,22 +14,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.agent import EvaluatorAgent
-from claude_evaluator.core.agents.evaluator.claude_client import ClaudeClient
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.agent import EvaluatorAgent
+from claude_evaluator.scoring.claude_client import ClaudeClient
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.code_quality import (
+from claude_evaluator.scoring.reviewers.code_quality import (
     CodeQualityReviewer,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.error_handling import (
+from claude_evaluator.scoring.reviewers.error_handling import (
     ErrorHandlingReviewer,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.registry import ReviewerRegistry
-from claude_evaluator.core.agents.evaluator.reviewers.task_completion import (
+from claude_evaluator.scoring.reviewers.registry import ReviewerRegistry
+from claude_evaluator.scoring.reviewers.task_completion import (
     TaskCompletionReviewer,
 )
 

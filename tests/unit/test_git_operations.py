@@ -6,7 +6,7 @@ Tests for build_clone_command, parse_git_status, and is_network_error functions.
 from pathlib import Path
 
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.git_operations import (
+from claude_evaluator.evaluation.git_operations import (
     build_clone_command,
     is_branch_not_found_error,
     is_network_error,

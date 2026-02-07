@@ -17,12 +17,12 @@ from pydantic import ConfigDict, Field, PrivateAttr
 
 from claude_evaluator.agents.developer.decision_log import DecisionLog
 from claude_evaluator.agents.developer.state_machine import DeveloperStateMachine
-from claude_evaluator.config.settings import get_settings
-from claude_evaluator.core.agents.exceptions import (
+from claude_evaluator.agents.exceptions import (
     InvalidStateTransitionError,
     LoopDetectedError,
 )
-from claude_evaluator.core.formatters import QuestionFormatter
+from claude_evaluator.config.settings import get_settings
+from claude_evaluator.evaluation.formatters import QuestionFormatter
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.base import BaseSchema
 from claude_evaluator.models.enums import DeveloperState, Outcome

@@ -16,14 +16,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerBase,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.registry import (
+from claude_evaluator.scoring.reviewers.registry import (
     ExecutionMode,
     ReviewerConfig,
     ReviewerRegistry,
@@ -314,7 +314,7 @@ class TestReviewerRegistryDiscoverReviewers:
         """Test that discover_reviewers() finds ReviewerBase subclasses."""
         # Mock the package discovery
         with patch(
-            "claude_evaluator.core.agents.evaluator.reviewers.registry.pkgutil.iter_modules"
+            "claude_evaluator.scoring.reviewers.registry.pkgutil.iter_modules"
         ) as mock_iter:
             mock_iter.return_value = []
             result = registry.discover_reviewers()
@@ -329,10 +329,10 @@ class TestReviewerRegistryDiscoverReviewers:
         # This test ensures the exclusion logic works
         with (
             patch(
-                "claude_evaluator.core.agents.evaluator.reviewers.registry.pkgutil.iter_modules"
+                "claude_evaluator.scoring.reviewers.registry.pkgutil.iter_modules"
             ) as mock_iter,
             patch(
-                "claude_evaluator.core.agents.evaluator.reviewers.registry.importlib.import_module"
+                "claude_evaluator.scoring.reviewers.registry.importlib.import_module"
             ) as mock_import,
         ):
             # Simulate finding base and registry modules

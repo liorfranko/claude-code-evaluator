@@ -14,14 +14,14 @@ import pytest
 
 from claude_evaluator.config.exceptions import ConfigurationError
 from claude_evaluator.config.loader import load_reviewer_configs
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerBase,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.registry import (
+from claude_evaluator.scoring.reviewers.registry import (
     ReviewerConfig,
     ReviewerRegistry,
 )

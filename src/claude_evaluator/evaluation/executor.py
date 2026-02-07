@@ -173,7 +173,11 @@ class EvaluationExecutor:
         try:
             # Execute workflow
             workflow = self._create_workflow(
-                workflow_type, collector, phases, model, max_turns,
+                workflow_type,
+                collector,
+                phases,
+                model,
+                max_turns,
                 on_progress_callback,
             )
             await workflow.execute_with_timeout(evaluation, effective_timeout)

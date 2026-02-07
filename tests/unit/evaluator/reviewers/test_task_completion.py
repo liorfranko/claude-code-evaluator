@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from claude_evaluator.core.agents.evaluator.reviewers.base import (
+from claude_evaluator.scoring.reviewers.base import (
     IssueSeverity,
     ReviewContext,
     ReviewerIssue,
     ReviewerOutput,
 )
-from claude_evaluator.core.agents.evaluator.reviewers.task_completion import (
+from claude_evaluator.scoring.reviewers.task_completion import (
     TaskCompletionReviewer,
 )
 

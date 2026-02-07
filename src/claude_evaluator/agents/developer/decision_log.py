@@ -76,8 +76,7 @@ class DecisionLog:
 
         """
         return [
-            d for d in self._decisions
-            if context_substring.lower() in d.context.lower()
+            d for d in self._decisions if context_substring.lower() in d.context.lower()
         ]
 
     def to_list(self) -> list[dict]:

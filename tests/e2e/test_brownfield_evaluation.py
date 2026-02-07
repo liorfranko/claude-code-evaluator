@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.git_operations import get_change_summary
+from claude_evaluator.evaluation.git_operations import get_change_summary
 
 # Small, stable public repository for testing
 TEST_REPO_URL = "https://github.com/octocat/Hello-World"
@@ -52,7 +52,7 @@ class TestBrownfieldEvaluationSetup:
         Verifies that clone_repository creates an isolated workspace
         with the expected repository contents.
         """
-        from claude_evaluator.core.git_operations import clone_repository
+        from claude_evaluator.evaluation.git_operations import clone_repository
 
         source = RepositorySource(
             url=TEST_REPO_URL,
@@ -79,7 +79,7 @@ class TestBrownfieldEvaluationSetup:
 
         Verifies that the cloned workspace is not cleaned up after use.
         """
-        from claude_evaluator.core.git_operations import clone_repository
+        from claude_evaluator.evaluation.git_operations import clone_repository
 
         source = RepositorySource(
             url=TEST_REPO_URL,
@@ -156,7 +156,7 @@ class TestBrownfieldChangeSummary:
     @pytest.mark.asyncio
     async def test_change_summary_detects_modifications(self) -> None:
         """Change summary should detect file modifications."""
-        from claude_evaluator.core.git_operations import clone_repository
+        from claude_evaluator.evaluation.git_operations import clone_repository
 
         source = RepositorySource(
             url=TEST_REPO_URL,
@@ -182,7 +182,7 @@ class TestBrownfieldChangeSummary:
     @pytest.mark.asyncio
     async def test_change_summary_detects_additions(self) -> None:
         """Change summary should detect new files."""
-        from claude_evaluator.core.git_operations import clone_repository
+        from claude_evaluator.evaluation.git_operations import clone_repository
 
         source = RepositorySource(
             url=TEST_REPO_URL,
@@ -207,7 +207,7 @@ class TestBrownfieldChangeSummary:
     @pytest.mark.asyncio
     async def test_change_summary_is_empty_for_unmodified_repo(self) -> None:
         """Fresh clone should have no changes."""
-        from claude_evaluator.core.git_operations import clone_repository
+        from claude_evaluator.evaluation.git_operations import clone_repository
 
         source = RepositorySource(
             url=TEST_REPO_URL,

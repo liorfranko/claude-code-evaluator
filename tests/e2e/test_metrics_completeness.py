@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from claude_evaluator.config.models import Phase
-from claude_evaluator.core import Evaluation
+from claude_evaluator.evaluation import Evaluation
 from claude_evaluator.agents.developer import DeveloperAgent, WorkerAgent
 from claude_evaluator.metrics.collector import MetricsCollector
 from claude_evaluator.models.enums import (

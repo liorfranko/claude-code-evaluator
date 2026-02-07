@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.exceptions import BranchNotFoundError, CloneError
-from claude_evaluator.core.git_operations import (
+from claude_evaluator.evaluation.exceptions import BranchNotFoundError, CloneError
+from claude_evaluator.evaluation.git_operations import (
     GitStatusError,
     clone_repository,
     get_change_summary,

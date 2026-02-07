@@ -3,7 +3,7 @@
 This module defines exceptions specific to the WorkerAgent and its components.
 """
 
-from claude_evaluator.core.agents.exceptions import AgentError
+from claude_evaluator.agents.exceptions import AgentError
 
 __all__ = [
     "WorkerAgentError",

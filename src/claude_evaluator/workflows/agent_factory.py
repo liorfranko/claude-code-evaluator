@@ -10,14 +10,14 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from claude_evaluator.agents.developer import DeveloperAgent
-from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.enums import PermissionMode
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from claude_evaluator.agents.developer import DeveloperAgent
+    from claude_evaluator.agents.worker import WorkerAgent
     from claude_evaluator.evaluation import Evaluation
     from claude_evaluator.models.execution.progress import ProgressEvent
 
@@ -94,6 +94,10 @@ class AgentFactory:
             Tuple of (developer, worker) agents.
 
         """
+        # Lazy imports to avoid circular dependencies
+        from claude_evaluator.agents.developer import DeveloperAgent
+        from claude_evaluator.agents.worker import WorkerAgent
+
         # Reuse agents from evaluation if already set (test support)
         if getattr(evaluation, "worker_agent", None) is not None:
             developer = getattr(evaluation, "developer_agent", None) or DeveloperAgent()
@@ -149,6 +153,9 @@ class AgentFactory:
             Configured WorkerAgent instance.
 
         """
+        # Lazy import to avoid circular dependencies
+        from claude_evaluator.agents.worker import WorkerAgent
+
         if additional_dirs is None:
             additional_dirs = self._build_additional_dirs()
 
@@ -170,6 +177,9 @@ class AgentFactory:
             Configured DeveloperAgent instance.
 
         """
+        # Lazy import to avoid circular dependencies
+        from claude_evaluator.agents.developer import DeveloperAgent
+
         return DeveloperAgent()
 
     @staticmethod

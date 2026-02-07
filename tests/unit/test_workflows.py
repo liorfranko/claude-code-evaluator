@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from claude_evaluator.config.models import Phase
-from claude_evaluator.core import Evaluation
+from claude_evaluator.evaluation import Evaluation
 from claude_evaluator.agents.worker import WorkerAgent
 from claude_evaluator.agents.developer import DeveloperAgent
 from claude_evaluator.metrics.collector import MetricsCollector

@@ -9,7 +9,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from claude_evaluator.agents.worker.exceptions import QuestionCallbackTimeoutError
-from claude_evaluator.core.formatters import QuestionFormatter
+from claude_evaluator.evaluation.formatters import QuestionFormatter
 from claude_evaluator.models.execution.progress import ProgressEvent, ProgressEventType
 from claude_evaluator.models.interaction.question import (
     QuestionContext,
