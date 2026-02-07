@@ -103,6 +103,7 @@ class RunBenchmarkCommand(BaseCommand):
             )
 
         runner = BenchmarkRunner(config=config, results_dir=results_dir)
+        verbose = getattr(args, "verbose", False)
 
         logger.info(
             "benchmark_starting",
@@ -115,6 +116,7 @@ class RunBenchmarkCommand(BaseCommand):
             workflow_name=workflow_name,
             runs=runs,
             version_override=version_override,
+            verbose=verbose,
         )
 
         # Format summary message
@@ -173,7 +175,7 @@ class RunBenchmarkCommand(BaseCommand):
             reference = baselines[0].workflow_name
 
         comparisons = compare_baselines(baselines, reference_name=reference)
-        table = format_comparison_table(baselines, comparisons, reference)
+        table = format_comparison_table(baselines, comparisons, reference_name=reference or "")
 
         return CommandResult(
             exit_code=0,

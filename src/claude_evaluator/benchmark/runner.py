@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import statistics as stats_lib
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -29,6 +30,7 @@ from claude_evaluator.models.benchmark.results import (
     RunMetrics,
 )
 from claude_evaluator.models.enums import WorkflowType
+from claude_evaluator.models.execution.progress import ProgressEvent
 from claude_evaluator.workflows import (
     BaseWorkflow,
     DirectWorkflow,
@@ -83,6 +85,7 @@ class BenchmarkRunner:
         workflow_name: str,
         runs: int = 5,
         version_override: str | None = None,
+        verbose: bool = False,
     ) -> BenchmarkBaseline:
         """Execute a workflow N times and return baseline.
 
@@ -90,6 +93,7 @@ class BenchmarkRunner:
             workflow_name: Name of workflow from config.
             runs: Number of runs to execute.
             version_override: Optional version to use instead of workflow.version.
+            verbose: Whether to print progress output.
 
         Returns:
             BenchmarkBaseline with all runs and computed stats.
@@ -114,12 +118,20 @@ class BenchmarkRunner:
 
         run_results: list[BenchmarkRun] = []
         for i in range(runs):
+            if verbose:
+                print(f"\nRun {i + 1}/{runs} starting...")
+
             result = await self._execute_single_run(
                 workflow_def=workflow_def,
                 workflow_name=workflow_name,
                 run_index=i,
+                verbose=verbose,
             )
             run_results.append(result)
+
+            if verbose:
+                print(f"Run {i + 1}/{runs} complete: score={result.score}")
+
             logger.info(
                 "benchmark_run_complete",
                 run=i + 1,
@@ -196,6 +208,7 @@ class BenchmarkRunner:
         workflow_def: WorkflowDefinition,
         workflow_name: str,
         run_index: int,
+        verbose: bool = False,
     ) -> BenchmarkRun:
         """Execute a single benchmark run.
 
@@ -203,6 +216,7 @@ class BenchmarkRunner:
             workflow_def: The workflow definition to execute.
             workflow_name: Name of the workflow.
             run_index: Index of this run (0-based).
+            verbose: Whether to print progress output.
 
         Returns:
             BenchmarkRun with results.
@@ -218,9 +232,19 @@ class BenchmarkRunner:
         # Setup fresh repository for this run under results directory
         workspace = await self._setup_repository(run_id=run_id)
 
+        if verbose:
+            print(f"  Workspace: {workspace}")
+
         try:
+            # Create progress callback for verbose output
+            progress_callback = None
+            if verbose:
+                from claude_evaluator.cli.formatters import create_progress_callback
+
+                progress_callback = create_progress_callback()
+
             # Create and execute workflow
-            workflow = self._create_workflow(workflow_def)
+            workflow = self._create_workflow(workflow_def, progress_callback)
             evaluation = self._create_evaluation(workspace, workflow_def.type)
 
             # Execute workflow
@@ -277,11 +301,13 @@ class BenchmarkRunner:
     def _create_workflow(
         self,
         workflow_def: WorkflowDefinition,
+        on_progress_callback: Callable[[ProgressEvent], None] | None = None,
     ) -> BaseWorkflow:
         """Create a workflow instance based on definition.
 
         Args:
             workflow_def: The workflow definition.
+            on_progress_callback: Optional callback for progress events.
 
         Returns:
             A BaseWorkflow instance.
@@ -301,6 +327,7 @@ class BenchmarkRunner:
                 defaults=defaults,
                 model=self.config.defaults.model,
                 max_turns=self.config.defaults.max_turns,
+                on_progress_callback=on_progress_callback,
             )
         elif workflow_def.type == WorkflowType.plan_then_implement:
             return PlanThenImplementWorkflow(
@@ -308,6 +335,7 @@ class BenchmarkRunner:
                 defaults=defaults,
                 model=self.config.defaults.model,
                 max_turns=self.config.defaults.max_turns,
+                on_progress_callback=on_progress_callback,
             )
         elif workflow_def.type == WorkflowType.multi_command:
             return MultiCommandWorkflow(
@@ -316,6 +344,7 @@ class BenchmarkRunner:
                 defaults=defaults,
                 model=self.config.defaults.model,
                 max_turns=self.config.defaults.max_turns,
+                on_progress_callback=on_progress_callback,
             )
         else:
             raise BenchmarkError(f"Unsupported workflow type: {workflow_def.type}")

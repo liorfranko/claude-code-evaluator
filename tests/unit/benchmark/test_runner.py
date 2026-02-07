@@ -856,3 +856,63 @@ class TestBenchmarkRunnerWorkspaceLocation:
         assert workspace.exists()
         assert test_file.exists()
         assert test_file.read_text() == "test content"
+
+
+class TestBenchmarkRunnerVerboseOutput:
+    """Tests for verbose/progress output in benchmark runner."""
+
+    @pytest.mark.asyncio
+    async def test_execute_accepts_verbose_parameter(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """Test that execute() accepts verbose parameter."""
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        # Create a mock run result
+        mock_run = BenchmarkRun(
+            run_id="test-0",
+            workflow_name="direct",
+            score=85,
+            timestamp=datetime.now(),
+            evaluation_id="eval-1",
+            duration_seconds=100,
+        )
+
+        with patch.object(
+            runner, "_execute_single_run", new_callable=AsyncMock
+        ) as mock_execute:
+            mock_execute.return_value = mock_run
+
+            # Should not raise - verbose parameter should be accepted
+            baseline = await runner.execute(
+                workflow_name="direct", runs=1, verbose=True
+            )
+            assert baseline is not None
+
+    @pytest.mark.asyncio
+    async def test_verbose_prints_run_progress(
+        self, minimal_config: BenchmarkConfig, tmp_path: Path, capsys
+    ) -> None:
+        """Test that verbose mode prints progress for each run."""
+        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
+
+        mock_run = BenchmarkRun(
+            run_id="test-0",
+            workflow_name="direct",
+            score=85,
+            timestamp=datetime.now(),
+            evaluation_id="eval-1",
+            duration_seconds=100,
+        )
+
+        with patch.object(
+            runner, "_execute_single_run", new_callable=AsyncMock
+        ) as mock_execute:
+            mock_execute.return_value = mock_run
+
+            await runner.execute(workflow_name="direct", runs=2, verbose=True)
+
+        captured = capsys.readouterr()
+        # Should print run progress
+        assert "Run 1" in captured.out or "run 1" in captured.out.lower()
+        assert "Run 2" in captured.out or "run 2" in captured.out.lower()
