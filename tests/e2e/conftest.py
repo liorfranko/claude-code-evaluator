@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from claude_evaluator.agents.developer import DeveloperAgent
+from claude_evaluator.agents import DeveloperAgent
 from claude_evaluator.models.interaction.answer import AnswerResult
 
 
