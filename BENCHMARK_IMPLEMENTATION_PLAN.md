@@ -198,8 +198,8 @@ src/claude_evaluator/
 ├── cli/commands/
 │   └── benchmark.py                # NEW - BenchmarkCommand
 │
-├── config/
-│   └── loader.py                   # MODIFY: add load_benchmark()
+├── config/loaders/
+│   └── benchmark.py                # NEW: load_benchmark()
 │
 └── cli/
     ├── parser.py                   # MODIFY: add --benchmark args
@@ -213,6 +213,36 @@ results/                            # NEW - Results directory (gitignored)
 
 benchmarks/                         # NEW - Benchmark configs (versioned)
 └── task-cli.yaml
+```
+
+### Current Directory Structure (Post-Refactoring)
+
+```
+src/claude_evaluator/
+├── agents/                 # Worker and Developer agents
+│   ├── developer/
+│   └── worker/
+├── cli/                    # CLI layer
+│   └── commands/
+├── config/                 # Configuration
+│   └── loaders/            # Suite, experiment, reviewer loaders
+├── evaluation/             # Evaluation execution + git ops
+│   └── git_operations.py   # Clone, checkout, status
+├── experiment/             # Pairwise experiment system
+├── metrics/                # Token/cost collection
+├── models/                 # Pydantic models by domain
+│   ├── evaluation/
+│   ├── execution/
+│   ├── experiment/
+│   └── interaction/
+├── report/                 # Report generation
+├── sandbox/                # Docker sandbox
+├── scoring/                # EvaluatorAgent + reviewers
+│   ├── analyzers/
+│   ├── ast/
+│   ├── checks/
+│   └── reviewers/
+└── workflows/              # Workflow runners
 ```
 
 ---
@@ -239,8 +269,9 @@ benchmarks/                         # NEW - Benchmark configs (versioned)
   - `RunMetrics` - tokens, cost, duration
   - `BaselineStats` - mean, std, CI
   - `BenchmarkBaseline` - stored baseline with runs
-- [ ] **1.4** Add `load_benchmark()` to `config/loader.py`
-  - Follow pattern of existing `load_suite()` and `load_experiment()`
+- [ ] **1.4** Create `config/loaders/benchmark.py` with `load_benchmark()`
+  - Follow pattern of existing `suite.py` and `experiment.py`
+  - Add export to `config/loaders/__init__.py`
 - [ ] **1.5** Create example benchmark config `benchmarks/task-cli.yaml`
 
 ### Models Detail
@@ -467,7 +498,7 @@ class BenchmarkBaseline(BaseSchema):
   - `StorageError` - results save/load failed
 - [ ] **2.3** Create `benchmark/runner.py`
   - `BenchmarkRunner` class
-  - `_setup_repository()` - clone using `core/git_operations.clone_repository()`
+  - `_setup_repository()` - clone using `evaluation/git_operations.clone_repository()`
   - `_create_workflow()` - dispatch to correct workflow class
   - `_execute_single_run()` - run workflow + score
   - `execute()` - main orchestration method
@@ -493,7 +524,7 @@ from uuid import uuid4
 from claude_evaluator.benchmark.exceptions import BenchmarkError, RepositoryError
 from claude_evaluator.benchmark.storage import BenchmarkStorage
 from claude_evaluator.config.models import RepositorySource
-from claude_evaluator.core.git_operations import clone_repository
+from claude_evaluator.evaluation.git_operations import clone_repository
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.benchmark.results import (
     BaselineStats,
@@ -541,12 +572,14 @@ class BenchmarkRunner:
         self,
         workflow_name: str,
         runs: int = 5,
+        version_override: str | None = None,
     ) -> BenchmarkBaseline:
         """Execute a workflow N times and return baseline.
 
         Args:
             workflow_name: Name of workflow from config.
             runs: Number of runs to execute.
+            version_override: Optional version to use instead of workflow.version.
 
         Returns:
             BenchmarkBaseline with all runs and computed stats.
@@ -559,11 +592,13 @@ class BenchmarkRunner:
             raise BenchmarkError(f"Workflow '{workflow_name}' not found in config")
 
         workflow = self.config.workflows[workflow_name]
+        effective_version = version_override or workflow.version
 
         logger.info(
             "benchmark_starting",
             benchmark=self.config.name,
             workflow=workflow_name,
+            version=effective_version,
             runs=runs,
         )
 
@@ -587,9 +622,12 @@ class BenchmarkRunner:
         stats = self._compute_stats(run_results)
 
         # Build and save baseline
+        # Storage key includes version: e.g., "spectra-v1.1.0"
+        storage_key = f"{workflow_name}-v{effective_version}"
+
         baseline = BenchmarkBaseline(
-            workflow_name=workflow_name,
-            workflow_version=workflow.version,
+            workflow_name=storage_key,
+            workflow_version=effective_version,
             model=self.config.defaults.model,
             runs=run_results,
             stats=stats,
@@ -600,7 +638,8 @@ class BenchmarkRunner:
 
         logger.info(
             "benchmark_complete",
-            workflow=workflow_name,
+            workflow=storage_key,
+            version=effective_version,
             mean=stats.mean,
             ci_95=stats.ci_95,
             n=stats.n,
@@ -686,14 +725,18 @@ class BenchmarkRunner:
 ```python
 # In benchmark/runner.py
 
+from claude_evaluator.scoring import EvaluatorAgent  # Updated import path
+
 async def _execute_single_run(
     self,
     workflow: WorkflowDefinition,
     workflow_name: str,
     repo_path: Path,
     run_index: int,
+    version_override: str | None = None,
 ) -> BenchmarkRun:
     """Execute a single run and score it."""
+    effective_version = version_override or workflow.version
     run_id = f"{workflow_name}-{run_index}-{uuid4().hex[:8]}"
     start_time = time.time()
 
@@ -703,7 +746,7 @@ async def _execute_single_run(
         repo_path=repo_path,
     )
 
-    # Score the result
+    # Score the result using EvaluatorAgent from scoring module
     evaluator = EvaluatorAgent(
         workspace_path=repo_path,
         enable_ast=True,
@@ -741,6 +784,7 @@ async def _execute_single_run(
   - Add `--benchmark` argument
   - Add `--workflow` (reuse existing)
   - Add `--runs` (reuse existing)
+  - Add `--version` argument (runtime version override)
   - Add `--compare` flag
   - Add `--list` flag
   - Add `--results-dir` argument
@@ -767,9 +811,16 @@ claude-evaluator --benchmark benchmarks/task-cli.yaml \
 
 # Run with custom results directory
 claude-evaluator --benchmark benchmarks/task-cli.yaml \
-  --workflow spectra-v1.0 \
+  --workflow spectra \
   --runs 5 \
   --results-dir ./my-results
+
+# Run with runtime version label (for iterating on Spectra releases)
+# Results stored as spectra-v1.1.0 without duplicating workflow definition
+claude-evaluator --benchmark benchmarks/task-cli.yaml \
+  --workflow spectra \
+  --version 1.1.0 \
+  --runs 5
 
 # Compare all stored baselines
 claude-evaluator --benchmark benchmarks/task-cli.yaml --compare
@@ -779,10 +830,37 @@ claude-evaluator --benchmark benchmarks/task-cli.yaml --list
 
 # Output:
 # Workflows in task-cli:
-#   direct         [5 runs] mean=67.5  95% CI=[62.1, 72.9]
-#   native-plan    [5 runs] mean=72.3  95% CI=[68.0, 76.6]
-#   spectra-v1.0   [5 runs] mean=78.2  95% CI=[74.5, 81.9]
-#   spectra-v1.1   [no baseline]
+#   direct           [5 runs] mean=67.5  95% CI=[62.1, 72.9]
+#   native-plan      [5 runs] mean=72.3  95% CI=[68.0, 76.6]
+#   spectra-v1.0.0   [5 runs] mean=78.2  95% CI=[74.5, 81.9]
+#   spectra-v1.1.0   [5 runs] mean=81.5  95% CI=[78.2, 84.8]
+```
+
+### Runtime Version Override
+
+When `--version` is provided at runtime:
+- Overrides the `version` field in the workflow definition
+- Results stored with workflow name + version (e.g., `spectra-v1.1.0.json`)
+- Enables iterating on Spectra without duplicating workflow definitions
+
+```yaml
+# Single workflow definition
+workflows:
+  spectra:
+    type: multi_command
+    version: "1.0.0"  # Default, can be overridden via --version
+    phases: [...]
+```
+
+```bash
+# Release v1.0.0
+claude-evaluator --benchmark task-cli.yaml --workflow spectra --runs 5
+
+# Make changes to Spectra, test v1.1.0
+claude-evaluator --benchmark task-cli.yaml --workflow spectra --version 1.1.0 --runs 5
+
+# Compare both versions
+claude-evaluator --benchmark task-cli.yaml --compare
 ```
 
 ---
@@ -967,11 +1045,11 @@ workflows:
 | `WorkflowType` | `models/enums.py` | Workflow type enum |
 | `RepositorySource` | `config/models.py` | Repository URL + ref config |
 | `Phase` | `config/models.py` | Multi-command phase config |
-| `EvaluatorAgent` | `core/agents/evaluator/agent.py` | Scoring runs |
+| `EvaluatorAgent` | `scoring/agent.py` | Scoring runs |
 | `DirectWorkflow` | `workflows/direct.py` | Direct execution |
 | `PlanThenImplementWorkflow` | `workflows/plan_then_implement.py` | Plan mode |
 | `MultiCommandWorkflow` | `workflows/multi_command.py` | Spectra-style |
-| `clone_repository` | `core/git_operations.py` | Clone repos |
+| `clone_repository` | `evaluation/git_operations.py` | Clone repos |
 | `_bootstrap_ci` | `experiment/statistics.py` | Confidence intervals (make public) |
 | `BaseSchema` | `models/base.py` | Base for all Pydantic models |
 | `get_logger` | `logging_config.py` | Structlog logger |
@@ -981,8 +1059,9 @@ workflows:
 | File | Change |
 |------|--------|
 | `experiment/statistics.py` | Export `bootstrap_ci` (rename from `_bootstrap_ci`) in `__all__` |
-| `config/loader.py` | Add `load_benchmark()` function |
-| `cli/parser.py` | Add `--benchmark`, `--compare`, `--list` arguments |
+| `config/loaders/__init__.py` | Add `load_benchmark` to exports |
+| `config/loaders/benchmark.py` | NEW: Create `load_benchmark()` function |
+| `cli/parser.py` | Add `--benchmark`, `--compare`, `--list`, `--version` arguments |
 | `cli/main.py` | Add benchmark dispatch in `_dispatch()` |
 
 ### New Dependencies
