@@ -221,8 +221,12 @@ class BenchmarkRunner:
                 timeout_seconds=self.config.defaults.timeout_seconds,
             )
 
+            # Mark evaluation complete and generate report
+            evaluation.complete(metrics)
+            report_path = await self._generate_report(evaluation, workspace)
+
             # Score the result
-            score_report = await self._score_evaluation(evaluation, workspace)
+            score_report = await self._score_evaluation(report_path, workspace)
 
             duration = int(time.time() - start_time)
 

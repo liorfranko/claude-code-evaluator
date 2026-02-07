@@ -51,6 +51,16 @@ async def _dispatch(args: argparse.Namespace) -> int:
             print(result.message)
         return result.exit_code
 
+    # Handle benchmark command
+    if getattr(args, "benchmark", None):
+        from claude_evaluator.cli.commands.benchmark import RunBenchmarkCommand
+
+        benchmark_cmd = RunBenchmarkCommand()
+        result = await benchmark_cmd.execute(args)
+        if result.message:
+            print(result.message)
+        return result.exit_code
+
     # Handle score command
     if args.score:
         args.evaluation_path = args.score

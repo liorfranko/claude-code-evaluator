@@ -63,8 +63,8 @@ def validate_args(args: argparse.Namespace) -> str | None:
         Error message if validation fails, None if valid.
 
     """
-    # --experiment and --score use getattr because tests may construct
-    # partial Namespace objects without these attributes.
+    # --experiment, --benchmark, and --score use getattr because tests may
+    # construct partial Namespace objects without these attributes.
     experiment = getattr(args, "experiment", None)
     if experiment is not None:
         exp_path = Path(experiment)
@@ -72,6 +72,21 @@ def validate_args(args: argparse.Namespace) -> str | None:
             return f"Error: Experiment file not found: {experiment}"
         if exp_path.suffix not in (".yaml", ".yml"):
             return f"Error: Experiment file must be YAML: {experiment}"
+        return None
+
+    benchmark = getattr(args, "benchmark", None)
+    if benchmark is not None:
+        bench_path = Path(benchmark)
+        if not bench_path.exists():
+            return f"Error: Benchmark file not found: {benchmark}"
+        if bench_path.suffix not in (".yaml", ".yml"):
+            return f"Error: Benchmark file must be YAML: {benchmark}"
+        # --compare and --list don't require --workflow, but run mode does
+        compare = getattr(args, "compare", False)
+        list_wf = getattr(args, "list_workflows", False)
+        workflow = getattr(args, "workflow", None)
+        if not compare and not list_wf and workflow is None:
+            return "Error: --benchmark requires --workflow (or use --compare or --list)"
         return None
 
     score = getattr(args, "score", None)

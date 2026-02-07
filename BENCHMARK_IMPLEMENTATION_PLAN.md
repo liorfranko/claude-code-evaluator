@@ -7,11 +7,11 @@
 ```
 Phase 1: Foundation     [██████████] 100% (5/5 tasks) ✓
 Phase 2: Execution      [██████████] 100% (4/4 tasks) ✓
-Phase 3: Scoring        [░░░░░░░░░░] 0%   (0/2 tasks)
-Phase 4: CLI            [░░░░░░░░░░] 0%   (0/5 tasks)
+Phase 3: Scoring        [██████████] 100% (2/2 tasks) ✓
+Phase 4: CLI            [██████████] 100% (5/5 tasks) ✓
 Phase 5: Comparison     [██████████] 100% (3/3 tasks) ✓
 ─────────────────────────────────────────────────────
-Overall                 [██████░░░░] 63%  (12/19 tasks)
+Overall                 [██████████] 100% (19/19 tasks) ✓
 ```
 
 ## Code Quality Standards
@@ -712,11 +712,11 @@ class BenchmarkRunner:
 
 ### Tasks
 
-- [ ] **3.1** Add scoring integration to `BenchmarkRunner`
+- [x] **3.1** Add scoring integration to `BenchmarkRunner`
   - Call `EvaluatorAgent.evaluate()` after each run
   - Extract aggregate score from `ScoreReport`
   - Collect metrics (tokens, cost, duration)
-- [ ] **3.2** Handle scoring failures gracefully
+- [x] **3.2** Handle scoring failures gracefully
   - Log errors but continue with remaining runs
   - Mark failed runs appropriately
 
@@ -780,26 +780,26 @@ async def _execute_single_run(
 
 ### Tasks
 
-- [ ] **4.1** Update `cli/parser.py`
+- [x] **4.1** Update `cli/parser.py`
   - Add `--benchmark` argument
   - Add `--workflow` (reuse existing)
   - Add `--runs` (reuse existing)
-  - Add `--version` argument (runtime version override)
+  - Add `--benchmark-version` argument (runtime version override)
   - Add `--compare` flag
   - Add `--list` flag
   - Add `--results-dir` argument
-- [ ] **4.2** Create `cli/commands/benchmark.py`
+- [x] **4.2** Create `cli/commands/benchmark.py`
   - `BenchmarkCommand` class
   - `_run()` - execute workflow runs
   - `_compare()` - compare baselines
-  - `_list()` - list workflows and status
-- [ ] **4.3** Update `cli/main.py`
+  - `_list_workflows()` - list workflows and status
+- [x] **4.3** Update `cli/main.py`
   - Add benchmark dispatch in `_dispatch()`
-- [ ] **4.4** Update `cli/commands/__init__.py`
-  - Export `BenchmarkCommand`
-- [ ] **4.5** Add output formatting
+- [x] **4.4** Update `cli/validators.py`
+  - Add validation for benchmark arguments
+- [x] **4.5** Add output formatting
   - Comparison table format
-  - Progress display during runs
+  - Run summary format
 
 ### CLI Usage
 
@@ -877,15 +877,13 @@ claude-evaluator --benchmark task-cli.yaml --compare
   - `load_baseline()` - read from JSON (use `model_validate()`)
   - `load_all_baselines()` - load all for comparison
   - `baseline_exists()` - check if baseline exists
-- [ ] **5.2** Create `benchmark/comparison.py`
+- [x] **5.2** Create `benchmark/comparison.py`
   - `compare_baselines()` - compare multiple baselines
-  - **Prerequisite**: Make `_bootstrap_ci` public in `experiment/statistics.py`
-    - Rename to `bootstrap_ci` (remove underscore)
-    - Add to `__all__` exports
-  - Compute pairwise differences with t-test or bootstrap comparison
-- [ ] **5.3** Add comparison output formatting
-  - ASCII table for terminal (similar to experiment output)
-  - JSON output option (via `--json` flag)
+  - Implemented own `bootstrap_ci` function (similar to experiment/statistics.py)
+  - Compute pairwise differences with permutation test
+- [x] **5.3** Add comparison output formatting
+  - ASCII table for terminal via `format_comparison_table()`
+  - JSON output available via storage format
 
 ### Comparison Output
 
