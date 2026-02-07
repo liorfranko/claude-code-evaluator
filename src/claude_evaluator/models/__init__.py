@@ -13,6 +13,19 @@ This module contains data models organized by domain:
 """
 
 from claude_evaluator.models.base import BaseSchema
+
+# Re-export from benchmark/
+from claude_evaluator.models.benchmark import (
+    BaselineStats,
+    BenchmarkBaseline,
+    BenchmarkConfig,
+    BenchmarkCriterion,
+    BenchmarkDefaults,
+    BenchmarkEvaluation,
+    BenchmarkRun,
+    RunMetrics,
+    WorkflowDefinition,
+)
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
@@ -83,19 +96,6 @@ from claude_evaluator.models.reviewer import (
     ReviewerConfig,
     ReviewerIssue,
     ReviewerOutput,
-)
-
-# Re-export from benchmark/
-from claude_evaluator.models.benchmark import (
-    BaselineStats,
-    BenchmarkBaseline,
-    BenchmarkConfig,
-    BenchmarkCriterion,
-    BenchmarkDefaults,
-    BenchmarkEvaluation,
-    BenchmarkRun,
-    RunMetrics,
-    WorkflowDefinition,
 )
 
 __all__ = [

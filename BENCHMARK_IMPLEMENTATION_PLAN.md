@@ -6,12 +6,12 @@
 
 ```
 Phase 1: Foundation     [██████████] 100% (5/5 tasks) ✓
-Phase 2: Execution      [██░░░░░░░░] 25%  (1/4 tasks) - exceptions.py done
+Phase 2: Execution      [██████████] 100% (4/4 tasks) ✓
 Phase 3: Scoring        [░░░░░░░░░░] 0%   (0/2 tasks)
 Phase 4: CLI            [░░░░░░░░░░] 0%   (0/5 tasks)
-Phase 5: Comparison     [███░░░░░░░] 33%  (1/3 tasks) - storage.py done
+Phase 5: Comparison     [██████████] 100% (3/3 tasks) ✓
 ─────────────────────────────────────────────────────
-Overall                 [███░░░░░░░] 37%  (7/19 tasks)
+Overall                 [██████░░░░] 63%  (12/19 tasks)
 ```
 
 ## Code Quality Standards
@@ -489,20 +489,20 @@ class BenchmarkBaseline(BaseSchema):
 
 ### Tasks
 
-- [ ] **2.1** Create `benchmark/__init__.py`
+- [x] **2.1** Create `benchmark/__init__.py`
   - Export `BenchmarkRunner`, exceptions
 - [x] **2.2** Create `benchmark/exceptions.py`
   - `BenchmarkError` - base exception (inherits `ClaudeEvaluatorError`)
   - `RepositoryError` - git operations failed
   - `WorkflowExecutionError` - workflow failed
   - `StorageError` - results save/load failed
-- [ ] **2.3** Create `benchmark/runner.py`
+- [x] **2.3** Create `benchmark/runner.py`
   - `BenchmarkRunner` class
   - `_setup_repository()` - clone using `evaluation/git_operations.clone_repository()`
   - `_create_workflow()` - dispatch to correct workflow class
   - `_execute_single_run()` - run workflow + score
   - `execute()` - main orchestration method
-- [ ] **2.4** Integrate with existing workflow runners
+- [x] **2.4** Integrate with existing workflow runners
   - Import and instantiate from `workflows/` module
   - Pass `MetricsCollector` and `EvalDefaults`
   - Handle workflow-specific configuration (phases for multi_command)
