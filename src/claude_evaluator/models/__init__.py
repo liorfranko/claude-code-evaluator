@@ -7,11 +7,25 @@ This module contains data models organized by domain:
 - execution/: Decision, ToolInvocation, QueryMetrics, Progress
 - interaction/: Question, Answer models
 - experiment/: Experiment config and result models
+- benchmark/: Benchmark config and result models
 - reviewer: Reviewer output models
 - exceptions: ModelValidationError
 """
 
 from claude_evaluator.models.base import BaseSchema
+
+# Re-export from benchmark/
+from claude_evaluator.models.benchmark import (
+    BaselineStats,
+    BenchmarkBaseline,
+    BenchmarkConfig,
+    BenchmarkCriterion,
+    BenchmarkDefaults,
+    BenchmarkEvaluation,
+    BenchmarkRun,
+    RunMetrics,
+    WorkflowDefinition,
+)
 from claude_evaluator.models.enums import (
     DeveloperState,
     EvaluationStatus,
@@ -143,4 +157,14 @@ __all__ = [
     "ReviewerConfig",
     "ReviewerIssue",
     "ReviewerOutput",
+    # Benchmark models
+    "BaselineStats",
+    "BenchmarkBaseline",
+    "BenchmarkConfig",
+    "BenchmarkCriterion",
+    "BenchmarkDefaults",
+    "BenchmarkEvaluation",
+    "BenchmarkRun",
+    "RunMetrics",
+    "WorkflowDefinition",
 ]

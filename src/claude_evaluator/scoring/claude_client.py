@@ -115,7 +115,9 @@ class ClaudeClient:
                     options=ClaudeAgentOptions(
                         model=self.model,
                         max_turns=self.max_turns,
-                        permission_mode="plan",
+                        # Use default mode for scoring - plan mode causes ExitPlanMode
+                        # tool calls instead of text responses
+                        permission_mode="default",
                     ),
                 ):
                     msg_type = type(message).__name__

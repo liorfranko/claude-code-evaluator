@@ -1,0 +1,91 @@
+# Benchmark configuration for task management CLI application
+name: task-cli
+description: Build a task management CLI application
+
+prompt: |
+  Build a task management CLI application with the following capabilities:
+  1. Add, list, update, and delete tasks
+  2. Mark tasks as complete/incomplete
+  3. Assign priorities (low, medium, high)
+  4. Filter and search tasks
+  5. Persist tasks to a JSON file
+  6. Support for due dates
+
+# Uses existing RepositorySource model from config/models.py
+repository:
+  url: "https://github.com/github/codespaces-blank"
+  ref: "main"
+  depth: 1
+
+defaults:
+  model: "sonnet"
+  max_turns: 2000
+  max_budget_usd: 50.0
+  timeout_seconds: 36000
+
+evaluation:
+  criteria:
+    - name: functionality
+      weight: 0.4
+      description: "All required features work correctly"
+    - name: code_quality
+      weight: 0.3
+      description: "Clean, idiomatic, well-structured code"
+    - name: error_handling
+      weight: 0.2
+      description: "Graceful handling of edge cases"
+    - name: documentation
+      weight: 0.1
+      description: "Clear README and code comments"
+
+workflows:
+  direct:
+    type: direct
+    version: "1.0.0"
+
+  native-plan:
+    type: plan_then_implement
+    version: "1.0.0"
+
+  spectra-v1.0:
+    type: multi_command
+    version: "1.0.0"
+    phases:
+      - name: specify
+        permission_mode: acceptEdits
+        prompt: "/spectra:specify {{prompt}}"
+      - name: clarify
+        permission_mode: acceptEdits
+        prompt: "/spectra:clarify"
+      - name: plan
+        permission_mode: acceptEdits
+        prompt: "/spectra:plan"
+      - name: tasks
+        permission_mode: acceptEdits
+        prompt: "/spectra:tasks"
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt: "/spectra:implement"
+
+  spectra-v1.1:
+    type: multi_command
+    version: "1.1.0"
+    phases:
+      - name: specify
+        permission_mode: acceptEdits
+        prompt: "/spectra:specify {{prompt}}"
+      - name: clarify
+        permission_mode: acceptEdits
+        prompt: "/spectra:clarify"
+      - name: plan
+        permission_mode: acceptEdits
+        prompt: "/spectra:plan"
+      - name: tasks
+        permission_mode: acceptEdits
+        prompt: "/spectra:tasks"
+      - name: validate
+        permission_mode: acceptEdits
+        prompt: "/spectra:validate"
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt: "/spectra:implement"

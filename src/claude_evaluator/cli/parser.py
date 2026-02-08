@@ -42,6 +42,15 @@ Examples:
   # Score an evaluation result
   claude-evaluator --score evaluations/2026-02-02T14-51-21/evaluation.json
 
+  # Run a benchmark workflow
+  claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct --runs 5
+
+  # Compare all benchmark baselines
+  claude-evaluator --benchmark benchmarks/task-cli.yaml --compare
+
+  # List benchmark workflows and their status
+  claude-evaluator --benchmark benchmarks/task-cli.yaml --list
+
   # Score with verbose output
   claude-evaluator --score evaluation.json --verbose
 
@@ -67,12 +76,14 @@ For more information, see the documentation.
         help="Path to YAML suite file to execute",
     )
 
-    # Ad-hoc evaluation
+    # Ad-hoc evaluation / Benchmark workflow
     parser.add_argument(
         "--workflow",
         type=str,
-        choices=["direct", "plan_then_implement", "multi_command"],
-        help="Workflow type for ad-hoc evaluation (requires --task)",
+        help=(
+            "Workflow to use. For ad-hoc evaluation: direct, plan_then_implement, "
+            "multi_command. For benchmarks: use workflow names from config file."
+        ),
     )
 
     parser.add_argument(
@@ -166,6 +177,43 @@ For more information, see the documentation.
         type=int,
         metavar="N",
         help="Override number of runs per config from experiment YAML",
+    )
+
+    # Benchmark arguments
+    parser.add_argument(
+        "--benchmark",
+        type=str,
+        metavar="FILE",
+        help="Path to benchmark YAML config for workflow comparison",
+    )
+
+    parser.add_argument(
+        "--compare",
+        action="store_true",
+        help="Compare all stored benchmark baselines (requires --benchmark)",
+    )
+
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        dest="list_workflows",
+        help="List benchmark workflows and their baseline status (requires --benchmark)",
+    )
+
+    parser.add_argument(
+        "--benchmark-version",
+        type=str,
+        metavar="VERSION",
+        dest="benchmark_version",
+        help="Override workflow version at runtime (e.g., '1.1.0')",
+    )
+
+    parser.add_argument(
+        "--results-dir",
+        type=str,
+        metavar="DIR",
+        dest="results_dir",
+        help="Directory for benchmark results (default: ./results)",
     )
 
     return parser
