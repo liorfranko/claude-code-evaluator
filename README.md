@@ -13,6 +13,7 @@ A CLI tool for evaluating Claude Code agent implementations with automated, inte
 - **Per-Evaluation Model Selection**: Configure different models for worker and developer agents
 - **Docker Sandbox**: Optional `--sandbox docker` flag for isolated evaluation execution with resource limits
 - **Experiment System**: Pairwise LLM-as-judge comparison of different configs (models, workflows, prompts) with statistical analysis and Elo ratings
+- **Benchmark System**: Run workflows multiple times against reference tasks, store baselines with statistical analysis, and compare workflow performance
 
 ## Installation
 
@@ -304,6 +305,124 @@ HEAD-TO-HEAD:
 Position Bias: 90% consistency (9/10 pairs)
 Total Cost: $1.24
 ============================================================
+```
+
+## Benchmarks
+
+Run workflows multiple times against reference tasks to establish performance baselines with statistical analysis.
+
+### Usage
+
+```bash
+# Run a benchmark workflow 5 times (default)
+claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct
+
+# Run with custom number of runs and verbose output
+claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct --runs 3 --verbose
+
+# Compare all stored baselines
+claude-evaluator --benchmark benchmarks/task-cli.yaml --compare
+
+# List available workflows and their baseline status
+claude-evaluator --benchmark benchmarks/task-cli.yaml --list
+```
+
+### Benchmark YAML
+
+```yaml
+name: task-cli
+description: Build a task management CLI application
+
+prompt: |
+  Build a task management CLI application with the following capabilities:
+  1. Add, list, update, and delete tasks
+  2. Mark tasks as complete/incomplete
+  3. Assign priorities (low, medium, high)
+  4. Filter and search tasks
+  5. Persist tasks to a JSON file
+  6. Support for due dates
+
+repository:
+  url: "https://github.com/github/codespaces-blank"
+  ref: "main"
+  depth: 1
+
+defaults:
+  model: "sonnet"
+  max_turns: 2000
+  max_budget_usd: 50.0
+  timeout_seconds: 36000
+
+evaluation:
+  criteria:
+    - name: functionality
+      weight: 0.4
+      description: "All required features work correctly"
+    - name: code_quality
+      weight: 0.3
+      description: "Clean, idiomatic, well-structured code"
+
+workflows:
+  direct:
+    type: direct
+    version: "1.0.0"
+
+  native-plan:
+    type: plan_then_implement
+    version: "1.0.0"
+
+  spectra-v1.0:
+    type: multi_command
+    version: "1.0.0"
+    phases:
+      - name: specify
+        permission_mode: acceptEdits
+        prompt: "/spectra:specify {{prompt}}"
+      - name: implement
+        permission_mode: bypassPermissions
+        prompt: "/spectra:implement"
+```
+
+### Output
+
+Benchmarks produce baselines with statistical analysis:
+
+```
+Benchmark Complete
+========================================
+Workflow:    direct-v1.0.0
+Version:     1.0.0
+Model:       sonnet
+Runs:        5
+
+Results:
+  Mean:      73.0
+  Std Dev:   4.24
+  95% CI:    [70.0, 76.0]
+
+Run Scores:
+  Run 1: 70 (580s)
+  Run 2: 76 (392s)
+```
+
+Results are stored in `results/{benchmark-name}/`:
+- `direct-v1.0.0.json` - Baseline with all runs and stats
+- `runs/{run-id}/workspace/` - Workspace for each run (code, evaluation.json)
+
+### Comparing Workflows
+
+```bash
+claude-evaluator --benchmark benchmarks/task-cli.yaml --compare
+```
+
+Output:
+```
+Workflow Comparison for task-cli
+============================================================
+Workflow              Mean   Std    95% CI         n   vs Reference
+--------------------------------------------------------------------
+direct-v1.0.0         73.0   4.24   [70.0, 76.0]   2   (reference)
+spectra-v1.0.0        78.5   3.10   [75.0, 82.0]   3   +5.5 (+7.5%)
 ```
 
 ## User Plugins Support

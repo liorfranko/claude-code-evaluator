@@ -14,6 +14,9 @@ claude-evaluator --score evaluations/.../evaluation.json # Score results
 claude-evaluator --suite evals/example-suite.yaml --sandbox docker # Run in Docker
 claude-evaluator --experiment experiment.yaml          # Run pairwise experiment
 claude-evaluator --experiment experiment.yaml --runs 3 # Override runs per config
+claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct --runs 5 # Run benchmark
+claude-evaluator --benchmark benchmarks/task-cli.yaml --compare  # Compare baselines
+claude-evaluator --benchmark benchmarks/task-cli.yaml --list     # List workflows
 ```
 
 ## Test
@@ -31,12 +34,13 @@ ruff format --check src/                 # Format check
 src/claude_evaluator/
   cli/              # CLI entry point, parser, commands, validators
   config/           # Settings, YAML loaders (config/loaders/)
-  models/           # Pydantic models (evaluation/, execution/, interaction/, experiment/)
+  models/           # Pydantic models (evaluation/, execution/, interaction/, experiment/, benchmark/)
   agents/           # Execution agents (developer/, worker/)
   scoring/          # Scoring and analysis (analyzers/, checks/, reviewers/)
   evaluation/       # Evaluation orchestration, state, git operations
   workflows/        # Workflow strategies (direct, plan, multi_command)
   experiment/       # Pairwise experiment system (runner, judge, statistics)
+  benchmark/        # Benchmark system (runner, storage, comparison)
   sandbox/          # Execution isolation (docker, local)
   report/           # Report generation
   metrics/          # Token/cost metrics collection
@@ -82,3 +86,17 @@ src/claude_evaluator/
 - No external stats dependencies — uses stdlib `math`/`statistics`/`random`
 - Position bias mitigation: judge each pair twice (A-B, B-A), reconcile or tie
 - Reuses existing `Phase`, `RepositorySource`, `WorkflowType` models via Pydantic auto-coercion
+
+## Benchmark System
+
+- `--benchmark FILE --workflow NAME` runs workflow N times and stores baseline
+- `--benchmark FILE --compare` compares all stored baselines with statistical analysis
+- `--benchmark FILE --list` shows workflows and their baseline status
+- `--runs N` overrides number of runs (default: 5)
+- `--verbose` shows progress output including tool usage
+- Config loader: `load_benchmark()` in `config/loaders/benchmark.py`
+- Runtime: `benchmark/runner.py` (orchestration), `benchmark/storage.py` (JSON persistence), `benchmark/comparison.py` (bootstrap CI, effect size)
+- Models: `models/benchmark/config.py` (YAML config), `models/benchmark/results.py` (baseline, stats)
+- Workspace: `results/{benchmark-name}/runs/{run-id}/workspace/` (not in git)
+- Baselines: `results/{benchmark-name}/{workflow}-v{version}.json`
+- Each run: clones repository, executes workflow, generates report, scores with EvaluatorAgent
