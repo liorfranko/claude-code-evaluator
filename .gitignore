@@ -73,3 +73,6 @@ worktrees/
 .worktrees/
 .security-key
 logs/security/
+
+# Benchmark results (runtime data)
+results/
