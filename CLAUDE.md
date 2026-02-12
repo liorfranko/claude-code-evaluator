@@ -81,9 +81,25 @@ src/claude_evaluator/
 - Config loader: `load_benchmark()` in `config/loaders/benchmark.py`
 - Runtime: `benchmark/runner.py` (orchestration), `benchmark/storage.py` (JSON persistence), `benchmark/comparison.py` (bootstrap CI, effect size)
 - Models: `models/benchmark/config.py` (YAML config), `models/benchmark/results.py` (baseline, stats, dimension scores)
-- Workspace: `results/{benchmark-name}/runs/{run-id}/workspace/` (not in git)
-- Baselines: `results/{benchmark-name}/{workflow}-v{version}.json`
 - Each run: clones repository, executes workflow, generates report, scores with EvaluatorAgent
+
+### Results Directory Structure
+
+```
+results/
+└── {benchmark-name}/
+    ├── baselines/                          # Baseline JSON files
+    │   ├── {workflow}-v{version}.json
+    │   └── ...
+    └── runs/                               # Date-organized run data
+        └── {YYYY-MM-DD}/                   # Date directory
+            └── {HH-MM-SS}_{workflow}_{uuid}/
+                └── workspace/              # Cloned repo + evaluations
+```
+
+- **baselines/** — Persisted baseline summaries for comparison
+- **runs/{date}/{time_workflow_uuid}/** — Individual run artifacts, organized by date
+- **workspace/** — Cloned repository with evaluation results (not in git)
 
 ### Dimension Scoring
 

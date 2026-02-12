@@ -151,7 +151,7 @@ class RunBenchmarkCommand(BaseCommand):
             format_comparison_table,
         )
 
-        storage = BenchmarkStorage(results_dir / config.name)
+        storage = BenchmarkStorage(results_dir / config.name / "baselines")
         baselines = storage.load_all_baselines()
 
         if not baselines:
@@ -200,7 +200,7 @@ class RunBenchmarkCommand(BaseCommand):
         """
         from claude_evaluator.benchmark import BenchmarkStorage
 
-        storage = BenchmarkStorage(results_dir / config.name)
+        storage = BenchmarkStorage(results_dir / config.name / "baselines")
         baselines = storage.load_all_baselines()
 
         # Build lookup

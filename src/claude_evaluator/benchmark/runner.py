@@ -80,7 +80,7 @@ class BenchmarkRunner:
         """
         self.config = config
         self.results_dir = results_dir or Path("results")
-        self._storage = BenchmarkStorage(self.results_dir / config.name)
+        self._storage = BenchmarkStorage(self.results_dir / config.name / "baselines")
 
     async def execute(
         self,
@@ -126,7 +126,6 @@ class BenchmarkRunner:
             result = await self._execute_single_run(
                 workflow_def=workflow_def,
                 workflow_name=workflow_name,
-                run_index=i,
                 verbose=verbose,
             )
             run_results.append(result)
@@ -170,14 +169,15 @@ class BenchmarkRunner:
 
         return baseline
 
-    async def _setup_repository(self, run_id: str) -> Path:
+    async def _setup_repository(self, run_id: str, date_str: str) -> Path:
         """Clone repository to workspace under results directory.
 
-        Creates a workspace structure like regular evaluations:
-        results/{benchmark_name}/runs/{run_id}/workspace/
+        Creates a date-centric workspace structure:
+        results/{benchmark_name}/runs/{YYYY-MM-DD}/{run_id}/workspace/
 
         Args:
-            run_id: Unique identifier for this run.
+            run_id: Unique identifier for this run (format: HH-MM-SS_workflow_uuid).
+            date_str: Date string in YYYY-MM-DD format.
 
         Returns:
             Path to cloned repository workspace.
@@ -186,8 +186,8 @@ class BenchmarkRunner:
             RepositoryError: If clone fails.
 
         """
-        # Create workspace under results_dir like regular evaluations
-        run_dir = self.results_dir / self.config.name / "runs" / run_id
+        # Create workspace under date-organized directory
+        run_dir = self.results_dir / self.config.name / "runs" / date_str / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
         workspace = run_dir / "workspace"
@@ -209,7 +209,6 @@ class BenchmarkRunner:
         self,
         workflow_def: WorkflowDefinition,
         workflow_name: str,
-        run_index: int,
         verbose: bool = False,
     ) -> BenchmarkRun:
         """Execute a single benchmark run.
@@ -217,7 +216,6 @@ class BenchmarkRunner:
         Args:
             workflow_def: The workflow definition to execute.
             workflow_name: Name of the workflow.
-            run_index: Index of this run (0-based).
             verbose: Whether to print progress output.
 
         Returns:
@@ -228,11 +226,15 @@ class BenchmarkRunner:
             RepositoryError: If repository setup fails.
 
         """
-        run_id = f"{workflow_name}-{run_index}-{uuid4().hex[:8]}"
+        # Generate date-centric run ID: HH-MM-SS_workflow_uuid
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H-%M-%S")
+        run_id = f"{time_str}_{workflow_name}_{uuid4().hex[:8]}"
         start_time = time.time()
 
-        # Setup fresh repository for this run under results directory
-        workspace = await self._setup_repository(run_id=run_id)
+        # Setup fresh repository for this run under date-organized directory
+        workspace = await self._setup_repository(run_id=run_id, date_str=date_str)
 
         if verbose:
             print(f"  Workspace: {workspace}")
