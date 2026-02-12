@@ -263,12 +263,25 @@ class RunBenchmarkCommand(BaseCommand):
             f"  Mean:      {stats.mean:.1f}",
             f"  Std Dev:   {stats.std:.1f}",
             f"  95% CI:    {ci_str}",
-            "",
         ]
+
+        # Add dimension breakdown if available
+        if stats.dimension_stats:
+            lines.append("")
+            lines.append("Dimension Scores:")
+            for dim_name, dim_stats in sorted(stats.dimension_stats.items()):
+                dim_ci_str = f"[{dim_stats.ci_95[0]:.1f}, {dim_stats.ci_95[1]:.1f}]"
+                lines.append(f"  {dim_name:<18} {dim_stats.mean:5.1f} ± {dim_stats.std:.1f}  CI: {dim_ci_str}")
+
+        lines.append("")
 
         # Add individual run scores
         lines.append("Run Scores:")
         for i, run in enumerate(baseline.runs, 1):
-            lines.append(f"  Run {i}: {run.score} ({run.duration_seconds}s)")
+            dim_summary = ""
+            if run.dimension_scores:
+                dim_parts = [f"{k}={v.score}" for k, v in sorted(run.dimension_scores.items())]
+                dim_summary = f" ({', '.join(dim_parts)})"
+            lines.append(f"  Run {i}: {run.score} ({run.duration_seconds}s){dim_summary}")
 
         return "\n".join(lines)

@@ -209,7 +209,7 @@ def format_comparison_table(
     comparisons: list[ComparisonResult],
     reference_name: str,
 ) -> str:
-    """Format comparison results as an ASCII table.
+    """Format comparison results as an ASCII table with dimension breakdown.
 
     Args:
         baselines: List of baselines.
@@ -220,50 +220,90 @@ def format_comparison_table(
         Formatted ASCII table string.
 
     """
-    # Build comparison lookup
-    comparison_lookup = {c.comparison_name: c for c in comparisons}
+    # Collect all dimension names across baselines
+    all_dimensions: set[str] = set()
+    for baseline in baselines:
+        all_dimensions.update(baseline.stats.dimension_stats.keys())
+    dimension_names = sorted(all_dimensions)
 
-    # Header
-    lines = [
-        "┌─────────────────┬───────┬─────────────────┬─────┬────────────────────┐",
-        "│ Workflow        │ Mean  │ 95% CI          │ n   │ vs reference       │",
-        "├─────────────────┼───────┼─────────────────┼─────┼────────────────────┤",
-    ]
+    # Sort baselines by mean score (best first)
+    sorted_baselines = sorted(baselines, key=lambda b: b.stats.mean, reverse=True)
 
-    # Rows
-    for baseline in sorted(baselines, key=lambda b: b.stats.mean, reverse=True):
-        name = baseline.workflow_name[:15].ljust(15)
-        mean = f"{baseline.stats.mean:5.1f}".rjust(5)
-        ci = f"[{baseline.stats.ci_95[0]:.1f}, {baseline.stats.ci_95[1]:.1f}]".ljust(15)
-        n = str(baseline.stats.n).rjust(3)
+    # Build header dynamically based on number of baselines
+    lines = []
+    lines.append("Workflow Comparison")
+    lines.append("=" * 70)
+    lines.append("")
 
-        if baseline.workflow_name == reference_name:
-            vs_ref = "baseline".ljust(18)
-        else:
-            comp = comparison_lookup.get(baseline.workflow_name)
-            if comp:
-                sign = "+" if comp.difference >= 0 else ""
-                sig = "*" if comp.significant and comp.p_value < 0.01 else ""
-                sig = "**" if comp.significant and comp.p_value < 0.001 else sig
-                vs_ref = f"{sign}{comp.difference:.1f}{sig} (p={comp.p_value:.2f})".ljust(18)
+    # Create a compact table header
+    header_line = f"{'Metric':<20}"
+    for baseline in sorted_baselines:
+        name = baseline.workflow_name[:15]
+        header_line += f"  {name:>12}"
+    lines.append(header_line)
+    lines.append("-" * len(header_line))
+
+    # Overall Score row
+    score_line = f"{'Overall Score':<20}"
+    best_mean = max(b.stats.mean for b in sorted_baselines) if sorted_baselines else 0
+    for baseline in sorted_baselines:
+        ci_half = (baseline.stats.ci_95[1] - baseline.stats.ci_95[0]) / 2
+        score_str = f"{baseline.stats.mean:.1f}±{ci_half:.1f}"
+        if baseline.stats.mean == best_mean:
+            score_str += " ✓"
+        score_line += f"  {score_str:>12}"
+    lines.append(score_line)
+
+    # Dimension rows
+    for dim_name in dimension_names:
+        dim_line = f"  {dim_name:<18}"
+        for baseline in sorted_baselines:
+            dim_stats = baseline.stats.dimension_stats.get(dim_name)
+            if dim_stats:
+                dim_line += f"  {dim_stats.mean:>12.1f}"
             else:
-                vs_ref = "-".ljust(18)
+                dim_line += f"  {'-':>12}"
+        lines.append(dim_line)
 
-        lines.append(f"│ {name} │ {mean} │ {ci} │ {n} │ {vs_ref} │")
+    # Runs row
+    runs_line = f"{'Runs':<20}"
+    for baseline in sorted_baselines:
+        runs_line += f"  {baseline.stats.n:>12}"
+    lines.append(runs_line)
 
-    lines.append("└─────────────────┴───────┴─────────────────┴─────┴────────────────────┘")
+    lines.append("-" * len(header_line))
+
+    # Add statistical comparison section if there are comparisons
+    if comparisons:
+        lines.append("")
+        lines.append("Statistical Comparison (vs reference):")
+        ref_baseline = next((b for b in baselines if b.workflow_name == reference_name), None)
+        if ref_baseline:
+            lines.append(f"  Reference: {reference_name}")
+            lines.append("")
+            for comp in comparisons:
+                sign = "+" if comp.difference >= 0 else ""
+                sig_marker = ""
+                if comp.significant:
+                    if comp.p_value < 0.001:
+                        sig_marker = "***"
+                    elif comp.p_value < 0.01:
+                        sig_marker = "**"
+                    else:
+                        sig_marker = "*"
+                lines.append(
+                    f"  {comp.comparison_name}: {sign}{comp.difference:.1f}{sig_marker} "
+                    f"(p={comp.p_value:.3f})"
+                )
 
     # Add legend
     lines.append("")
-    lines.append("* p < 0.05  ** p < 0.01")
+    lines.append("* p < 0.05  ** p < 0.01  *** p < 0.001")
 
-    # Find best and baseline
+    # Find best performer
     if baselines:
         best = max(baselines, key=lambda b: b.stats.mean)
-        ref = next((b for b in baselines if b.workflow_name == reference_name), None)
         lines.append("")
         lines.append(f"Best performing: {best.workflow_name} (mean={best.stats.mean:.1f})")
-        if ref:
-            lines.append(f"Baseline: {ref.workflow_name} (mean={ref.stats.mean:.1f})")
 
     return "\n".join(lines)

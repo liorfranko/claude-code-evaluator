@@ -63,17 +63,8 @@ def validate_args(args: argparse.Namespace) -> str | None:
         Error message if validation fails, None if valid.
 
     """
-    # --experiment, --benchmark, and --score use getattr because tests may
+    # --benchmark and --score use getattr because tests may
     # construct partial Namespace objects without these attributes.
-    experiment = getattr(args, "experiment", None)
-    if experiment is not None:
-        exp_path = Path(experiment)
-        if not exp_path.exists():
-            return f"Error: Experiment file not found: {experiment}"
-        if exp_path.suffix not in (".yaml", ".yml"):
-            return f"Error: Experiment file must be YAML: {experiment}"
-        return None
-
     benchmark = getattr(args, "benchmark", None)
     if benchmark is not None:
         bench_path = Path(benchmark)
@@ -96,27 +87,19 @@ def validate_args(args: argparse.Namespace) -> str | None:
             return f"Error: Evaluation file not found: {score}"
         return None
 
-    # Check --workflow requires --task
-    if args.workflow is not None and args.task is None:
+    # Check --workflow requires --task (for ad-hoc evaluation)
+    workflow = getattr(args, "workflow", None)
+    task = getattr(args, "task", None)
+
+    if workflow is not None and task is None:
         return "Error: --workflow requires --task"
 
-    # Check --task requires --workflow
-    if args.task is not None and args.workflow is None:
+    if task is not None and workflow is None:
         return "Error: --task requires --workflow"
 
-    # Must have either --suite or (--workflow and --task)
-    if args.suite is None and not (args.workflow is not None and args.task is not None):
-        return "Error: Either --suite or both --workflow and --task are required, or use --score"
-
-    # --dry-run only works with --suite
-    if args.dry_run and args.suite is None:
-        return "Error: --dry-run requires --suite"
-
-    # Validate suite file exists
-    if args.suite is not None:
-        suite_path = Path(args.suite)
-        if not suite_path.exists():
-            return f"Error: Suite file not found: {args.suite}"
+    # Must have --benchmark, --score, or (--workflow and --task)
+    if not (workflow is not None and task is not None):
+        return "Error: --benchmark, --score, or both --workflow and --task are required"
 
     # Validate output path is safe (if output is specified).
     # Use getattr because tests may construct partial Namespace objects.

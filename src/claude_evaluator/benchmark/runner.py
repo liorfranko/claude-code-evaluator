@@ -27,6 +27,8 @@ from claude_evaluator.models.benchmark.results import (
     BaselineStats,
     BenchmarkBaseline,
     BenchmarkRun,
+    DimensionRunScore,
+    DimensionStats,
     RunMetrics,
 )
 from claude_evaluator.models.enums import WorkflowType
@@ -268,8 +270,20 @@ class BenchmarkRunner:
             # Generate report from the completed evaluation
             report_path = await self._generate_report(evaluation, workspace)
 
-            # Score the result
-            score_report = await self._score_evaluation(report_path, workspace)
+            # Score the result with criteria if available
+            criteria = self.config.evaluation.criteria if self.config.evaluation.criteria else None
+            score_report = await self._score_evaluation(report_path, workspace, criteria)
+
+            # Extract dimension scores from score report
+            dimension_scores: dict[str, DimensionRunScore] = {}
+            for dim_score in score_report.dimension_scores:
+                dim_name = dim_score.dimension_name.value
+                dimension_scores[dim_name] = DimensionRunScore(
+                    name=dim_name,
+                    score=dim_score.score,
+                    weight=dim_score.weight,
+                    rationale=dim_score.rationale,
+                )
 
             duration = int(time.time() - start_time)
 
@@ -285,6 +299,7 @@ class BenchmarkRunner:
                     total_cost_usd=metrics.total_cost_usd,
                     turn_count=metrics.turn_count,
                 ),
+                dimension_scores=dimension_scores,
             )
 
         except Exception as e:
@@ -432,12 +447,14 @@ class BenchmarkRunner:
         self,
         report_path: Path,
         workspace: Path,
+        criteria: list | None = None,
     ) -> ScoreReport:
         """Score the evaluation using EvaluatorAgent.
 
         Args:
             report_path: Path to the EvaluationReport JSON file.
             workspace: Path to the workspace.
+            criteria: Optional benchmark criteria for dimension scoring.
 
         Returns:
             ScoreReport with scores.
@@ -450,7 +467,10 @@ class BenchmarkRunner:
             enable_ast=True,
         )
 
-        return await evaluator.evaluate(evaluation_path=report_path)
+        return await evaluator.evaluate(
+            evaluation_path=report_path,
+            criteria=criteria,
+        )
 
     def _compute_stats(self, runs: list[BenchmarkRun]) -> BaselineStats:
         """Compute statistics from run results.
@@ -459,7 +479,7 @@ class BenchmarkRunner:
             runs: List of benchmark runs.
 
         Returns:
-            BaselineStats with mean, std, CI, and n.
+            BaselineStats with mean, std, CI, n, and per-dimension stats.
 
         """
         from claude_evaluator.benchmark.comparison import bootstrap_ci
@@ -474,11 +494,36 @@ class BenchmarkRunner:
         std = stats_lib.stdev(scores) if n > 1 else 0.0
         ci_lower, ci_upper = bootstrap_ci(scores, confidence_level=0.95)
 
+        # Compute per-dimension statistics
+        dimension_stats: dict[str, DimensionStats] = {}
+
+        # Collect all dimension names from runs
+        dimension_names: set[str] = set()
+        for run in runs:
+            dimension_names.update(run.dimension_scores.keys())
+
+        for dim_name in dimension_names:
+            dim_scores = [
+                run.dimension_scores[dim_name].score
+                for run in runs
+                if dim_name in run.dimension_scores
+            ]
+            if dim_scores:
+                dim_mean = stats_lib.mean(dim_scores)
+                dim_std = stats_lib.stdev(dim_scores) if len(dim_scores) > 1 else 0.0
+                dim_ci_lower, dim_ci_upper = bootstrap_ci(dim_scores, confidence_level=0.95)
+                dimension_stats[dim_name] = DimensionStats(
+                    mean=round(dim_mean, 2),
+                    std=round(dim_std, 2),
+                    ci_95=(round(dim_ci_lower, 2), round(dim_ci_upper, 2)),
+                )
+
         return BaselineStats(
             mean=round(mean, 2),
             std=round(std, 2),
             ci_95=(round(ci_lower, 2), round(ci_upper, 2)),
             n=n,
+            dimension_stats=dimension_stats,
         )
 
     def get_storage(self) -> BenchmarkStorage:

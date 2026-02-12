@@ -16,8 +16,42 @@ __all__ = [
     "BaselineStats",
     "BenchmarkBaseline",
     "BenchmarkRun",
+    "DimensionRunScore",
+    "DimensionStats",
     "RunMetrics",
 ]
+
+
+class DimensionRunScore(BaseSchema):
+    """Score for a single dimension in a benchmark run.
+
+    Attributes:
+        name: Dimension name (e.g., "functionality", "code_quality").
+        score: Score for this dimension (0-100).
+        weight: Weight used in aggregate calculation (0.0-1.0).
+        rationale: Explanation for this score.
+
+    """
+
+    name: str
+    score: int = Field(..., ge=0, le=100)
+    weight: float = Field(default=1.0, ge=0.0, le=1.0)
+    rationale: str = ""
+
+
+class DimensionStats(BaseSchema):
+    """Statistics for a single dimension across runs.
+
+    Attributes:
+        mean: Mean score for this dimension.
+        std: Standard deviation.
+        ci_95: 95% confidence interval (lower, upper).
+
+    """
+
+    mean: float
+    std: float
+    ci_95: tuple[float, float]
 
 
 class RunMetrics(BaseSchema):
@@ -46,6 +80,7 @@ class BenchmarkRun(BaseSchema):
         evaluation_id: Link to full evaluation report.
         duration_seconds: Total execution time.
         metrics: Token/cost/turn metrics.
+        dimension_scores: Scores per dimension for this run.
 
     """
 
@@ -56,6 +91,7 @@ class BenchmarkRun(BaseSchema):
     evaluation_id: str
     duration_seconds: int
     metrics: RunMetrics = Field(default_factory=RunMetrics)
+    dimension_scores: dict[str, DimensionRunScore] = Field(default_factory=dict)
 
 
 class BaselineStats(BaseSchema):
@@ -66,6 +102,7 @@ class BaselineStats(BaseSchema):
         std: Standard deviation.
         ci_95: 95% confidence interval (lower, upper).
         n: Number of runs.
+        dimension_stats: Per-dimension statistics.
 
     """
 
@@ -73,6 +110,7 @@ class BaselineStats(BaseSchema):
     std: float
     ci_95: tuple[float, float]
     n: int
+    dimension_stats: dict[str, DimensionStats] = Field(default_factory=dict)
 
 
 class BenchmarkBaseline(BaseSchema):

@@ -177,15 +177,10 @@ class DockerSandbox(BaseSandbox):
         Path(host_output).mkdir(parents=True, exist_ok=True)
         flags.extend(["-v", f"{host_output}:/app/output"])
 
-        # Suite file (read-only)
-        if getattr(args, "suite", None):
-            host_suite = str(Path(args.suite).resolve())
-            flags.extend(["-v", f"{host_suite}:/app/suite.yaml:ro"])
-
-        # Experiment file (read-only)
-        if getattr(args, "experiment", None):
-            host_experiment = str(Path(args.experiment).resolve())
-            flags.extend(["-v", f"{host_experiment}:/app/experiment.yaml:ro"])
+        # Benchmark file (read-only)
+        if getattr(args, "benchmark", None):
+            host_benchmark = str(Path(args.benchmark).resolve())
+            flags.extend(["-v", f"{host_benchmark}:/app/benchmark.yaml:ro"])
 
         # GCloud ADC credentials (read-only)
         adc_path = Path.home() / ".config/gcloud/application_default_credentials.json"
@@ -208,10 +203,8 @@ class DockerSandbox(BaseSandbox):
         inner: list[str] = []
 
         # Path arguments are remapped to container paths
-        if getattr(args, "suite", None):
-            inner.extend(["--suite", "/app/suite.yaml"])
-        if getattr(args, "experiment", None):
-            inner.extend(["--experiment", "/app/experiment.yaml"])
+        if getattr(args, "benchmark", None):
+            inner.extend(["--benchmark", "/app/benchmark.yaml"])
 
         # Value flags
         for attr, flag in _VALUE_FLAGS:

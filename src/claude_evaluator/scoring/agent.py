@@ -5,12 +5,17 @@ AST parsing, step analysis, code analysis, and LLM-based scoring
 to produce a comprehensive ScoreReport using the multi-phase reviewer system.
 """
 
+from __future__ import annotations
+
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+    from claude_evaluator.models.benchmark.config import BenchmarkCriterion
 
 from claude_evaluator.models.evaluation.report import EvaluationReport
 from claude_evaluator.models.evaluation.score_report import (
@@ -294,12 +299,15 @@ class EvaluatorAgent:
         self,
         evaluation_path: Path | str,
         context: str = "",
+        criteria: list[BenchmarkCriterion] | None = None,
     ) -> ScoreReport:
         """Evaluate an evaluation report and produce scores.
 
         Args:
             evaluation_path: Path to the evaluation.json file.
             context: Additional context for scoring.
+            criteria: Optional benchmark criteria for dimension scoring.
+                If provided, uses criteria-based scoring instead of defaults.
 
         Returns:
             Complete ScoreReport with all dimension scores.
@@ -364,13 +372,25 @@ class EvaluatorAgent:
             reviewer_summary = None
 
         # Calculate dimension scores using score builder
-        dimension_scores = self.score_builder.calculate_dimension_scores(
-            reviewer_outputs=reviewer_outputs,
-            evaluation_outcome=evaluation.outcome.value,
-            total_tokens=evaluation.metrics.total_tokens,
-            turn_count=evaluation.metrics.turn_count,
-            total_cost=evaluation.metrics.total_cost_usd,
-        )
+        if criteria:
+            # Use criteria-based scoring
+            dimension_scores = self.score_builder.calculate_scores_from_criteria(
+                criteria=criteria,
+                reviewer_outputs=reviewer_outputs,
+                evaluation_outcome=evaluation.outcome.value,
+                total_tokens=evaluation.metrics.total_tokens,
+                turn_count=evaluation.metrics.turn_count,
+                total_cost=evaluation.metrics.total_cost_usd,
+            )
+        else:
+            # Use default scoring
+            dimension_scores = self.score_builder.calculate_dimension_scores(
+                reviewer_outputs=reviewer_outputs,
+                evaluation_outcome=evaluation.outcome.value,
+                total_tokens=evaluation.metrics.total_tokens,
+                turn_count=evaluation.metrics.turn_count,
+                total_cost=evaluation.metrics.total_cost_usd,
+            )
 
         # Calculate aggregate score
         aggregate_score = self.score_builder.calculate_aggregate_score(dimension_scores)

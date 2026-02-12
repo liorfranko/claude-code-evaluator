@@ -8,15 +8,12 @@ Claude Code Evaluator — a CLI tool that runs automated evaluations of Claude C
 
 ```bash
 pip install -e .                          # Install in dev mode
-claude-evaluator --suite evals/example-suite.yaml  # Run a suite
 claude-evaluator --workflow direct --task "..." # Ad-hoc evaluation
 claude-evaluator --score evaluations/.../evaluation.json # Score results
-claude-evaluator --suite evals/example-suite.yaml --sandbox docker # Run in Docker
-claude-evaluator --experiment experiment.yaml          # Run pairwise experiment
-claude-evaluator --experiment experiment.yaml --runs 3 # Override runs per config
 claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct --runs 5 # Run benchmark
 claude-evaluator --benchmark benchmarks/task-cli.yaml --compare  # Compare baselines
 claude-evaluator --benchmark benchmarks/task-cli.yaml --list     # List workflows
+claude-evaluator --benchmark benchmarks/task-cli.yaml --sandbox docker # Run in Docker
 ```
 
 ## Test
@@ -34,12 +31,11 @@ ruff format --check src/                 # Format check
 src/claude_evaluator/
   cli/              # CLI entry point, parser, commands, validators
   config/           # Settings, YAML loaders (config/loaders/)
-  models/           # Pydantic models (evaluation/, execution/, interaction/, experiment/, benchmark/)
+  models/           # Pydantic models (evaluation/, execution/, interaction/, benchmark/)
   agents/           # Execution agents (developer/, worker/)
   scoring/          # Scoring and analysis (analyzers/, checks/, reviewers/)
   evaluation/       # Evaluation orchestration, state, git operations
   workflows/        # Workflow strategies (direct, plan, multi_command)
-  experiment/       # Pairwise experiment system (runner, judge, statistics)
   benchmark/        # Benchmark system (runner, storage, comparison)
   sandbox/          # Execution isolation (docker, local)
   report/           # Report generation
@@ -62,7 +58,7 @@ src/claude_evaluator/
 
 - CLI dispatch: `parser.py` creates argparse, `main.py:_dispatch()` routes to command classes
 - New commands: add to `cli/commands/`, register in `cli/commands/__init__.py`
-- Lazy imports for optional features (e.g., experiment, sandbox) to keep startup fast
+- Lazy imports for optional features (e.g., sandbox) to keep startup fast
 - Settings via `pydantic-settings` with `CLAUDE_*` env var prefixes
 - Output path validation prevents writes outside CWD or temp dir
 
@@ -72,20 +68,8 @@ src/claude_evaluator/
 - `--sandbox docker` intercepts dispatch before any evaluation logic
 - Container runs the same CLI without `--sandbox` (no special code paths)
 - Auto-builds image on first use if not found
-- Mounts: output dir (rw), suite file (ro), GCloud ADC (ro)
+- Mounts: output dir (rw), benchmark file (ro), GCloud ADC (ro)
 - Forwards `ANTHROPIC_*`, `CLAUDE_*`, `CLOUD_ML_REGION` env vars
-
-## Experiment System
-
-- `--experiment FILE` runs pairwise comparison of configs (models, workflows, prompts)
-- `--runs N` overrides `runs_per_config` from YAML
-- Models split: `models/experiment.py` (result/domain), `models/experiment_models.py` (YAML config)
-- Config loader: `load_experiment()` in `config/loader.py` alongside `load_suite()`
-- Runtime: `experiment/runner.py` (orchestration), `experiment/judge.py` (LLM-as-judge), `experiment/statistics.py` (Wilcoxon, Elo, bootstrap CI, Cohen's d), `experiment/report_generator.py` (JSON/HTML/CLI)
-- Exceptions: `ExperimentError`, `JudgeError`, `StatisticsError` (all inherit `ClaudeEvaluatorError`)
-- No external stats dependencies — uses stdlib `math`/`statistics`/`random`
-- Position bias mitigation: judge each pair twice (A-B, B-A), reconcile or tie
-- Reuses existing `Phase`, `RepositorySource`, `WorkflowType` models via Pydantic auto-coercion
 
 ## Benchmark System
 
@@ -96,7 +80,15 @@ src/claude_evaluator/
 - `--verbose` shows progress output including tool usage
 - Config loader: `load_benchmark()` in `config/loaders/benchmark.py`
 - Runtime: `benchmark/runner.py` (orchestration), `benchmark/storage.py` (JSON persistence), `benchmark/comparison.py` (bootstrap CI, effect size)
-- Models: `models/benchmark/config.py` (YAML config), `models/benchmark/results.py` (baseline, stats)
+- Models: `models/benchmark/config.py` (YAML config), `models/benchmark/results.py` (baseline, stats, dimension scores)
 - Workspace: `results/{benchmark-name}/runs/{run-id}/workspace/` (not in git)
 - Baselines: `results/{benchmark-name}/{workflow}-v{version}.json`
 - Each run: clones repository, executes workflow, generates report, scores with EvaluatorAgent
+
+### Dimension Scoring
+
+- Benchmarks support per-dimension scoring (e.g., functionality, code_quality, efficiency)
+- Configure criteria in benchmark YAML under `evaluation.criteria` with name, weight, description
+- Scores are computed by `ScoreReportBuilder.calculate_scores_from_criteria()`
+- Per-dimension statistics (mean, std, CI) are stored in `BaselineStats.dimension_stats`
+- Comparison output shows dimension breakdown alongside overall scores

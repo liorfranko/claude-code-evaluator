@@ -15,6 +15,8 @@ from claude_evaluator.models.benchmark.results import (
     BaselineStats,
     BenchmarkBaseline,
     BenchmarkRun,
+    DimensionRunScore,
+    DimensionStats,
     RunMetrics,
 )
 
@@ -29,5 +31,7 @@ __all__ = [
     "BaselineStats",
     "BenchmarkBaseline",
     "BenchmarkRun",
+    "DimensionRunScore",
+    "DimensionStats",
     "RunMetrics",
 ]
