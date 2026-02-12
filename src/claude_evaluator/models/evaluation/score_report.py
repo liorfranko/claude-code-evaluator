@@ -449,8 +449,7 @@ class ScoreReport(BaseSchema):
     )
     dimension_scores: list[DimensionScore] = Field(
         ...,
-        min_length=2,
-        max_length=3,
+        min_length=1,
         description="Individual scores for each quality dimension",
     )
     rationale: str = Field(
