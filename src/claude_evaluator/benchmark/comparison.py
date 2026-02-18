@@ -277,7 +277,9 @@ def format_comparison_table(
     if comparisons:
         lines.append("")
         lines.append("Statistical Comparison (vs reference):")
-        ref_baseline = next((b for b in baselines if b.workflow_name == reference_name), None)
+        ref_baseline = next(
+            (b for b in baselines if b.workflow_name == reference_name), None
+        )
         if ref_baseline:
             lines.append(f"  Reference: {reference_name}")
             lines.append("")
@@ -304,6 +306,8 @@ def format_comparison_table(
     if baselines:
         best = max(baselines, key=lambda b: b.stats.mean)
         lines.append("")
-        lines.append(f"Best performing: {best.workflow_name} (mean={best.stats.mean:.1f})")
+        lines.append(
+            f"Best performing: {best.workflow_name} (mean={best.stats.mean:.1f})"
+        )
 
     return "\n".join(lines)

@@ -395,7 +395,9 @@ class ScoreReportBuilder:
                 else:
                     # Fallback based on code quality
                     error_score = 70
-                    rationale = "No error handling review available; default score assigned."
+                    rationale = (
+                        "No error handling review available; default score assigned."
+                    )
 
                 dimension_scores.append(
                     DimensionScore(
@@ -422,7 +424,9 @@ class ScoreReportBuilder:
                 else:
                     # Default score for unknown criterion
                     score = 70
-                    rationale = f"No reviewer found for '{name}'; default score assigned."
+                    rationale = (
+                        f"No reviewer found for '{name}'; default score assigned."
+                    )
 
                 # Use task_completion as fallback dimension type
                 dimension_scores.append(

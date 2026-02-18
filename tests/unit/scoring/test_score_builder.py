@@ -6,8 +6,15 @@ Tests dimension score calculation, aggregate scoring, and criteria-based scoring
 import pytest
 
 from claude_evaluator.models.benchmark.config import BenchmarkCriterion
-from claude_evaluator.models.evaluation.score_report import DimensionScore, DimensionType
-from claude_evaluator.models.reviewer import IssueSeverity, ReviewerIssue, ReviewerOutput
+from claude_evaluator.models.evaluation.score_report import (
+    DimensionScore,
+    DimensionType,
+)
+from claude_evaluator.models.reviewer import (
+    IssueSeverity,
+    ReviewerIssue,
+    ReviewerOutput,
+)
 from claude_evaluator.scoring.score_builder import ScoreReportBuilder
 
 

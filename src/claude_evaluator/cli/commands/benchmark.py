@@ -175,7 +175,9 @@ class RunBenchmarkCommand(BaseCommand):
             reference = baselines[0].workflow_name
 
         comparisons = compare_baselines(baselines, reference_name=reference)
-        table = format_comparison_table(baselines, comparisons, reference_name=reference or "")
+        table = format_comparison_table(
+            baselines, comparisons, reference_name=reference or ""
+        )
 
         return CommandResult(
             exit_code=0,
@@ -271,7 +273,9 @@ class RunBenchmarkCommand(BaseCommand):
             lines.append("Dimension Scores:")
             for dim_name, dim_stats in sorted(stats.dimension_stats.items()):
                 dim_ci_str = f"[{dim_stats.ci_95[0]:.1f}, {dim_stats.ci_95[1]:.1f}]"
-                lines.append(f"  {dim_name:<18} {dim_stats.mean:5.1f} ± {dim_stats.std:.1f}  CI: {dim_ci_str}")
+                lines.append(
+                    f"  {dim_name:<18} {dim_stats.mean:5.1f} ± {dim_stats.std:.1f}  CI: {dim_ci_str}"
+                )
 
         lines.append("")
 
@@ -280,8 +284,12 @@ class RunBenchmarkCommand(BaseCommand):
         for i, run in enumerate(baseline.runs, 1):
             dim_summary = ""
             if run.dimension_scores:
-                dim_parts = [f"{k}={v.score}" for k, v in sorted(run.dimension_scores.items())]
+                dim_parts = [
+                    f"{k}={v.score}" for k, v in sorted(run.dimension_scores.items())
+                ]
                 dim_summary = f" ({', '.join(dim_parts)})"
-            lines.append(f"  Run {i}: {run.score} ({run.duration_seconds}s){dim_summary}")
+            lines.append(
+                f"  Run {i}: {run.score} ({run.duration_seconds}s){dim_summary}"
+            )
 
         return "\n".join(lines)

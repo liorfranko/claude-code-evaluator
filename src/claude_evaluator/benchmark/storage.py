@@ -105,9 +105,7 @@ class BenchmarkStorage:
             return BenchmarkBaseline.model_validate(data)
 
         except json.JSONDecodeError as e:
-            raise StorageError(
-                f"Failed to parse baseline from {file_path}: {e}"
-            ) from e
+            raise StorageError(f"Failed to parse baseline from {file_path}: {e}") from e
         except OSError as e:
             raise StorageError(f"Failed to read baseline from {file_path}: {e}") from e
         except Exception as e:

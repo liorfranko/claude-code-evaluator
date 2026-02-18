@@ -119,9 +119,7 @@ def _parse_repository(data: dict[str, Any], context: str) -> RepositorySource:
         raise ConfigurationError(f"Missing required field 'repository' in {context}")
 
     if not isinstance(repo_data, dict):
-        raise ConfigurationError(
-            f"Invalid 'repository': expected mapping in {context}"
-        )
+        raise ConfigurationError(f"Invalid 'repository': expected mapping in {context}")
 
     repo_context = f"repository in {context}"
     v = FieldValidator(repo_data, repo_context)
@@ -169,9 +167,7 @@ def _parse_defaults(data: dict[str, Any], source_path: Path) -> BenchmarkDefault
     )
 
 
-def _parse_evaluation(
-    data: Any, source_path: Path
-) -> BenchmarkEvaluation:
+def _parse_evaluation(data: Any, source_path: Path) -> BenchmarkEvaluation:
     """Parse evaluation criteria configuration.
 
     Args:
@@ -261,7 +257,9 @@ def _parse_workflows(
         raise ConfigurationError(f"Invalid 'workflows': expected mapping in {context}")
 
     if not workflows_data:
-        raise ConfigurationError(f"Empty 'workflows': at least one workflow required in {context}")
+        raise ConfigurationError(
+            f"Empty 'workflows': at least one workflow required in {context}"
+        )
 
     workflows: dict[str, WorkflowDefinition] = {}
     for name, workflow_data in workflows_data.items():

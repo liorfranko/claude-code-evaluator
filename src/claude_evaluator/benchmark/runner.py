@@ -273,8 +273,14 @@ class BenchmarkRunner:
             report_path = await self._generate_report(evaluation, workspace)
 
             # Score the result with criteria if available
-            criteria = self.config.evaluation.criteria if self.config.evaluation.criteria else None
-            score_report = await self._score_evaluation(report_path, workspace, criteria)
+            criteria = (
+                self.config.evaluation.criteria
+                if self.config.evaluation.criteria
+                else None
+            )
+            score_report = await self._score_evaluation(
+                report_path, workspace, criteria
+            )
 
             # Extract dimension scores from score report
             dimension_scores: dict[str, DimensionRunScore] = {}
@@ -513,7 +519,9 @@ class BenchmarkRunner:
             if dim_scores:
                 dim_mean = stats_lib.mean(dim_scores)
                 dim_std = stats_lib.stdev(dim_scores) if len(dim_scores) > 1 else 0.0
-                dim_ci_lower, dim_ci_upper = bootstrap_ci(dim_scores, confidence_level=0.95)
+                dim_ci_lower, dim_ci_upper = bootstrap_ci(
+                    dim_scores, confidence_level=0.95
+                )
                 dimension_stats[dim_name] = DimensionStats(
                     mean=round(dim_mean, 2),
                     std=round(dim_std, 2),
