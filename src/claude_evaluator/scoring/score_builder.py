@@ -450,13 +450,15 @@ class ScoreReportBuilder:
                         hint="Check that criterion name matches a registered reviewer",
                     )
 
-                # Use task_completion as fallback dimension type
+                # Use task_completion as fallback dimension type, but preserve
+                # the original criterion name to avoid key collisions
                 dimension_scores.append(
                     DimensionScore(
                         dimension_name=DimensionType.task_completion,
                         score=score,
                         weight=weight,
                         rationale=rationale,
+                        criterion_name=name,
                     )
                 )
 

@@ -78,6 +78,7 @@ class DimensionScore(BaseSchema):
         weight: Weight applied in aggregate calculation (0.0-1.0).
         rationale: Explanation for this dimension's score.
         sub_scores: Breakdown of score components (for code_quality).
+        criterion_name: Original criterion name from benchmark config (if different).
 
     """
 
@@ -105,6 +106,10 @@ class DimensionScore(BaseSchema):
     sub_scores: dict[str, int] | None = Field(
         default=None,
         description="Breakdown of score components (for code_quality)",
+    )
+    criterion_name: str | None = Field(
+        default=None,
+        description="Original criterion name from benchmark config (for unknown criteria)",
     )
 
 

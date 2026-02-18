@@ -157,6 +157,40 @@ class TestValidateArgs:
         assert error is not None
         assert "--benchmark requires --workflow" in error
 
+    def test_error_results_dir_outside_cwd(self, tmp_path: Path) -> None:
+        """Test error when --results-dir is outside CWD and temp dir."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test\nworkflows: {}")
+
+        args = Namespace(
+            benchmark=str(bench_file),
+            workflow="direct",
+            compare=False,
+            list_workflows=False,
+            results_dir="/etc/passwd",  # Outside allowed directories
+        )
+        error = validate_args(args)
+        assert error is not None
+        assert "must be within" in error
+
+    def test_valid_results_dir_in_cwd(self, tmp_path: Path, monkeypatch) -> None:
+        """Test that results-dir within CWD is valid."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test\nworkflows: {}")
+        results_dir = tmp_path / "results"
+
+        # Change CWD to tmp_path so results_dir is within it
+        monkeypatch.chdir(tmp_path)
+
+        args = Namespace(
+            benchmark=str(bench_file),
+            workflow="direct",
+            compare=False,
+            list_workflows=False,
+            results_dir=str(results_dir),
+        )
+        assert validate_args(args) is None
+
 
 class TestFormatResults:
     """Tests for format_results function."""

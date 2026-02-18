@@ -227,10 +227,12 @@ class BenchmarkRunner:
 
         """
         # Generate date-centric run ID: HH-MM-SS_workflow_uuid
+        # Sanitize workflow_name for filesystem safety (prevent path traversal)
+        safe_workflow_name = self._sanitize_path_component(workflow_name)
         now = datetime.now()
         date_str = now.strftime("%Y-%m-%d")
         time_str = now.strftime("%H-%M-%S")
-        run_id = f"{time_str}_{workflow_name}_{uuid4().hex[:8]}"
+        run_id = f"{time_str}_{safe_workflow_name}_{uuid4().hex[:8]}"
         start_time = time.time()
 
         # Setup fresh repository for this run under date-organized directory
@@ -283,11 +285,20 @@ class BenchmarkRunner:
             )
 
             # Extract dimension scores from score report
+            # Use criterion_name if present (for unknown criteria) to avoid key collisions
             dimension_scores: dict[str, DimensionRunScore] = {}
             for dim_score in score_report.dimension_scores:
-                dim_name = dim_score.dimension_name.value
-                dimension_scores[dim_name] = DimensionRunScore(
-                    name=dim_name,
+                # Use criterion_name if set, otherwise use dimension_name.value
+                key = dim_score.criterion_name or dim_score.dimension_name.value
+                if key in dimension_scores:
+                    logger.warning(
+                        "dimension_score_overwritten",
+                        key=key,
+                        original_score=dimension_scores[key].score,
+                        new_score=dim_score.score,
+                    )
+                dimension_scores[key] = DimensionRunScore(
+                    name=key,
                     score=dim_score.score,
                     weight=dim_score.weight,
                     rationale=dim_score.rationale,
@@ -557,3 +568,25 @@ class BenchmarkRunner:
 
         """
         return self._storage
+
+    @staticmethod
+    def _sanitize_path_component(name: str) -> str:
+        """Sanitize a string for safe use in filesystem paths.
+
+        Prevents path traversal by replacing dangerous characters.
+
+        Args:
+            name: The string to sanitize.
+
+        Returns:
+            A filesystem-safe version of the string.
+
+        """
+        # Replace path separators and parent directory references
+        safe = name.replace("/", "-").replace("\\", "-").replace("..", "_")
+        # Remove any remaining problematic characters
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe)
+        # Ensure it doesn't start with a dot (hidden file) or hyphen
+        while safe.startswith((".", "-")):
+            safe = safe[1:] if len(safe) > 1 else "unnamed"
+        return safe or "unnamed"

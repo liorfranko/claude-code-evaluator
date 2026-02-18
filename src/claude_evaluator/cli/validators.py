@@ -78,6 +78,14 @@ def validate_args(args: argparse.Namespace) -> str | None:
         workflow = getattr(args, "workflow", None)
         if not compare and not list_wf and workflow is None:
             return "Error: --benchmark requires --workflow (or use --compare or --list)"
+
+        # Validate --results-dir is within safe boundaries
+        results_dir = getattr(args, "results_dir", None)
+        if results_dir is not None:
+            results_error = validate_output_path(results_dir)
+            if results_error:
+                return results_error
+
         return None
 
     score = getattr(args, "score", None)
