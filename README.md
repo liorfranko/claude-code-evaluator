@@ -28,14 +28,6 @@ cd claude-code-evaluator
 pip install -e .
 ```
 
-For SDK-based execution with Q&A support:
-
-```bash
-pip install claude-evaluator[sdk]
-# or
-pip install claude-agent-sdk
-```
-
 ## Quick Start
 
 1. Run an ad-hoc evaluation:
@@ -535,7 +527,7 @@ The evaluator uses a multi-agent architecture:
 ## Requirements
 
 - Python 3.10+
-- `claude-agent-sdk` for SDK-based execution
+- `claude-agent-sdk` (installed automatically)
 
 ## License
 
