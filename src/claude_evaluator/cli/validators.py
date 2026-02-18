@@ -86,6 +86,12 @@ def validate_args(args: argparse.Namespace) -> str | None:
             if results_error:
                 return results_error
 
+        # Validate --output is within safe boundaries (also applies to benchmark mode)
+        if getattr(args, "output", None):
+            output_error = validate_output_path(args.output)
+            if output_error:
+                return output_error
+
         return None
 
     score = getattr(args, "score", None)

@@ -502,6 +502,65 @@ class TestCalculateScoresFromCriteria:
         assert task_score.weight == 0.7
         assert efficiency_score.weight == 0.3
 
+    def test_criteria_alias_collision_prevented(
+        self,
+        builder: ScoreReportBuilder,
+        task_output: ReviewerOutput,
+    ) -> None:
+        """Test that task_completion and functionality don't collide.
+
+        Both map to DimensionType.task_completion, but should have different
+        criterion_name values to prevent one overwriting the other.
+        """
+        criteria = [
+            BenchmarkCriterion(name="task_completion", weight=0.5),
+            BenchmarkCriterion(name="functionality", weight=0.5),
+        ]
+        result = builder.calculate_scores_from_criteria(
+            criteria=criteria,
+            reviewer_outputs=[task_output],
+            evaluation_outcome="success",
+            total_tokens=10000,
+            turn_count=5,
+            total_cost=0.05,
+        )
+        # Both should be present, not one overwriting the other
+        assert len(result) == 2
+        # Both should have DimensionType.task_completion
+        assert all(ds.dimension_name == DimensionType.task_completion for ds in result)
+        # But different criterion_name values
+        criterion_names = {ds.criterion_name for ds in result}
+        assert criterion_names == {"task_completion", "functionality"}
+
+    def test_all_criteria_have_criterion_name(
+        self,
+        builder: ScoreReportBuilder,
+        task_output: ReviewerOutput,
+        code_output: ReviewerOutput,
+        error_output: ReviewerOutput,
+    ) -> None:
+        """Test that all criteria have criterion_name set for dict keying."""
+        criteria = [
+            BenchmarkCriterion(name="task_completion", weight=0.2),
+            BenchmarkCriterion(name="code_quality", weight=0.2),
+            BenchmarkCriterion(name="efficiency", weight=0.2),
+            BenchmarkCriterion(name="error_handling", weight=0.2),
+            BenchmarkCriterion(name="custom_criterion", weight=0.2),
+        ]
+        result = builder.calculate_scores_from_criteria(
+            criteria=criteria,
+            reviewer_outputs=[task_output, code_output, error_output],
+            evaluation_outcome="success",
+            total_tokens=10000,
+            turn_count=5,
+            total_cost=0.05,
+        )
+        # All dimension scores should have criterion_name set
+        for ds in result:
+            assert ds.criterion_name is not None, (
+                f"criterion_name not set for {ds.dimension_name}"
+            )
+
 
 class TestEfficiencyScoring:
     """Tests for efficiency score calculation."""

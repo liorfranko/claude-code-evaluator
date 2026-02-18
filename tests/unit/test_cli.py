@@ -191,6 +191,22 @@ class TestValidateArgs:
         )
         assert validate_args(args) is None
 
+    def test_error_benchmark_output_outside_cwd(self, tmp_path: Path) -> None:
+        """Test error when --benchmark --output is outside CWD and temp dir."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test\nworkflows: {}")
+
+        args = Namespace(
+            benchmark=str(bench_file),
+            workflow="direct",
+            compare=False,
+            list_workflows=False,
+            output="/etc/passwd",  # Outside allowed directories
+        )
+        error = validate_args(args)
+        assert error is not None
+        assert "must be within" in error
+
 
 class TestFormatResults:
     """Tests for format_results function."""

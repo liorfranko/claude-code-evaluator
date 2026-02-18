@@ -328,6 +328,7 @@ class ScoreReportBuilder:
             weight = criterion.weight
 
             # Map criterion names to scores
+            # Always set criterion_name to preserve the original name and avoid collisions
             if name in ("task_completion", "functionality"):
                 task_score = self._calculate_task_completion_score(
                     reviewer_outputs=reviewer_outputs,
@@ -340,6 +341,7 @@ class ScoreReportBuilder:
                         weight=weight,
                         rationale=task_score.rationale,
                         sub_scores=task_score.sub_scores,
+                        criterion_name=name,
                     )
                 )
 
@@ -353,6 +355,7 @@ class ScoreReportBuilder:
                             weight=weight,
                             rationale=code_score.rationale,
                             sub_scores=code_score.sub_scores,
+                            criterion_name=name,
                         )
                     )
                 else:
@@ -369,6 +372,7 @@ class ScoreReportBuilder:
                             score=70,
                             weight=weight,
                             rationale="No code quality analysis available; default score assigned.",
+                            criterion_name=name,
                         )
                     )
 
@@ -385,6 +389,7 @@ class ScoreReportBuilder:
                         weight=weight,
                         rationale=efficiency_score.rationale,
                         sub_scores=efficiency_score.sub_scores,
+                        criterion_name=name,
                     )
                 )
 
@@ -420,6 +425,7 @@ class ScoreReportBuilder:
                         score=error_score,
                         weight=weight,
                         rationale=rationale,
+                        criterion_name=name,
                     )
                 )
 
