@@ -1,0 +1,106 @@
+name: Codex PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  codex:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      final_message: ${{ steps.run_codex.outputs.final-message }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Pre-fetch base and head refs for the PR
+        run: |
+          git fetch --no-tags origin \
+            ${{ github.event.pull_request.base.ref }} \
+            +refs/pull/${{ github.event.pull_request.number }}/head
+
+      - name: Run Codex
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          safety-strategy: drop-sudo
+          prompt: |
+            This is PR #${{ github.event.pull_request.number }} for ${{ github.repository }}.
+
+            First, read CLAUDE.md at the repository root for project-specific:
+            - Code style and conventions
+            - Architecture guidelines
+            - Important development rules
+            - Python coding patterns to follow/avoid
+
+            Review ONLY the changes introduced by the PR by examining:
+               git log --oneline ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
+
+            This is a Claude Code Evaluator project - a CLI tool that runs automated evaluations
+            of Claude Code agent implementations using a two-agent architecture (Worker + Developer)
+            with an Evaluator agent for scoring.
+
+            Project structure:
+            - src/claude_evaluator/cli/ - CLI entry point, parser, commands
+            - src/claude_evaluator/config/ - Settings, YAML loaders
+            - src/claude_evaluator/models/ - Pydantic models
+            - src/claude_evaluator/agents/ - Execution agents (developer, worker)
+            - src/claude_evaluator/scoring/ - Scoring and analysis
+            - src/claude_evaluator/evaluation/ - Evaluation orchestration
+            - src/claude_evaluator/workflows/ - Workflow strategies
+            - src/claude_evaluator/benchmark/ - Benchmark system
+            - src/claude_evaluator/sandbox/ - Execution isolation
+
+            Focus your review on:
+            1. Potential bugs or logic errors
+            2. Security vulnerabilities (especially command injection, path traversal)
+            3. Adherence to CLAUDE.md conventions and patterns
+            4. Missing error handling (check CLAUDE.md for error handling patterns)
+            5. Type safety issues (Python 3.10+ type hints, Pydantic v2 models)
+            6. Code smells:
+               - Long methods or functions (>50 lines)
+               - Deep nesting (>3 levels)
+               - Duplicate code
+               - Dead code or unused variables
+               - Magic numbers/strings without constants
+               - God classes or functions doing too much
+               - Inappropriate intimacy (tight coupling)
+               - Feature envy (methods using other class's data excessively)
+               - Primitive obsession (using primitives instead of small objects)
+               - Long parameter lists (>4 parameters)
+
+            Flag only actionable issues introduced by this PR.
+            When flagging an issue, cite the affected file and line.
+            Be concise and specific. Only mention significant issues.
+
+            Pull request title and body:
+            ----
+            ${{ github.event.pull_request.title }}
+            ${{ github.event.pull_request.body }}
+
+  post_feedback:
+    runs-on: ubuntu-latest
+    needs: codex
+    if: needs.codex.outputs.final_message != ''
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Report Codex feedback
+        uses: actions/github-script@v7
+        env:
+          CODEX_FINAL_MESSAGE: ${{ needs.codex.outputs.final_message }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: process.env.CODEX_FINAL_MESSAGE,
+            });

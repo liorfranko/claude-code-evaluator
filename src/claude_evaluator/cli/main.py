@@ -10,9 +10,7 @@ import traceback
 
 from claude_evaluator.cli.commands import (
     RunEvaluationCommand,
-    RunSuiteCommand,
     ScoreCommand,
-    ValidateSuiteCommand,
 )
 from claude_evaluator.cli.formatters import format_results
 from claude_evaluator.cli.parser import create_parser
@@ -41,16 +39,6 @@ async def _dispatch(args: argparse.Namespace) -> int:
         sandbox = DockerSandbox()
         return await sandbox.run(args)
 
-    # Handle experiment command
-    if getattr(args, "experiment", None):
-        from claude_evaluator.cli.commands.experiment import RunExperimentCommand
-
-        experiment_cmd = RunExperimentCommand()
-        result = await experiment_cmd.execute(args)
-        if result.message:
-            print(result.message)
-        return result.exit_code
-
     # Handle benchmark command
     if getattr(args, "benchmark", None):
         from claude_evaluator.cli.commands.benchmark import RunBenchmarkCommand
@@ -68,20 +56,6 @@ async def _dispatch(args: argparse.Namespace) -> int:
         result = await score_cmd.execute(args)
         if result.message:
             print(result.message)
-        return result.exit_code
-
-    # Handle dry-run (validation only)
-    if args.dry_run:
-        validate_cmd = ValidateSuiteCommand()
-        result = await validate_cmd.execute(args)
-        return result.exit_code
-
-    # Handle suite execution
-    if args.suite:
-        suite_cmd = RunSuiteCommand()
-        result = await suite_cmd.execute(args)
-        output = format_results(result.reports, json_output=args.json_output)
-        print(output)
         return result.exit_code
 
     # Handle ad-hoc evaluation

@@ -27,6 +27,8 @@ from claude_evaluator.models.benchmark.results import (
     BaselineStats,
     BenchmarkBaseline,
     BenchmarkRun,
+    DimensionRunScore,
+    DimensionStats,
     RunMetrics,
 )
 from claude_evaluator.models.enums import WorkflowType
@@ -78,7 +80,7 @@ class BenchmarkRunner:
         """
         self.config = config
         self.results_dir = results_dir or Path("results")
-        self._storage = BenchmarkStorage(self.results_dir / config.name)
+        self._storage = BenchmarkStorage(self.results_dir / config.name / "baselines")
 
     async def execute(
         self,
@@ -124,7 +126,6 @@ class BenchmarkRunner:
             result = await self._execute_single_run(
                 workflow_def=workflow_def,
                 workflow_name=workflow_name,
-                run_index=i,
                 verbose=verbose,
             )
             run_results.append(result)
@@ -168,14 +169,15 @@ class BenchmarkRunner:
 
         return baseline
 
-    async def _setup_repository(self, run_id: str) -> Path:
+    async def _setup_repository(self, run_id: str, date_str: str) -> Path:
         """Clone repository to workspace under results directory.
 
-        Creates a workspace structure like regular evaluations:
-        results/{benchmark_name}/runs/{run_id}/workspace/
+        Creates a date-centric workspace structure:
+        results/{benchmark_name}/runs/{YYYY-MM-DD}/{run_id}/workspace/
 
         Args:
-            run_id: Unique identifier for this run.
+            run_id: Unique identifier for this run (format: HH-MM-SS_workflow_uuid).
+            date_str: Date string in YYYY-MM-DD format.
 
         Returns:
             Path to cloned repository workspace.
@@ -184,8 +186,8 @@ class BenchmarkRunner:
             RepositoryError: If clone fails.
 
         """
-        # Create workspace under results_dir like regular evaluations
-        run_dir = self.results_dir / self.config.name / "runs" / run_id
+        # Create workspace under date-organized directory
+        run_dir = self.results_dir / self.config.name / "runs" / date_str / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
         workspace = run_dir / "workspace"
@@ -207,7 +209,6 @@ class BenchmarkRunner:
         self,
         workflow_def: WorkflowDefinition,
         workflow_name: str,
-        run_index: int,
         verbose: bool = False,
     ) -> BenchmarkRun:
         """Execute a single benchmark run.
@@ -215,7 +216,6 @@ class BenchmarkRunner:
         Args:
             workflow_def: The workflow definition to execute.
             workflow_name: Name of the workflow.
-            run_index: Index of this run (0-based).
             verbose: Whether to print progress output.
 
         Returns:
@@ -226,11 +226,17 @@ class BenchmarkRunner:
             RepositoryError: If repository setup fails.
 
         """
-        run_id = f"{workflow_name}-{run_index}-{uuid4().hex[:8]}"
+        # Generate date-centric run ID: HH-MM-SS_workflow_uuid
+        # Sanitize workflow_name for filesystem safety (prevent path traversal)
+        safe_workflow_name = self._sanitize_path_component(workflow_name)
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H-%M-%S")
+        run_id = f"{time_str}_{safe_workflow_name}_{uuid4().hex[:8]}"
         start_time = time.time()
 
-        # Setup fresh repository for this run under results directory
-        workspace = await self._setup_repository(run_id=run_id)
+        # Setup fresh repository for this run under date-organized directory
+        workspace = await self._setup_repository(run_id=run_id, date_str=date_str)
 
         if verbose:
             print(f"  Workspace: {workspace}")
@@ -268,8 +274,35 @@ class BenchmarkRunner:
             # Generate report from the completed evaluation
             report_path = await self._generate_report(evaluation, workspace)
 
-            # Score the result
-            score_report = await self._score_evaluation(report_path, workspace)
+            # Score the result with criteria if available
+            criteria = (
+                self.config.evaluation.criteria
+                if self.config.evaluation.criteria
+                else None
+            )
+            score_report = await self._score_evaluation(
+                report_path, workspace, criteria
+            )
+
+            # Extract dimension scores from score report
+            # Use criterion_name if present (for unknown criteria) to avoid key collisions
+            dimension_scores: dict[str, DimensionRunScore] = {}
+            for dim_score in score_report.dimension_scores:
+                # Use criterion_name if set, otherwise use dimension_name.value
+                key = dim_score.criterion_name or dim_score.dimension_name.value
+                if key in dimension_scores:
+                    logger.warning(
+                        "dimension_score_overwritten",
+                        key=key,
+                        original_score=dimension_scores[key].score,
+                        new_score=dim_score.score,
+                    )
+                dimension_scores[key] = DimensionRunScore(
+                    name=key,
+                    score=dim_score.score,
+                    weight=dim_score.weight,
+                    rationale=dim_score.rationale,
+                )
 
             duration = int(time.time() - start_time)
 
@@ -285,11 +318,18 @@ class BenchmarkRunner:
                     total_cost_usd=metrics.total_cost_usd,
                     turn_count=metrics.turn_count,
                 ),
+                dimension_scores=dimension_scores,
             )
 
+        except KeyboardInterrupt:
+            logger.info("benchmark_run_interrupted", run_id=run_id)
+            raise
+        except (WorkflowExecutionError, RepositoryError):
+            # Already the right exception types, re-raise as-is
+            raise
         except Exception as e:
             logger.error(
-                "benchmark_run_failed",
+                "benchmark_run_unexpected_error",
                 run_id=run_id,
                 error=str(e),
                 error_type=type(e).__name__,
@@ -432,12 +472,14 @@ class BenchmarkRunner:
         self,
         report_path: Path,
         workspace: Path,
+        criteria: list | None = None,
     ) -> ScoreReport:
         """Score the evaluation using EvaluatorAgent.
 
         Args:
             report_path: Path to the EvaluationReport JSON file.
             workspace: Path to the workspace.
+            criteria: Optional benchmark criteria for dimension scoring.
 
         Returns:
             ScoreReport with scores.
@@ -450,7 +492,10 @@ class BenchmarkRunner:
             enable_ast=True,
         )
 
-        return await evaluator.evaluate(evaluation_path=report_path)
+        return await evaluator.evaluate(
+            evaluation_path=report_path,
+            criteria=criteria,
+        )
 
     def _compute_stats(self, runs: list[BenchmarkRun]) -> BaselineStats:
         """Compute statistics from run results.
@@ -459,7 +504,7 @@ class BenchmarkRunner:
             runs: List of benchmark runs.
 
         Returns:
-            BaselineStats with mean, std, CI, and n.
+            BaselineStats with mean, std, CI, n, and per-dimension stats.
 
         """
         from claude_evaluator.benchmark.comparison import bootstrap_ci
@@ -474,11 +519,45 @@ class BenchmarkRunner:
         std = stats_lib.stdev(scores) if n > 1 else 0.0
         ci_lower, ci_upper = bootstrap_ci(scores, confidence_level=0.95)
 
+        # Compute per-dimension statistics
+        dimension_stats: dict[str, DimensionStats] = {}
+
+        # Collect all dimension names from runs
+        dimension_names: set[str] = set()
+        for run in runs:
+            dimension_names.update(run.dimension_scores.keys())
+
+        for dim_name in dimension_names:
+            dim_scores = [
+                run.dimension_scores[dim_name].score
+                for run in runs
+                if dim_name in run.dimension_scores
+            ]
+            if dim_scores:
+                if len(dim_scores) < n:
+                    logger.warning(
+                        "dimension_stats_partial_data",
+                        dimension=dim_name,
+                        samples=len(dim_scores),
+                        total_runs=n,
+                    )
+                dim_mean = stats_lib.mean(dim_scores)
+                dim_std = stats_lib.stdev(dim_scores) if len(dim_scores) > 1 else 0.0
+                dim_ci_lower, dim_ci_upper = bootstrap_ci(
+                    dim_scores, confidence_level=0.95
+                )
+                dimension_stats[dim_name] = DimensionStats(
+                    mean=round(dim_mean, 2),
+                    std=round(dim_std, 2),
+                    ci_95=(round(dim_ci_lower, 2), round(dim_ci_upper, 2)),
+                )
+
         return BaselineStats(
             mean=round(mean, 2),
             std=round(std, 2),
             ci_95=(round(ci_lower, 2), round(ci_upper, 2)),
             n=n,
+            dimension_stats=dimension_stats,
         )
 
     def get_storage(self) -> BenchmarkStorage:
@@ -489,3 +568,25 @@ class BenchmarkRunner:
 
         """
         return self._storage
+
+    @staticmethod
+    def _sanitize_path_component(name: str) -> str:
+        """Sanitize a string for safe use in filesystem paths.
+
+        Prevents path traversal by replacing dangerous characters.
+
+        Args:
+            name: The string to sanitize.
+
+        Returns:
+            A filesystem-safe version of the string.
+
+        """
+        # Replace path separators and parent directory references
+        safe = name.replace("/", "-").replace("\\", "-").replace("..", "_")
+        # Remove any remaining problematic characters
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe)
+        # Ensure it doesn't start with a dot (hidden file) or hyphen
+        while safe.startswith((".", "-")):
+            safe = safe[1:] if len(safe) > 1 else "unnamed"
+        return safe or "unnamed"

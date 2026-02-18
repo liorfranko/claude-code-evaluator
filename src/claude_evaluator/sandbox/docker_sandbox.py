@@ -32,6 +32,8 @@ _BOOL_FLAGS = [
     ("json_output", "--json", False),
     ("dry_run", "--dry-run", False),
     ("no_ast", "--no-ast", False),
+    ("compare", "--compare", False),
+    ("list_workflows", "--list", False),
 ]
 
 # Mapping of (argparse attr, CLI flag) for value flags forwarded to container
@@ -40,6 +42,7 @@ _VALUE_FLAGS = [
     ("workflow", "--workflow"),
     ("task", "--task"),
     ("timeout", "--timeout"),
+    ("benchmark_version", "--benchmark-version"),
 ]
 
 
@@ -177,15 +180,17 @@ class DockerSandbox(BaseSandbox):
         Path(host_output).mkdir(parents=True, exist_ok=True)
         flags.extend(["-v", f"{host_output}:/app/output"])
 
-        # Suite file (read-only)
-        if getattr(args, "suite", None):
-            host_suite = str(Path(args.suite).resolve())
-            flags.extend(["-v", f"{host_suite}:/app/suite.yaml:ro"])
+        # Results directory (read-write) for benchmark baselines and run artifacts
+        # Use --results-dir if provided, otherwise default to ./results
+        host_results = getattr(args, "results_dir", None) or "./results"
+        host_results = str(Path(host_results).resolve())
+        Path(host_results).mkdir(parents=True, exist_ok=True)
+        flags.extend(["-v", f"{host_results}:/app/results"])
 
-        # Experiment file (read-only)
-        if getattr(args, "experiment", None):
-            host_experiment = str(Path(args.experiment).resolve())
-            flags.extend(["-v", f"{host_experiment}:/app/experiment.yaml:ro"])
+        # Benchmark file (read-only)
+        if getattr(args, "benchmark", None):
+            host_benchmark = str(Path(args.benchmark).resolve())
+            flags.extend(["-v", f"{host_benchmark}:/app/benchmark.yaml:ro"])
 
         # GCloud ADC credentials (read-only)
         adc_path = Path.home() / ".config/gcloud/application_default_credentials.json"
@@ -208,10 +213,8 @@ class DockerSandbox(BaseSandbox):
         inner: list[str] = []
 
         # Path arguments are remapped to container paths
-        if getattr(args, "suite", None):
-            inner.extend(["--suite", "/app/suite.yaml"])
-        if getattr(args, "experiment", None):
-            inner.extend(["--experiment", "/app/experiment.yaml"])
+        if getattr(args, "benchmark", None):
+            inner.extend(["--benchmark", "/app/benchmark.yaml"])
 
         # Value flags
         for attr, flag in _VALUE_FLAGS:
@@ -220,6 +223,9 @@ class DockerSandbox(BaseSandbox):
                 inner.extend([flag, str(value)])
 
         inner.extend(["--output", "/app/output"])
+
+        # Results directory is always mounted at /app/results (for benchmark baselines)
+        inner.extend(["--results-dir", "/app/results"])
 
         # Boolean flags
         for attr, flag, default in _BOOL_FLAGS:

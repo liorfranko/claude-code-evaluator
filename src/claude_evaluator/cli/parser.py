@@ -27,17 +27,8 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run a suite of evaluations
-  claude-evaluator --suite evals/greenfield.yaml
-
   # Run an ad-hoc evaluation with a specific workflow
   claude-evaluator --workflow direct --task "Create a hello world script"
-
-  # Validate a suite without running
-  claude-evaluator --suite evals/example.yaml --dry-run
-
-  # Output results as JSON
-  claude-evaluator --suite evals/example.yaml --json
 
   # Score an evaluation result
   claude-evaluator --score evaluations/2026-02-02T14-51-21/evaluation.json
@@ -55,7 +46,7 @@ Examples:
   claude-evaluator --score evaluation.json --verbose
 
   # Run inside a Docker container for isolation
-  claude-evaluator --suite evals/example.yaml --sandbox docker
+  claude-evaluator --benchmark benchmarks/task-cli.yaml --sandbox docker
 
 For more information, see the documentation.
 """,
@@ -66,14 +57,6 @@ For more information, see the documentation.
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
-    )
-
-    # Suite execution
-    parser.add_argument(
-        "--suite",
-        type=str,
-        metavar="FILE",
-        help="Path to YAML suite file to execute",
     )
 
     # Ad-hoc evaluation / Benchmark workflow
@@ -126,13 +109,6 @@ For more information, see the documentation.
         help="Output results as JSON instead of formatted text",
     )
 
-    # Validation
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Validate suite configuration without running evaluations",
-    )
-
     # Score command
     parser.add_argument(
         "--score",
@@ -164,22 +140,13 @@ For more information, see the documentation.
         help="Run the evaluation inside an isolated sandbox (e.g. docker)",
     )
 
-    # Experiment arguments
-    parser.add_argument(
-        "--experiment",
-        type=str,
-        metavar="FILE",
-        help="Path to experiment YAML config for pairwise comparison",
-    )
-
+    # Benchmark arguments
     parser.add_argument(
         "--runs",
         type=int,
         metavar="N",
-        help="Override number of runs per config from experiment YAML",
+        help="Number of benchmark runs to execute (default: 5)",
     )
-
-    # Benchmark arguments
     parser.add_argument(
         "--benchmark",
         type=str,

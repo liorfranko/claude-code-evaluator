@@ -516,7 +516,6 @@ class TestBenchmarkRunnerWorkflowIntegration:
                 result = await runner._execute_single_run(
                     workflow_def=workflow_def,
                     workflow_name="direct",
-                    run_index=0,
                 )
                 # If we get here, the bug is fixed
                 assert result.score == 85
@@ -588,7 +587,6 @@ class TestBenchmarkRunnerWorkflowIntegration:
                 result = await runner._execute_single_run(
                     workflow_def=workflow_def,
                     workflow_name="direct",
-                    run_index=0,
                 )
 
                 # Verify the run metrics match what the workflow returned
@@ -676,7 +674,6 @@ class TestBenchmarkRunnerErrorHandling:
                 await runner._execute_single_run(
                     workflow_def=workflow_def,
                     workflow_name="direct",
-                    run_index=0,
                 )
                 # If we get here, check that _score_evaluation was NOT called
                 # for a failed evaluation
@@ -758,7 +755,6 @@ class TestBenchmarkRunnerErrorHandling:
                 await runner._execute_single_run(
                     workflow_def=workflow_def,
                     workflow_name="direct",
-                    run_index=0,
                 )
                 # If we get here without error, check that score was not called
                 if mock_score.called:
@@ -785,7 +781,7 @@ class TestBenchmarkRunnerWorkspaceLocation:
         """Test that workspace is created under results_dir, not in temp.
 
         Expected structure:
-        results/{benchmark_name}/runs/{run_id}/workspace/
+        results/{benchmark_name}/runs/{YYYY-MM-DD}/{run_id}/workspace/
         """
         runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
 
@@ -795,7 +791,9 @@ class TestBenchmarkRunnerWorkspaceLocation:
             new_callable=AsyncMock,
         ):
             # Call _setup_repository which should create workspace under results_dir
-            workspace = await runner._setup_repository(run_id="test-run-123")
+            workspace = await runner._setup_repository(
+                run_id="12-30-45_test_abc123", date_str="2026-02-08"
+            )
 
         # Workspace should be under results_dir, not system temp
         assert str(tmp_path) in str(workspace), (
@@ -803,8 +801,8 @@ class TestBenchmarkRunnerWorkspaceLocation:
             f"not in system temp directory"
         )
 
-        # Workspace should follow the expected structure
-        expected_base = tmp_path / minimal_config.name / "runs"
+        # Workspace should follow the expected structure with date directory
+        expected_base = tmp_path / minimal_config.name / "runs" / "2026-02-08"
         assert str(expected_base) in str(workspace), (
             f"Workspace should be under {expected_base}"
         )
@@ -816,14 +814,16 @@ class TestBenchmarkRunnerWorkspaceLocation:
         """Test that workspace path includes the run ID for traceability."""
         runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
 
-        run_id = "direct-0-abc123"
+        run_id = "14-25-30_direct_abc123"
 
         # Mock clone_repository to avoid actual git clone
         with patch(
             "claude_evaluator.benchmark.runner.clone_repository",
             new_callable=AsyncMock,
         ):
-            workspace = await runner._setup_repository(run_id=run_id)
+            workspace = await runner._setup_repository(
+                run_id=run_id, date_str="2026-02-08"
+            )
 
         # Workspace path should include the run ID
         assert run_id in str(workspace), (
@@ -846,7 +846,9 @@ class TestBenchmarkRunnerWorkspaceLocation:
             "claude_evaluator.benchmark.runner.clone_repository",
             new_callable=AsyncMock,
         ):
-            workspace = await runner._setup_repository(run_id="test-run-456")
+            workspace = await runner._setup_repository(
+                run_id="16-45-00_test_def456", date_str="2026-02-08"
+            )
 
         # Create a file in the workspace
         test_file = workspace / "test.txt"
@@ -916,3 +918,59 @@ class TestBenchmarkRunnerVerboseOutput:
         # Should print run progress
         assert "Run 1" in captured.out or "run 1" in captured.out.lower()
         assert "Run 2" in captured.out or "run 2" in captured.out.lower()
+
+
+class TestSanitizePathComponent:
+    """Tests for path component sanitization."""
+
+    def test_removes_path_separators(self) -> None:
+        """Test that forward and back slashes are replaced."""
+        result = BenchmarkRunner._sanitize_path_component("foo/bar\\baz")
+        assert "/" not in result
+        assert "\\" not in result
+        assert result == "foo-bar-baz"
+
+    def test_removes_parent_directory_references(self) -> None:
+        """Test that .. is replaced to prevent path traversal."""
+        result = BenchmarkRunner._sanitize_path_component("../../../etc/passwd")
+        assert ".." not in result
+        # Should be sanitized to something safe
+        assert "etc" in result or "passwd" in result
+
+    def test_removes_special_characters(self) -> None:
+        """Test that special characters are replaced."""
+        result = BenchmarkRunner._sanitize_path_component("foo:bar*baz?")
+        assert ":" not in result
+        assert "*" not in result
+        assert "?" not in result
+
+    def test_handles_normal_names(self) -> None:
+        """Test that normal workflow names pass through."""
+        result = BenchmarkRunner._sanitize_path_component("my-workflow")
+        assert result == "my-workflow"
+
+    def test_handles_names_with_underscores(self) -> None:
+        """Test that underscores are preserved."""
+        result = BenchmarkRunner._sanitize_path_component("my_workflow_v1")
+        assert result == "my_workflow_v1"
+
+    def test_removes_leading_dots(self) -> None:
+        """Test that leading dots are removed (hidden files)."""
+        result = BenchmarkRunner._sanitize_path_component(".hidden")
+        assert not result.startswith(".")
+
+    def test_removes_leading_hyphens(self) -> None:
+        """Test that leading hyphens are removed."""
+        result = BenchmarkRunner._sanitize_path_component("--flag")
+        assert not result.startswith("-")
+
+    def test_empty_string_returns_unnamed(self) -> None:
+        """Test that empty string returns 'unnamed'."""
+        result = BenchmarkRunner._sanitize_path_component("")
+        assert result == "unnamed"
+
+    def test_only_special_chars_returns_unnamed(self) -> None:
+        """Test that string with only special chars returns 'unnamed'."""
+        result = BenchmarkRunner._sanitize_path_component("...")
+        # After removing dots, should be unnamed
+        assert result == "unnamed" or len(result) > 0

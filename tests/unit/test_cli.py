@@ -33,12 +33,6 @@ class TestCreateParser:
         ]
         assert len(version_actions) == 1
 
-    def test_parser_has_suite_option(self) -> None:
-        """Test that parser has --suite option."""
-        parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml"])
-        assert args.suite == "test.yaml"
-
     def test_parser_has_workflow_option(self) -> None:
         """Test that parser has --workflow option with valid choices."""
         parser = create_parser()
@@ -54,67 +48,60 @@ class TestCreateParser:
     def test_parser_has_output_option_with_default(self) -> None:
         """Test that --output has default value."""
         parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml"])
+        args = parser.parse_args(["--workflow", "direct", "--task", "test"])
         assert args.output == "evaluations"
 
     def test_parser_has_timeout_option(self) -> None:
         """Test that parser has --timeout option."""
         parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml", "--timeout", "300"])
+        args = parser.parse_args(
+            ["--workflow", "direct", "--task", "test", "--timeout", "300"]
+        )
         assert args.timeout == 300
 
     def test_parser_has_verbose_flag(self) -> None:
         """Test that parser has --verbose flag."""
         parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml", "--verbose"])
+        args = parser.parse_args(
+            ["--workflow", "direct", "--task", "test", "--verbose"]
+        )
         assert args.verbose is True
 
     def test_parser_has_json_flag(self) -> None:
         """Test that parser has --json flag."""
         parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml", "--json"])
+        args = parser.parse_args(["--workflow", "direct", "--task", "test", "--json"])
         assert args.json_output is True
 
-    def test_parser_has_dry_run_flag(self) -> None:
-        """Test that parser has --dry-run flag."""
+    def test_parser_has_benchmark_option(self) -> None:
+        """Test that parser has --benchmark option."""
         parser = create_parser()
-        args = parser.parse_args(["--suite", "test.yaml", "--dry-run"])
-        assert args.dry_run is True
+        args = parser.parse_args(["--benchmark", "test.yaml", "--workflow", "direct"])
+        assert args.benchmark == "test.yaml"
+
+    def test_parser_has_compare_flag(self) -> None:
+        """Test that parser has --compare flag."""
+        parser = create_parser()
+        args = parser.parse_args(["--benchmark", "test.yaml", "--compare"])
+        assert args.compare is True
 
 
 class TestValidateArgs:
     """Tests for validate_args function."""
 
-    def test_valid_suite_returns_none(self, tmp_path: Path) -> None:
-        """Test that valid suite args return None (no error)."""
-        suite_file = tmp_path / "test.yaml"
-        suite_file.write_text("name: test\nevaluations: []")
-
-        args = Namespace(
-            suite=str(suite_file),
-            workflow=None,
-            task=None,
-            dry_run=False,
-        )
-        assert validate_args(args) is None
-
     def test_valid_adhoc_returns_none(self) -> None:
         """Test that valid ad-hoc args return None (no error)."""
         args = Namespace(
-            suite=None,
             workflow="direct",
             task="test task",
-            dry_run=False,
         )
         assert validate_args(args) is None
 
     def test_error_workflow_without_task(self) -> None:
         """Test error when --workflow provided without --task."""
         args = Namespace(
-            suite=None,
             workflow="direct",
             task=None,
-            dry_run=False,
         )
         error = validate_args(args)
         assert error is not None
@@ -123,50 +110,102 @@ class TestValidateArgs:
     def test_error_task_without_workflow(self) -> None:
         """Test error when --task provided without --workflow."""
         args = Namespace(
-            suite=None,
             workflow=None,
             task="test task",
-            dry_run=False,
         )
         error = validate_args(args)
         assert error is not None
         assert "--task requires --workflow" in error
 
     def test_error_no_mode_specified(self) -> None:
-        """Test error when neither suite nor ad-hoc mode specified."""
+        """Test error when neither benchmark, score, nor ad-hoc mode specified."""
         args = Namespace(
-            suite=None,
             workflow=None,
             task=None,
-            dry_run=False,
         )
         error = validate_args(args)
         assert error is not None
-        assert "Either --suite or both --workflow and --task are required" in error
+        assert (
+            "--benchmark, --score, or both --workflow and --task are required" in error
+        )
 
-    def test_error_dry_run_without_suite(self) -> None:
-        """Test error when --dry-run provided without --suite."""
+    def test_valid_benchmark_returns_none(self, tmp_path: Path) -> None:
+        """Test that valid benchmark args return None (no error)."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test\nworkflows: {}")
+
         args = Namespace(
-            suite=None,
+            benchmark=str(bench_file),
             workflow="direct",
-            task="test",
-            dry_run=True,
+            compare=False,
+            list_workflows=False,
         )
-        error = validate_args(args)
-        assert error is not None
-        assert "--dry-run requires --suite" in error
+        assert validate_args(args) is None
 
-    def test_error_suite_file_not_found(self) -> None:
-        """Test error when suite file does not exist."""
+    def test_error_benchmark_without_workflow_or_flags(self, tmp_path: Path) -> None:
+        """Test error when --benchmark provided without --workflow, --compare, or --list."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test")
+
         args = Namespace(
-            suite="/nonexistent/path/test.yaml",
+            benchmark=str(bench_file),
             workflow=None,
-            task=None,
-            dry_run=False,
+            compare=False,
+            list_workflows=False,
         )
         error = validate_args(args)
         assert error is not None
-        assert "Suite file not found" in error
+        assert "--benchmark requires --workflow" in error
+
+    def test_error_results_dir_outside_cwd(self, tmp_path: Path) -> None:
+        """Test error when --results-dir is outside CWD and temp dir."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test\nworkflows: {}")
+
+        args = Namespace(
+            benchmark=str(bench_file),
+            workflow="direct",
+            compare=False,
+            list_workflows=False,
+            results_dir="/etc/passwd",  # Outside allowed directories
+        )
+        error = validate_args(args)
+        assert error is not None
+        assert "must be within" in error
+
+    def test_valid_results_dir_in_cwd(self, tmp_path: Path, monkeypatch) -> None:
+        """Test that results-dir within CWD is valid."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test\nworkflows: {}")
+        results_dir = tmp_path / "results"
+
+        # Change CWD to tmp_path so results_dir is within it
+        monkeypatch.chdir(tmp_path)
+
+        args = Namespace(
+            benchmark=str(bench_file),
+            workflow="direct",
+            compare=False,
+            list_workflows=False,
+            results_dir=str(results_dir),
+        )
+        assert validate_args(args) is None
+
+    def test_error_benchmark_output_outside_cwd(self, tmp_path: Path) -> None:
+        """Test error when --benchmark --output is outside CWD and temp dir."""
+        bench_file = tmp_path / "test.yaml"
+        bench_file.write_text("name: test\nworkflows: {}")
+
+        args = Namespace(
+            benchmark=str(bench_file),
+            workflow="direct",
+            compare=False,
+            list_workflows=False,
+            output="/etc/passwd",  # Outside allowed directories
+        )
+        error = validate_args(args)
+        assert error is not None
+        assert "must be within" in error
 
 
 class TestFormatResults:

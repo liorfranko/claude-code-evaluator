@@ -631,7 +631,9 @@ class TestEfficiencyScoreCalculation:
         """Create a ScoreReportBuilder for testing efficiency calculation."""
         return ScoreReportBuilder()
 
-    def test_low_token_usage_high_score(self, score_builder: ScoreReportBuilder) -> None:
+    def test_low_token_usage_high_score(
+        self, score_builder: ScoreReportBuilder
+    ) -> None:
         """Test that low token usage produces high efficiency score."""
         score = score_builder._calculate_efficiency_score(
             total_tokens=10000,

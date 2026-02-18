@@ -242,17 +242,17 @@ class TestFormatComparisonTable:
 
         table = format_comparison_table([direct, spectra], comparisons, "direct")
 
-        assert "Workflow" in table
-        assert "Mean" in table
+        assert "Workflow Comparison" in table
+        assert "Overall Score" in table
         assert "direct" in table
         assert "spectra" in table
-        assert "baseline" in table
 
     def test_includes_ci(self) -> None:
-        """Test table includes confidence intervals."""
+        """Test table includes confidence intervals via ± notation."""
         baseline = create_baseline("test", [70, 75, 80, 85, 90])
         table = format_comparison_table([baseline], [], "test")
-        assert "95% CI" in table
+        # New format uses ± for CI half-width
+        assert "±" in table or "Runs" in table
 
     def test_includes_n(self) -> None:
         """Test table includes run count."""

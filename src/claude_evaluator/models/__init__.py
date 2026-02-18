@@ -6,7 +6,6 @@ This module contains data models organized by domain:
 - evaluation/: EvaluationReport, ScoreReport, Metrics, TimelineEvent
 - execution/: Decision, ToolInvocation, QueryMetrics, Progress
 - interaction/: Question, Answer models
-- experiment/: Experiment config and result models
 - benchmark/: Benchmark config and result models
 - reviewer: Reviewer output models
 - exceptions: ModelValidationError
@@ -23,6 +22,8 @@ from claude_evaluator.models.benchmark import (
     BenchmarkDefaults,
     BenchmarkEvaluation,
     BenchmarkRun,
+    DimensionRunScore,
+    DimensionStats,
     RunMetrics,
     WorkflowDefinition,
 )
@@ -63,21 +64,6 @@ from claude_evaluator.models.execution import (
     ProgressEventType,
     QueryMetrics,
     ToolInvocation,
-)
-
-# Re-export from experiment/results (not config to avoid circular import)
-from claude_evaluator.models.experiment.results import (
-    ComparisonVerdict,
-    ConfigResult,
-    DimensionJudgment,
-    EloRating,
-    ExperimentReport,
-    JudgeVerdict,
-    PairwiseComparison,
-    PositionBiasAnalysis,
-    PresentationOrder,
-    RunResult,
-    StatisticalTest,
 )
 
 # Re-export from interaction/
@@ -138,18 +124,6 @@ __all__ = [
     "QuestionContext",
     "QuestionItem",
     "QuestionOption",
-    # Experiment result models (config models imported separately to avoid circular import)
-    "ComparisonVerdict",
-    "ConfigResult",
-    "DimensionJudgment",
-    "EloRating",
-    "ExperimentReport",
-    "JudgeVerdict",
-    "PairwiseComparison",
-    "PositionBiasAnalysis",
-    "PresentationOrder",
-    "RunResult",
-    "StatisticalTest",
     # Reviewer models
     "CodeFile",
     "ExecutionMode",
@@ -165,6 +139,8 @@ __all__ = [
     "BenchmarkDefaults",
     "BenchmarkEvaluation",
     "BenchmarkRun",
+    "DimensionRunScore",
+    "DimensionStats",
     "RunMetrics",
     "WorkflowDefinition",
 ]

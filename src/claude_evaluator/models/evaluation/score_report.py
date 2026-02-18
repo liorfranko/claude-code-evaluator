@@ -34,6 +34,7 @@ class DimensionType(str, Enum):
     task_completion = "task_completion"
     code_quality = "code_quality"
     efficiency = "efficiency"
+    error_handling = "error_handling"
 
 
 class EfficiencyFlag(str, Enum):
@@ -77,6 +78,7 @@ class DimensionScore(BaseSchema):
         weight: Weight applied in aggregate calculation (0.0-1.0).
         rationale: Explanation for this dimension's score.
         sub_scores: Breakdown of score components (for code_quality).
+        criterion_name: Original criterion name from benchmark config (if different).
 
     """
 
@@ -104,6 +106,10 @@ class DimensionScore(BaseSchema):
     sub_scores: dict[str, int] | None = Field(
         default=None,
         description="Breakdown of score components (for code_quality)",
+    )
+    criterion_name: str | None = Field(
+        default=None,
+        description="Original criterion name from benchmark config (for unknown criteria)",
     )
 
 
@@ -449,8 +455,7 @@ class ScoreReport(BaseSchema):
     )
     dimension_scores: list[DimensionScore] = Field(
         ...,
-        min_length=2,
-        max_length=3,
+        min_length=1,
         description="Individual scores for each quality dimension",
     )
     rationale: str = Field(

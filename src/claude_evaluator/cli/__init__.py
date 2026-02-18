@@ -1,16 +1,14 @@
 """CLI package for claude-evaluator.
 
-This package provides the command-line interface for running evaluations.
-It implements the Command pattern for different operations (run evaluation,
-run suite, validate suite).
+This package provides the command-line interface for running evaluations
+and benchmarks.
 """
 
 from claude_evaluator.cli.commands import (
     BaseCommand,
     CommandResult,
     RunEvaluationCommand,
-    RunSuiteCommand,
-    ValidateSuiteCommand,
+    ScoreCommand,
 )
 from claude_evaluator.cli.formatters import create_progress_callback, format_results
 from claude_evaluator.cli.main import main
@@ -25,8 +23,7 @@ __all__ = [
     "format_results",
     "main",
     "RunEvaluationCommand",
-    "RunSuiteCommand",
+    "ScoreCommand",
     "validate_args",
     "validate_output_path",
-    "ValidateSuiteCommand",
 ]
