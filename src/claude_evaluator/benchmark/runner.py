@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import statistics as stats_lib
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -120,27 +120,15 @@ class BenchmarkRunner:
             runs=runs,
         )
 
-        run_results: list[BenchmarkRun] = []
-        for i in range(runs):
-            if verbose:
-                print(f"\nRun {i + 1}/{runs} starting...")
-
-            result = await self._execute_single_run(
+        run_results = await self._execute_run_loop(
+            runs=runs,
+            verbose=verbose,
+            execute_fn=lambda: self._execute_single_run(
                 workflow_def=workflow_def,
                 workflow_name=workflow_name,
                 verbose=verbose,
-            )
-            run_results.append(result)
-
-            if verbose:
-                print(f"Run {i + 1}/{runs} complete: score={result.score}")
-
-            logger.info(
-                "benchmark_run_complete",
-                run=i + 1,
-                total=runs,
-                score=result.score,
-            )
+            ),
+        )
 
         # Compute stats using bootstrap CI
         stats = self._compute_stats(run_results)
@@ -258,6 +246,56 @@ class BenchmarkRunner:
 
         return session_id, baselines
 
+    async def _execute_run_loop(
+        self,
+        runs: int,
+        verbose: bool,
+        execute_fn: Callable[..., Awaitable[BenchmarkRun]],
+    ) -> list[BenchmarkRun]:
+        """Execute the run loop with common logging and progress output.
+
+        Args:
+            runs: Number of runs to execute.
+            verbose: Whether to print progress output.
+            execute_fn: Async function that executes a single run.
+                        Can accept no args or a single run_number arg.
+
+        Returns:
+            List of BenchmarkRun results.
+
+        """
+        import inspect
+
+        run_results: list[BenchmarkRun] = []
+
+        # Check if execute_fn accepts run_number argument
+        sig = inspect.signature(execute_fn)
+        accepts_run_number = len(sig.parameters) > 0
+
+        for i in range(runs):
+            run_number = i + 1
+            if verbose:
+                print(f"\nRun {run_number}/{runs} starting...")
+
+            if accepts_run_number:
+                result = await execute_fn(run_number)
+            else:
+                result = await execute_fn()
+
+            run_results.append(result)
+
+            if verbose:
+                print(f"Run {run_number}/{runs} complete: score={result.score}")
+
+            logger.info(
+                "benchmark_run_complete",
+                run=run_number,
+                total=runs,
+                score=result.score,
+            )
+
+        return run_results
+
     async def _execute_session_workflow(
         self,
         session_storage: SessionStorage,
@@ -281,34 +319,23 @@ class BenchmarkRunner:
         """
         workflow_def = self.config.workflows[workflow_name]
 
-        run_results: list[BenchmarkRun] = []
-        for i in range(runs):
-            if verbose:
-                print(f"\nRun {i + 1}/{runs} starting...")
-
-            # Get workspace path from session storage
+        async def execute_session_run(run_number: int) -> BenchmarkRun:
             workspace_path = session_storage.get_run_workspace(
-                session_path, workflow_name, i + 1
+                session_path, workflow_name, run_number
             )
-
-            result = await self._execute_single_run_in_session(
+            return await self._execute_single_run_in_session(
                 workflow_def=workflow_def,
                 workflow_name=workflow_name,
                 workspace_path=workspace_path,
-                run_number=i + 1,
+                run_number=run_number,
                 verbose=verbose,
             )
-            run_results.append(result)
 
-            if verbose:
-                print(f"Run {i + 1}/{runs} complete: score={result.score}")
-
-            logger.info(
-                "benchmark_run_complete",
-                run=i + 1,
-                total=runs,
-                score=result.score,
-            )
+        run_results = await self._execute_run_loop(
+            runs=runs,
+            verbose=verbose,
+            execute_fn=execute_session_run,
+        )
 
         # Compute stats
         stats = self._compute_stats(run_results)
