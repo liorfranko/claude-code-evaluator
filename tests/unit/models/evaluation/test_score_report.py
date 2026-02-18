@@ -162,7 +162,9 @@ class TestScoreReport:
                 self._create_dimension_score(DimensionType.task_completion, 90, 0.3),
                 self._create_dimension_score(DimensionType.code_quality, 80, 0.3),
                 self._create_dimension_score(DimensionType.efficiency, 75, 0.2),
-                self._create_dimension_score(DimensionType.code_quality, 85, 0.2),  # error_handling mapped
+                self._create_dimension_score(
+                    DimensionType.code_quality, 85, 0.2
+                ),  # error_handling mapped
             ],
             rationale="Evaluation with 4 criteria from benchmark config including error handling dimension.",
             generated_at=datetime.now(),
@@ -206,7 +208,10 @@ class TestScoreReport:
                 evaluation_duration_ms=5000,
             )
         # The error message should indicate the list is too short
-        assert "too_short" in str(exc_info.value).lower() or "at least" in str(exc_info.value).lower()
+        assert (
+            "too_short" in str(exc_info.value).lower()
+            or "at least" in str(exc_info.value).lower()
+        )
 
     def test_aggregate_score_must_be_in_range(self) -> None:
         """Test that aggregate_score must be between 0 and 100."""

@@ -171,8 +171,9 @@ class TestBenchmarkStorageLoadAll:
 
     def test_load_all_empty(self, storage: BenchmarkStorage) -> None:
         """Test load_all on empty storage returns empty list."""
-        result = storage.load_all_baselines()
-        assert result == []
+        baselines, failures = storage.load_all_baselines()
+        assert baselines == []
+        assert failures == []
 
     def test_load_all_multiple(self, storage: BenchmarkStorage) -> None:
         """Test load_all returns all baselines."""
@@ -188,9 +189,10 @@ class TestBenchmarkStorageLoadAll:
             )
             storage.save_baseline(baseline)
 
-        result = storage.load_all_baselines()
-        assert len(result) == 3
-        names = {b.workflow_name for b in result}
+        baselines, failures = storage.load_all_baselines()
+        assert len(baselines) == 3
+        assert failures == []
+        names = {b.workflow_name for b in baselines}
         assert names == {"workflow-0", "workflow-1", "workflow-2"}
 
     def test_load_all_ignores_invalid_files(
@@ -203,9 +205,12 @@ class TestBenchmarkStorageLoadAll:
         (storage.storage_dir / "invalid.txt").write_text("not json")
         (storage.storage_dir / "bad.json").write_text("{invalid json")
 
-        result = storage.load_all_baselines()
-        assert len(result) == 1
-        assert result[0].workflow_name == "direct-v1.0.0"
+        baselines, failures = storage.load_all_baselines()
+        assert len(baselines) == 1
+        assert baselines[0].workflow_name == "direct-v1.0.0"
+        # Should report 2 failures (invalid.txt is not a .json file, so only bad.json fails)
+        assert len(failures) == 1
+        assert "bad.json" in str(failures[0][0])
 
 
 class TestBenchmarkStorageExists:
@@ -221,5 +226,3 @@ class TestBenchmarkStorageExists:
     def test_exists_false(self, storage: BenchmarkStorage) -> None:
         """Test exists returns False for missing baseline."""
         assert storage.baseline_exists("nonexistent") is False
-
-

@@ -34,6 +34,7 @@ class DimensionType(str, Enum):
     task_completion = "task_completion"
     code_quality = "code_quality"
     efficiency = "efficiency"
+    error_handling = "error_handling"
 
 
 class EfficiencyFlag(str, Enum):

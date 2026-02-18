@@ -310,9 +310,15 @@ class BenchmarkRunner:
                 dimension_scores=dimension_scores,
             )
 
+        except KeyboardInterrupt:
+            logger.info("benchmark_run_interrupted", run_id=run_id)
+            raise
+        except (WorkflowExecutionError, RepositoryError):
+            # Already the right exception types, re-raise as-is
+            raise
         except Exception as e:
             logger.error(
-                "benchmark_run_failed",
+                "benchmark_run_unexpected_error",
                 run_id=run_id,
                 error=str(e),
                 error_type=type(e).__name__,
@@ -517,6 +523,13 @@ class BenchmarkRunner:
                 if dim_name in run.dimension_scores
             ]
             if dim_scores:
+                if len(dim_scores) < n:
+                    logger.warning(
+                        "dimension_stats_partial_data",
+                        dimension=dim_name,
+                        samples=len(dim_scores),
+                        total_runs=n,
+                    )
                 dim_mean = stats_lib.mean(dim_scores)
                 dim_std = stats_lib.stdev(dim_scores) if len(dim_scores) > 1 else 0.0
                 dim_ci_lower, dim_ci_upper = bootstrap_ci(

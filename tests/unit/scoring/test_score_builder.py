@@ -85,7 +85,9 @@ class TestCalculateDimensionScores:
         """Create a ScoreReportBuilder instance."""
         return ScoreReportBuilder()
 
-    def test_returns_list_of_dimension_scores(self, builder: ScoreReportBuilder) -> None:
+    def test_returns_list_of_dimension_scores(
+        self, builder: ScoreReportBuilder
+    ) -> None:
         """Test that method returns a list of DimensionScore objects."""
         result = builder.calculate_dimension_scores(
             reviewer_outputs=[],
@@ -106,7 +108,9 @@ class TestCalculateDimensionScores:
             turn_count=5,
             total_cost=0.05,
         )
-        task_dimensions = [ds for ds in result if ds.dimension_name == DimensionType.task_completion]
+        task_dimensions = [
+            ds for ds in result if ds.dimension_name == DimensionType.task_completion
+        ]
         assert len(task_dimensions) == 1
 
     def test_always_includes_efficiency(self, builder: ScoreReportBuilder) -> None:
@@ -118,10 +122,14 @@ class TestCalculateDimensionScores:
             turn_count=5,
             total_cost=0.05,
         )
-        efficiency_dimensions = [ds for ds in result if ds.dimension_name == DimensionType.efficiency]
+        efficiency_dimensions = [
+            ds for ds in result if ds.dimension_name == DimensionType.efficiency
+        ]
         assert len(efficiency_dimensions) == 1
 
-    def test_code_quality_included_when_reviewer_present(self, builder: ScoreReportBuilder) -> None:
+    def test_code_quality_included_when_reviewer_present(
+        self, builder: ScoreReportBuilder
+    ) -> None:
         """Test that code quality dimension is included when reviewer output exists."""
         code_output = ReviewerOutput(
             reviewer_name="code_quality",
@@ -138,10 +146,14 @@ class TestCalculateDimensionScores:
             turn_count=5,
             total_cost=0.05,
         )
-        code_dimensions = [ds for ds in result if ds.dimension_name == DimensionType.code_quality]
+        code_dimensions = [
+            ds for ds in result if ds.dimension_name == DimensionType.code_quality
+        ]
         assert len(code_dimensions) == 1
 
-    def test_fallback_score_for_failed_outcome(self, builder: ScoreReportBuilder) -> None:
+    def test_fallback_score_for_failed_outcome(
+        self, builder: ScoreReportBuilder
+    ) -> None:
         """Test that failed outcome gets lower task completion score."""
         result = builder.calculate_dimension_scores(
             reviewer_outputs=[],
@@ -150,7 +162,9 @@ class TestCalculateDimensionScores:
             turn_count=5,
             total_cost=0.05,
         )
-        task_score = next(ds for ds in result if ds.dimension_name == DimensionType.task_completion)
+        task_score = next(
+            ds for ds in result if ds.dimension_name == DimensionType.task_completion
+        )
         assert task_score.score == 30  # OUTCOME_FALLBACK_SCORES["failure"]
 
 
@@ -363,8 +377,8 @@ class TestCalculateScoresFromCriteria:
             total_cost=0.05,
         )
         assert len(result) == 1
-        # error_handling maps to code_quality dimension type
-        assert result[0].dimension_name == DimensionType.code_quality
+        # error_handling now has its own dimension type
+        assert result[0].dimension_name == DimensionType.error_handling
 
     def test_handles_3_criteria(
         self,
@@ -479,8 +493,12 @@ class TestCalculateScoresFromCriteria:
             turn_count=5,
             total_cost=0.05,
         )
-        task_score = next(ds for ds in result if ds.dimension_name == DimensionType.task_completion)
-        efficiency_score = next(ds for ds in result if ds.dimension_name == DimensionType.efficiency)
+        task_score = next(
+            ds for ds in result if ds.dimension_name == DimensionType.task_completion
+        )
+        efficiency_score = next(
+            ds for ds in result if ds.dimension_name == DimensionType.efficiency
+        )
         assert task_score.weight == 0.7
         assert efficiency_score.weight == 0.3
 
@@ -502,7 +520,9 @@ class TestEfficiencyScoring:
             turn_count=3,  # Low
             total_cost=0.02,  # Low
         )
-        efficiency = next(ds for ds in result if ds.dimension_name == DimensionType.efficiency)
+        efficiency = next(
+            ds for ds in result if ds.dimension_name == DimensionType.efficiency
+        )
         assert efficiency.score >= 80
 
     def test_high_token_count_scores_low(self, builder: ScoreReportBuilder) -> None:
@@ -514,7 +534,9 @@ class TestEfficiencyScoring:
             turn_count=60,  # Very high
             total_cost=3.00,  # Very high
         )
-        efficiency = next(ds for ds in result if ds.dimension_name == DimensionType.efficiency)
+        efficiency = next(
+            ds for ds in result if ds.dimension_name == DimensionType.efficiency
+        )
         assert efficiency.score <= 30
 
 

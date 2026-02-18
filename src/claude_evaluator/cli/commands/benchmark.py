@@ -152,7 +152,14 @@ class RunBenchmarkCommand(BaseCommand):
         )
 
         storage = BenchmarkStorage(results_dir / config.name / "baselines")
-        baselines = storage.load_all_baselines()
+        baselines, failures = storage.load_all_baselines()
+
+        if failures:
+            # Log warning about partial load but continue with available baselines
+            print(
+                f"Warning: {len(failures)} baseline(s) failed to load. "
+                "Run with --verbose for details."
+            )
 
         if not baselines:
             return CommandResult(
@@ -203,7 +210,13 @@ class RunBenchmarkCommand(BaseCommand):
         from claude_evaluator.benchmark import BenchmarkStorage
 
         storage = BenchmarkStorage(results_dir / config.name / "baselines")
-        baselines = storage.load_all_baselines()
+        baselines, failures = storage.load_all_baselines()
+
+        if failures:
+            print(
+                f"Warning: {len(failures)} baseline(s) failed to load. "
+                "Run with --verbose for details."
+            )
 
         # Build lookup
         baseline_lookup = {b.workflow_name: b for b in baselines}

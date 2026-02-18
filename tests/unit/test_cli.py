@@ -54,13 +54,17 @@ class TestCreateParser:
     def test_parser_has_timeout_option(self) -> None:
         """Test that parser has --timeout option."""
         parser = create_parser()
-        args = parser.parse_args(["--workflow", "direct", "--task", "test", "--timeout", "300"])
+        args = parser.parse_args(
+            ["--workflow", "direct", "--task", "test", "--timeout", "300"]
+        )
         assert args.timeout == 300
 
     def test_parser_has_verbose_flag(self) -> None:
         """Test that parser has --verbose flag."""
         parser = create_parser()
-        args = parser.parse_args(["--workflow", "direct", "--task", "test", "--verbose"])
+        args = parser.parse_args(
+            ["--workflow", "direct", "--task", "test", "--verbose"]
+        )
         assert args.verbose is True
 
     def test_parser_has_json_flag(self) -> None:
@@ -121,7 +125,9 @@ class TestValidateArgs:
         )
         error = validate_args(args)
         assert error is not None
-        assert "--benchmark, --score, or both --workflow and --task are required" in error
+        assert (
+            "--benchmark, --score, or both --workflow and --task are required" in error
+        )
 
     def test_valid_benchmark_returns_none(self, tmp_path: Path) -> None:
         """Test that valid benchmark args return None (no error)."""

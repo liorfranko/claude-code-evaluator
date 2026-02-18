@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.evaluation.score_report import (
     DimensionScore,
     DimensionType,
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     from claude_evaluator.models.benchmark.config import BenchmarkCriterion
 
 __all__ = ["ScoreReportBuilder"]
+
+logger = get_logger(__name__)
 
 
 class ScoreReportBuilder:
@@ -354,6 +357,12 @@ class ScoreReportBuilder:
                     )
                 else:
                     # Fallback if no code quality reviewer output
+                    logger.warning(
+                        "criterion_fallback_score",
+                        criterion_name=name,
+                        fallback_score=70,
+                        reason="No code quality reviewer output available",
+                    )
                     dimension_scores.append(
                         DimensionScore(
                             dimension_name=DimensionType.code_quality,
@@ -393,15 +402,21 @@ class ScoreReportBuilder:
                         f"Found {len(error_output.issues)} issues."
                     )
                 else:
-                    # Fallback based on code quality
+                    # Fallback when no error_handling reviewer available
                     error_score = 70
                     rationale = (
                         "No error handling review available; default score assigned."
                     )
+                    logger.warning(
+                        "criterion_fallback_score",
+                        criterion_name=name,
+                        fallback_score=70,
+                        reason="No error_handling reviewer output available",
+                    )
 
                 dimension_scores.append(
                     DimensionScore(
-                        dimension_name=DimensionType.code_quality,  # Use code_quality enum
+                        dimension_name=DimensionType.error_handling,
                         score=error_score,
                         weight=weight,
                         rationale=rationale,
@@ -426,6 +441,13 @@ class ScoreReportBuilder:
                     score = 70
                     rationale = (
                         f"No reviewer found for '{name}'; default score assigned."
+                    )
+                    logger.warning(
+                        "criterion_fallback_score",
+                        criterion_name=name,
+                        fallback_score=70,
+                        reason="No matching reviewer found",
+                        hint="Check that criterion name matches a registered reviewer",
                     )
 
                 # Use task_completion as fallback dimension type

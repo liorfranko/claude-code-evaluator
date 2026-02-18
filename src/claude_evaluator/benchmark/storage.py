@@ -113,22 +113,23 @@ class BenchmarkStorage:
                 f"Failed to validate baseline from {file_path}: {e}"
             ) from e
 
-    def load_all_baselines(self) -> list[BenchmarkBaseline]:
+    def load_all_baselines(
+        self,
+    ) -> tuple[list[BenchmarkBaseline], list[tuple[Path, str]]]:
         """Load all baselines from the storage directory.
 
         Returns:
-            List of all loaded baselines.
-
-        Raises:
-            StorageError: If any baseline file cannot be read or parsed.
+            Tuple of (successfully loaded baselines, list of (failed_path, error_msg)).
+            The second element allows callers to report partial load failures.
 
         """
         from claude_evaluator.models.benchmark.results import BenchmarkBaseline
 
         if not self.storage_dir.exists():
-            return []
+            return [], []
 
         baselines: list[BenchmarkBaseline] = []
+        failures: list[tuple[Path, str]] = []
 
         for file_path in self.storage_dir.glob("*.json"):
             try:
@@ -142,11 +143,19 @@ class BenchmarkStorage:
                     path=str(file_path),
                     error=str(e),
                 )
-                # Continue loading other baselines
+                failures.append((file_path, str(e)))
+
+        if failures:
+            logger.error(
+                "baselines_partial_load",
+                loaded_count=len(baselines),
+                failed_count=len(failures),
+                failed_paths=[str(p) for p, _ in failures],
+            )
 
         # Sort by workflow name for consistent ordering
         baselines.sort(key=lambda b: b.workflow_name)
-        return baselines
+        return baselines, failures
 
     def baseline_exists(self, workflow_name: str) -> bool:
         """Check if a baseline exists for a workflow.
