@@ -32,6 +32,8 @@ _BOOL_FLAGS = [
     ("json_output", "--json", False),
     ("dry_run", "--dry-run", False),
     ("no_ast", "--no-ast", False),
+    ("compare", "--compare", False),
+    ("list_workflows", "--list", False),
 ]
 
 # Mapping of (argparse attr, CLI flag) for value flags forwarded to container
