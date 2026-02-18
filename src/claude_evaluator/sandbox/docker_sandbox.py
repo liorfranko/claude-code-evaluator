@@ -43,6 +43,7 @@ _VALUE_FLAGS = [
     ("task", "--task"),
     ("timeout", "--timeout"),
     ("benchmark_version", "--benchmark-version"),
+    ("session", "--session"),
 ]
 
 

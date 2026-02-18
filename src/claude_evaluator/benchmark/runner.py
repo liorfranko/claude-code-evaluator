@@ -19,6 +19,7 @@ from claude_evaluator.benchmark.exceptions import (
     RepositoryError,
     WorkflowExecutionError,
 )
+from claude_evaluator.benchmark.session_storage import SessionStorage
 from claude_evaluator.benchmark.storage import BenchmarkStorage
 from claude_evaluator.evaluation.git_operations import clone_repository
 from claude_evaluator.logging_config import get_logger
@@ -169,15 +170,322 @@ class BenchmarkRunner:
 
         return baseline
 
-    async def _setup_repository(self, run_id: str, date_str: str) -> Path:
-        """Clone repository to workspace under results directory.
+    async def execute_session(
+        self,
+        workflow_names: list[str] | None = None,
+        runs: int = 5,
+        verbose: bool = False,
+    ) -> tuple[str, list[BenchmarkBaseline]]:
+        """Execute workflows and store in a timestamped session folder.
 
-        Creates a date-centric workspace structure:
+        This method runs all specified workflows (or all workflows if none specified)
+        in a single session, storing results in a timestamped folder structure.
+
+        Args:
+            workflow_names: Names of workflows to run. If None, runs all workflows.
+            runs: Number of runs per workflow.
+            verbose: Whether to print progress output.
+
+        Returns:
+            Tuple of (session_id, list of baselines for each workflow).
+
+        Raises:
+            BenchmarkError: If a workflow is not found or execution fails.
+
+        """
+        session_storage = SessionStorage(self.results_dir, self.config.name)
+        session_id, session_path = session_storage.create_session()
+
+        # Determine which workflows to run
+        if workflow_names is None:
+            workflow_names = list(self.config.workflows.keys())
+        else:
+            # Validate all workflow names exist
+            for name in workflow_names:
+                if name not in self.config.workflows:
+                    raise BenchmarkError(f"Workflow '{name}' not found in config")
+
+        logger.info(
+            "session_starting",
+            benchmark=self.config.name,
+            session_id=session_id,
+            workflows=workflow_names,
+            runs=runs,
+        )
+
+        if verbose:
+            print(f"\nSession: {session_id}")
+            print(f"Workflows: {', '.join(workflow_names)}")
+            print(f"Runs per workflow: {runs}")
+            print("")
+
+        baselines: list[BenchmarkBaseline] = []
+
+        for workflow_name in workflow_names:
+            if verbose:
+                print(f"\n{'=' * 50}")
+                print(f"Workflow: {workflow_name}")
+                print(f"{'=' * 50}")
+
+            baseline = await self._execute_session_workflow(
+                session_storage=session_storage,
+                session_path=session_path,
+                workflow_name=workflow_name,
+                runs=runs,
+                verbose=verbose,
+            )
+            baselines.append(baseline)
+
+            logger.info(
+                "workflow_complete",
+                workflow=workflow_name,
+                mean=baseline.stats.mean,
+                n=baseline.stats.n,
+            )
+
+        # Generate comparison.json
+        if len(baselines) > 1:
+            session_storage.save_comparison(session_path, baselines)
+            if verbose:
+                print("\nComparison saved to comparison.json")
+
+        logger.info(
+            "session_complete",
+            session_id=session_id,
+            workflow_count=len(baselines),
+        )
+
+        return session_id, baselines
+
+    async def _execute_session_workflow(
+        self,
+        session_storage: SessionStorage,
+        session_path: Path,
+        workflow_name: str,
+        runs: int,
+        verbose: bool,
+    ) -> BenchmarkBaseline:
+        """Execute a single workflow within a session.
+
+        Args:
+            session_storage: The session storage manager.
+            session_path: Path to the session directory.
+            workflow_name: Name of the workflow.
+            runs: Number of runs.
+            verbose: Whether to print progress.
+
+        Returns:
+            BenchmarkBaseline with results.
+
+        """
+        workflow_def = self.config.workflows[workflow_name]
+
+        run_results: list[BenchmarkRun] = []
+        for i in range(runs):
+            if verbose:
+                print(f"\nRun {i + 1}/{runs} starting...")
+
+            # Get workspace path from session storage
+            workspace_path = session_storage.get_run_workspace(
+                session_path, workflow_name, i + 1
+            )
+
+            result = await self._execute_single_run_in_session(
+                workflow_def=workflow_def,
+                workflow_name=workflow_name,
+                workspace_path=workspace_path,
+                run_number=i + 1,
+                verbose=verbose,
+            )
+            run_results.append(result)
+
+            if verbose:
+                print(f"Run {i + 1}/{runs} complete: score={result.score}")
+
+            logger.info(
+                "benchmark_run_complete",
+                run=i + 1,
+                total=runs,
+                score=result.score,
+            )
+
+        # Compute stats
+        stats = self._compute_stats(run_results)
+
+        # Build baseline (use workflow_name directly, no version suffix)
+        baseline = BenchmarkBaseline(
+            workflow_name=workflow_name,
+            workflow_version=workflow_def.version,
+            model=self.config.defaults.model,
+            runs=run_results,
+            stats=stats,
+            updated_at=datetime.now(),
+        )
+
+        # Save summary to session
+        session_storage.save_workflow_summary(session_path, workflow_name, baseline)
+
+        return baseline
+
+    async def _execute_single_run_in_session(
+        self,
+        workflow_def: WorkflowDefinition,
+        workflow_name: str,
+        workspace_path: Path,
+        run_number: int,
+        verbose: bool,
+    ) -> BenchmarkRun:
+        """Execute a single benchmark run within a session.
+
+        Args:
+            workflow_def: The workflow definition to execute.
+            workflow_name: Name of the workflow.
+            workspace_path: Pre-computed workspace path.
+            run_number: The run number (1-based).
+            verbose: Whether to print progress output.
+
+        Returns:
+            BenchmarkRun with results.
+
+        Raises:
+            WorkflowExecutionError: If workflow execution fails.
+            RepositoryError: If repository setup fails.
+
+        """
+        # Generate run ID for logging
+        safe_workflow_name = self._sanitize_path_component(workflow_name)
+        run_id = f"run-{run_number}_{safe_workflow_name}_{uuid4().hex[:8]}"
+        start_time = time.time()
+
+        # Setup repository in provided workspace
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        workspace = await self._setup_repository(
+            run_id=run_id,
+            date_str=date_str,
+            workspace_path=workspace_path,
+        )
+
+        if verbose:
+            print(f"  Workspace: {workspace}")
+
+        try:
+            # Create progress callback for verbose output
+            progress_callback = None
+            if verbose:
+                from claude_evaluator.cli.formatters import create_progress_callback
+
+                progress_callback = create_progress_callback()
+
+            # Create and execute workflow
+            workflow = self._create_workflow(workflow_def, progress_callback)
+            evaluation = self._create_evaluation(workspace, workflow_def.type)
+
+            # Execute workflow
+            metrics = await workflow.execute_with_timeout(
+                evaluation=evaluation,
+                timeout_seconds=self.config.defaults.timeout_seconds,
+            )
+
+            # Check if evaluation failed
+            from claude_evaluator.models.enums import EvaluationStatus
+
+            if evaluation.status == EvaluationStatus.failed:
+                error_msg = evaluation.error or "Workflow execution failed"
+                raise WorkflowExecutionError(
+                    f"Evaluation failed for run {run_id}: {error_msg}"
+                )
+
+            # Generate report from the completed evaluation
+            report_path = await self._generate_report(evaluation, workspace)
+
+            # Score the result with criteria if available
+            criteria = (
+                self.config.evaluation.criteria
+                if self.config.evaluation.criteria
+                else None
+            )
+            score_report = await self._score_evaluation(
+                report_path, workspace, criteria
+            )
+
+            # Extract dimension scores from score report
+            dimension_scores: dict[str, DimensionRunScore] = {}
+            for dim_score in score_report.dimension_scores:
+                key = dim_score.criterion_name or dim_score.dimension_name.value
+                if key in dimension_scores:
+                    logger.warning(
+                        "dimension_score_overwritten",
+                        key=key,
+                        original_score=dimension_scores[key].score,
+                        new_score=dim_score.score,
+                    )
+                dimension_scores[key] = DimensionRunScore(
+                    name=key,
+                    score=dim_score.score,
+                    weight=dim_score.weight,
+                    rationale=dim_score.rationale,
+                )
+
+            duration = int(time.time() - start_time)
+
+            return BenchmarkRun(
+                run_id=run_id,
+                workflow_name=workflow_name,
+                score=score_report.aggregate_score,
+                timestamp=datetime.now(),
+                evaluation_id=str(evaluation.id),
+                duration_seconds=duration,
+                metrics=RunMetrics(
+                    total_tokens=metrics.total_tokens,
+                    total_cost_usd=metrics.total_cost_usd,
+                    turn_count=metrics.turn_count,
+                ),
+                dimension_scores=dimension_scores,
+            )
+
+        except KeyboardInterrupt:
+            logger.info("benchmark_run_interrupted", run_id=run_id)
+            raise
+        except (WorkflowExecutionError, RepositoryError):
+            raise
+        except Exception as e:
+            logger.error(
+                "benchmark_run_unexpected_error",
+                run_id=run_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise WorkflowExecutionError(
+                f"Workflow execution failed for run {run_id}: {e}"
+            ) from e
+
+    def get_session_storage(self) -> SessionStorage:
+        """Get a session storage instance.
+
+        Returns:
+            SessionStorage instance for this benchmark.
+
+        """
+        return SessionStorage(self.results_dir, self.config.name)
+
+    async def _setup_repository(
+        self,
+        run_id: str,
+        date_str: str,
+        *,
+        workspace_path: Path | None = None,
+    ) -> Path:
+        """Clone repository to workspace.
+
+        Can use a provided workspace path (for session-based runs) or
+        create a date-centric workspace structure:
         results/{benchmark_name}/runs/{YYYY-MM-DD}/{run_id}/workspace/
 
         Args:
             run_id: Unique identifier for this run (format: HH-MM-SS_workflow_uuid).
             date_str: Date string in YYYY-MM-DD format.
+            workspace_path: Optional explicit workspace path to use.
 
         Returns:
             Path to cloned repository workspace.
@@ -186,12 +494,15 @@ class BenchmarkRunner:
             RepositoryError: If clone fails.
 
         """
-        # Create workspace under date-organized directory
-        run_dir = self.results_dir / self.config.name / "runs" / date_str / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-        workspace = run_dir / "workspace"
-        workspace.mkdir(exist_ok=True)
+        if workspace_path is not None:
+            workspace = workspace_path
+            workspace.mkdir(parents=True, exist_ok=True)
+        else:
+            # Create workspace under date-organized directory (legacy mode)
+            run_dir = self.results_dir / self.config.name / "runs" / date_str / run_id
+            run_dir.mkdir(parents=True, exist_ok=True)
+            workspace = run_dir / "workspace"
+            workspace.mkdir(exist_ok=True)
 
         try:
             await clone_repository(

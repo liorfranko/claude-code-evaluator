@@ -18,6 +18,7 @@ from claude_evaluator.benchmark.exceptions import (
     WorkflowExecutionError,
 )
 from claude_evaluator.benchmark.runner import BenchmarkRunner
+from claude_evaluator.benchmark.session_storage import SessionStorage
 from claude_evaluator.benchmark.storage import BenchmarkStorage
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "BenchmarkStorage",
     "ComparisonResult",
     "RepositoryError",
+    "SessionStorage",
     "StorageError",
     "WorkflowExecutionError",
     "bootstrap_ci",
