@@ -40,6 +40,7 @@ _VALUE_FLAGS = [
     ("workflow", "--workflow"),
     ("task", "--task"),
     ("timeout", "--timeout"),
+    ("benchmark_version", "--benchmark-version"),
 ]
 
 
@@ -177,6 +178,13 @@ class DockerSandbox(BaseSandbox):
         Path(host_output).mkdir(parents=True, exist_ok=True)
         flags.extend(["-v", f"{host_output}:/app/output"])
 
+        # Results directory (read-write) for benchmark baselines and run artifacts
+        # Use --results-dir if provided, otherwise default to ./results
+        host_results = getattr(args, "results_dir", None) or "./results"
+        host_results = str(Path(host_results).resolve())
+        Path(host_results).mkdir(parents=True, exist_ok=True)
+        flags.extend(["-v", f"{host_results}:/app/results"])
+
         # Benchmark file (read-only)
         if getattr(args, "benchmark", None):
             host_benchmark = str(Path(args.benchmark).resolve())
@@ -213,6 +221,9 @@ class DockerSandbox(BaseSandbox):
                 inner.extend([flag, str(value)])
 
         inner.extend(["--output", "/app/output"])
+
+        # Results directory is always mounted at /app/results (for benchmark baselines)
+        inner.extend(["--results-dir", "/app/results"])
 
         # Boolean flags
         for attr, flag, default in _BOOL_FLAGS:
