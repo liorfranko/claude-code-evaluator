@@ -366,9 +366,10 @@ class MultiCommandWorkflow(BaseWorkflow):
     ) -> str:
         """Build the prompt for a phase from its template.
 
-        Substitutes placeholders in the prompt template:
-        - {task}: The evaluation task description
-        - {previous_result}: The result from the previous phase
+        Substitutes placeholders in the prompt:
+        - {{prompt}} or {prompt}: The evaluation task description (benchmark prompt)
+        - {{task}} or {task}: Alias for prompt
+        - {{previous_result}} or {previous_result}: The result from the previous phase
 
         Args:
             phase: The Phase configuration.
@@ -379,18 +380,30 @@ class MultiCommandWorkflow(BaseWorkflow):
             The formatted prompt string.
 
         """
+        prompt_text: str | None = None
+
         # Use static prompt if provided, otherwise use template
         if phase.prompt:
-            return phase.prompt
+            prompt_text = phase.prompt
+        elif phase.prompt_template:
+            prompt_text = phase.prompt_template
+        else:
+            # Default: just use the task description
+            return task
 
-        if phase.prompt_template:
-            return phase.prompt_template.format(
-                task=task,
-                previous_result=previous_result or "",
-            )
+        # Substitute placeholders (support both {{var}} and {var} syntax)
+        # Replace {{prompt}} and {{task}} with task description
+        prompt_text = prompt_text.replace("{{prompt}}", task)
+        prompt_text = prompt_text.replace("{{task}}", task)
+        prompt_text = prompt_text.replace("{{previous_result}}", previous_result or "")
 
-        # Default: just use the task description
-        return task
+        # Also support single-brace syntax for backwards compatibility
+        # Use str.replace to avoid KeyError with .format()
+        prompt_text = prompt_text.replace("{prompt}", task)
+        prompt_text = prompt_text.replace("{task}", task)
+        prompt_text = prompt_text.replace("{previous_result}", previous_result or "")
+
+        return prompt_text
 
     def reset(self) -> None:
         """Reset the workflow state for re-execution.
