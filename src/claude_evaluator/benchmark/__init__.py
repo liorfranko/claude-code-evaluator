@@ -20,6 +20,7 @@ from claude_evaluator.benchmark.exceptions import (
 from claude_evaluator.benchmark.runner import BenchmarkRunner
 from claude_evaluator.benchmark.session_storage import SessionStorage
 from claude_evaluator.benchmark.storage import BenchmarkStorage
+from claude_evaluator.benchmark.utils import sanitize_path_component
 
 __all__ = [
     "BenchmarkError",
@@ -33,4 +34,5 @@ __all__ = [
     "bootstrap_ci",
     "compare_baselines",
     "format_comparison_table",
+    "sanitize_path_component",
 ]

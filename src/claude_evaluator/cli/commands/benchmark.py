@@ -194,17 +194,15 @@ class RunBenchmarkCommand(BaseCommand):
             )
 
         # Use first baseline as reference if not specified
-        reference = getattr(args, "reference", None)
-        if reference is None:
-            # Default to the first workflow in config order
-            for wf_name in config.workflows:
-                matching = [b for b in baselines if b.workflow_name == wf_name]
-                if matching:
-                    reference = matching[0].workflow_name
-                    break
-
-        if reference is None and baselines:
-            reference = baselines[0].workflow_name
+        reference = getattr(args, "reference", None) or next(
+            (
+                b.workflow_name
+                for wf_name in config.workflows
+                for b in baselines
+                if b.workflow_name == wf_name
+            ),
+            baselines[0].workflow_name if baselines else None,
+        )
 
         comparisons = compare_baselines(baselines, reference_name=reference)
         table = format_comparison_table(
@@ -327,63 +325,5 @@ class RunBenchmarkCommand(BaseCommand):
             lines.append("")
             lines.append("-" * 60)
             lines.append(f"Best: {best.workflow_name} (mean={best.stats.mean:.1f})")
-
-        return "\n".join(lines)
-
-    def _format_run_summary(
-        self,
-        baseline: BenchmarkBaseline,
-    ) -> str:
-        """Format a summary of a single workflow benchmark run.
-
-        Args:
-            baseline: The baseline that was created/updated.
-
-        Returns:
-            Formatted summary string.
-
-        """
-        stats = baseline.stats
-        ci_str = f"[{stats.ci_95[0]:.1f}, {stats.ci_95[1]:.1f}]"
-
-        lines = [
-            "",
-            "Benchmark Complete",
-            "=" * 40,
-            f"Workflow:    {baseline.workflow_name}",
-            f"Version:     {baseline.workflow_version}",
-            f"Model:       {baseline.model}",
-            f"Runs:        {stats.n}",
-            "",
-            "Results:",
-            f"  Mean:      {stats.mean:.1f}",
-            f"  Std Dev:   {stats.std:.1f}",
-            f"  95% CI:    {ci_str}",
-        ]
-
-        # Add dimension breakdown if available
-        if stats.dimension_stats:
-            lines.append("")
-            lines.append("Dimension Scores:")
-            for dim_name, dim_stats in sorted(stats.dimension_stats.items()):
-                dim_ci_str = f"[{dim_stats.ci_95[0]:.1f}, {dim_stats.ci_95[1]:.1f}]"
-                lines.append(
-                    f"  {dim_name:<18} {dim_stats.mean:5.1f} ± {dim_stats.std:.1f}  CI: {dim_ci_str}"
-                )
-
-        lines.append("")
-
-        # Add individual run scores
-        lines.append("Run Scores:")
-        for i, run in enumerate(baseline.runs, 1):
-            dim_summary = ""
-            if run.dimension_scores:
-                dim_parts = [
-                    f"{k}={v.score}" for k, v in sorted(run.dimension_scores.items())
-                ]
-                dim_summary = f" ({', '.join(dim_parts)})"
-            lines.append(
-                f"  Run {i}: {run.score} ({run.duration_seconds}s){dim_summary}"
-            )
 
         return "\n".join(lines)

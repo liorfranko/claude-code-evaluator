@@ -21,6 +21,7 @@ from claude_evaluator.benchmark.exceptions import (
 )
 from claude_evaluator.benchmark.session_storage import SessionStorage
 from claude_evaluator.benchmark.storage import BenchmarkStorage
+from claude_evaluator.benchmark.utils import sanitize_path_component
 from claude_evaluator.evaluation.git_operations import clone_repository
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.metrics.collector import MetricsCollector
@@ -352,113 +353,23 @@ class BenchmarkRunner:
             RepositoryError: If repository setup fails.
 
         """
-        # Generate run ID for logging
-        safe_workflow_name = self._sanitize_path_component(workflow_name)
+        safe_workflow_name = sanitize_path_component(workflow_name)
         run_id = f"run-{run_number}_{safe_workflow_name}_{uuid4().hex[:8]}"
-        start_time = time.time()
 
         # Setup repository in provided workspace
-        now = datetime.now()
-        date_str = now.strftime("%Y-%m-%d")
         workspace = await self._setup_repository(
             run_id=run_id,
-            date_str=date_str,
+            date_str=datetime.now().strftime("%Y-%m-%d"),
             workspace_path=workspace_path,
         )
 
-        if verbose:
-            print(f"  Workspace: {workspace}")
-
-        try:
-            # Create progress callback for verbose output
-            progress_callback = None
-            if verbose:
-                from claude_evaluator.cli.formatters import create_progress_callback
-
-                progress_callback = create_progress_callback()
-
-            # Create and execute workflow
-            workflow = self._create_workflow(workflow_def, progress_callback)
-            evaluation = self._create_evaluation(workspace, workflow_def.type)
-
-            # Execute workflow
-            metrics = await workflow.execute_with_timeout(
-                evaluation=evaluation,
-                timeout_seconds=self.config.defaults.timeout_seconds,
-            )
-
-            # Check if evaluation failed
-            from claude_evaluator.models.enums import EvaluationStatus
-
-            if evaluation.status == EvaluationStatus.failed:
-                error_msg = evaluation.error or "Workflow execution failed"
-                raise WorkflowExecutionError(
-                    f"Evaluation failed for run {run_id}: {error_msg}"
-                )
-
-            # Generate report from the completed evaluation
-            report_path = await self._generate_report(evaluation, workspace)
-
-            # Score the result with criteria if available
-            criteria = (
-                self.config.evaluation.criteria
-                if self.config.evaluation.criteria
-                else None
-            )
-            score_report = await self._score_evaluation(
-                report_path, workspace, criteria
-            )
-
-            # Extract dimension scores from score report
-            dimension_scores: dict[str, DimensionRunScore] = {}
-            for dim_score in score_report.dimension_scores:
-                key = dim_score.criterion_name or dim_score.dimension_name.value
-                if key in dimension_scores:
-                    logger.warning(
-                        "dimension_score_overwritten",
-                        key=key,
-                        original_score=dimension_scores[key].score,
-                        new_score=dim_score.score,
-                    )
-                dimension_scores[key] = DimensionRunScore(
-                    name=key,
-                    score=dim_score.score,
-                    weight=dim_score.weight,
-                    rationale=dim_score.rationale,
-                )
-
-            duration = int(time.time() - start_time)
-
-            return BenchmarkRun(
-                run_id=run_id,
-                workflow_name=workflow_name,
-                score=score_report.aggregate_score,
-                timestamp=datetime.now(),
-                evaluation_id=str(evaluation.id),
-                duration_seconds=duration,
-                metrics=RunMetrics(
-                    total_tokens=metrics.total_tokens,
-                    total_cost_usd=metrics.total_cost_usd,
-                    turn_count=metrics.turn_count,
-                ),
-                dimension_scores=dimension_scores,
-            )
-
-        except KeyboardInterrupt:
-            logger.info("benchmark_run_interrupted", run_id=run_id)
-            raise
-        except (WorkflowExecutionError, RepositoryError):
-            raise
-        except Exception as e:
-            logger.error(
-                "benchmark_run_unexpected_error",
-                run_id=run_id,
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            raise WorkflowExecutionError(
-                f"Workflow execution failed for run {run_id}: {e}"
-            ) from e
+        return await self._execute_run_core(
+            workflow_def=workflow_def,
+            workflow_name=workflow_name,
+            workspace=workspace,
+            run_id=run_id,
+            verbose=verbose,
+        )
 
     def get_session_storage(self) -> SessionStorage:
         """Get a session storage instance.
@@ -537,43 +448,67 @@ class BenchmarkRunner:
             RepositoryError: If repository setup fails.
 
         """
-        # Generate date-centric run ID: HH-MM-SS_workflow_uuid
-        # Sanitize workflow_name for filesystem safety (prevent path traversal)
-        safe_workflow_name = self._sanitize_path_component(workflow_name)
+        safe_workflow_name = sanitize_path_component(workflow_name)
         now = datetime.now()
         date_str = now.strftime("%Y-%m-%d")
         time_str = now.strftime("%H-%M-%S")
         run_id = f"{time_str}_{safe_workflow_name}_{uuid4().hex[:8]}"
-        start_time = time.time()
 
         # Setup fresh repository for this run under date-organized directory
         workspace = await self._setup_repository(run_id=run_id, date_str=date_str)
+
+        return await self._execute_run_core(
+            workflow_def=workflow_def,
+            workflow_name=workflow_name,
+            workspace=workspace,
+            run_id=run_id,
+            verbose=verbose,
+        )
+
+    async def _execute_run_core(
+        self,
+        workflow_def: WorkflowDefinition,
+        workflow_name: str,
+        workspace: Path,
+        run_id: str,
+        verbose: bool,
+    ) -> BenchmarkRun:
+        """Execute the core benchmark run logic.
+
+        This is the shared implementation used by both _execute_single_run
+        and _execute_single_run_in_session.
+
+        Args:
+            workflow_def: The workflow definition to execute.
+            workflow_name: Name of the workflow.
+            workspace: Path to the workspace (already set up with cloned repo).
+            run_id: Unique identifier for this run.
+            verbose: Whether to print progress output.
+
+        Returns:
+            BenchmarkRun with results.
+
+        Raises:
+            WorkflowExecutionError: If workflow execution fails.
+
+        """
+        start_time = time.time()
 
         if verbose:
             print(f"  Workspace: {workspace}")
 
         try:
-            # Create progress callback for verbose output
-            progress_callback = None
-            if verbose:
-                from claude_evaluator.cli.formatters import create_progress_callback
+            progress_callback = self._create_progress_callback(verbose)
 
-                progress_callback = create_progress_callback()
-
-            # Create and execute workflow
             workflow = self._create_workflow(workflow_def, progress_callback)
             evaluation = self._create_evaluation(workspace, workflow_def.type)
 
-            # Execute workflow
-            # Note: workflow.execute_with_timeout() calls on_execution_complete()
-            # which already calls evaluation.complete(metrics), so we don't need
-            # to call it again here.
             metrics = await workflow.execute_with_timeout(
                 evaluation=evaluation,
                 timeout_seconds=self.config.defaults.timeout_seconds,
             )
 
-            # Check if evaluation failed - don't proceed to scoring if it did
+            # Check if evaluation failed
             from claude_evaluator.models.enums import EvaluationStatus
 
             if evaluation.status == EvaluationStatus.failed:
@@ -582,39 +517,14 @@ class BenchmarkRunner:
                     f"Evaluation failed for run {run_id}: {error_msg}"
                 )
 
-            # Generate report from the completed evaluation
             report_path = await self._generate_report(evaluation, workspace)
 
-            # Score the result with criteria if available
-            criteria = (
-                self.config.evaluation.criteria
-                if self.config.evaluation.criteria
-                else None
-            )
+            criteria = self.config.evaluation.criteria or None
             score_report = await self._score_evaluation(
                 report_path, workspace, criteria
             )
 
-            # Extract dimension scores from score report
-            # Use criterion_name if present (for unknown criteria) to avoid key collisions
-            dimension_scores: dict[str, DimensionRunScore] = {}
-            for dim_score in score_report.dimension_scores:
-                # Use criterion_name if set, otherwise use dimension_name.value
-                key = dim_score.criterion_name or dim_score.dimension_name.value
-                if key in dimension_scores:
-                    logger.warning(
-                        "dimension_score_overwritten",
-                        key=key,
-                        original_score=dimension_scores[key].score,
-                        new_score=dim_score.score,
-                    )
-                dimension_scores[key] = DimensionRunScore(
-                    name=key,
-                    score=dim_score.score,
-                    weight=dim_score.weight,
-                    rationale=dim_score.rationale,
-                )
-
+            dimension_scores = self._extract_dimension_scores(score_report)
             duration = int(time.time() - start_time)
 
             return BenchmarkRun(
@@ -636,7 +546,6 @@ class BenchmarkRunner:
             logger.info("benchmark_run_interrupted", run_id=run_id)
             raise
         except (WorkflowExecutionError, RepositoryError):
-            # Already the right exception types, re-raise as-is
             raise
         except Exception as e:
             logger.error(
@@ -648,6 +557,54 @@ class BenchmarkRunner:
             raise WorkflowExecutionError(
                 f"Workflow execution failed for run {run_id}: {e}"
             ) from e
+
+    def _create_progress_callback(
+        self, verbose: bool
+    ) -> Callable[[ProgressEvent], None] | None:
+        """Create a progress callback if verbose mode is enabled.
+
+        Args:
+            verbose: Whether verbose output is enabled.
+
+        Returns:
+            Progress callback function or None.
+
+        """
+        if not verbose:
+            return None
+        from claude_evaluator.cli.formatters import create_progress_callback
+
+        return create_progress_callback()
+
+    def _extract_dimension_scores(
+        self, score_report: ScoreReport
+    ) -> dict[str, DimensionRunScore]:
+        """Extract dimension scores from a score report.
+
+        Args:
+            score_report: The score report to extract from.
+
+        Returns:
+            Dictionary mapping dimension names to scores.
+
+        """
+        dimension_scores: dict[str, DimensionRunScore] = {}
+        for dim_score in score_report.dimension_scores:
+            key = dim_score.criterion_name or dim_score.dimension_name.value
+            if key in dimension_scores:
+                logger.warning(
+                    "dimension_score_overwritten",
+                    key=key,
+                    original_score=dimension_scores[key].score,
+                    new_score=dim_score.score,
+                )
+            dimension_scores[key] = DimensionRunScore(
+                name=key,
+                score=dim_score.score,
+                weight=dim_score.weight,
+                rationale=dim_score.rationale,
+            )
+        return dimension_scores
 
     def _create_workflow(
         self,
@@ -879,25 +836,3 @@ class BenchmarkRunner:
 
         """
         return self._storage
-
-    @staticmethod
-    def _sanitize_path_component(name: str) -> str:
-        """Sanitize a string for safe use in filesystem paths.
-
-        Prevents path traversal by replacing dangerous characters.
-
-        Args:
-            name: The string to sanitize.
-
-        Returns:
-            A filesystem-safe version of the string.
-
-        """
-        # Replace path separators and parent directory references
-        safe = name.replace("/", "-").replace("\\", "-").replace("..", "_")
-        # Remove any remaining problematic characters
-        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe)
-        # Ensure it doesn't start with a dot (hidden file) or hyphen
-        while safe.startswith((".", "-")):
-            safe = safe[1:] if len(safe) > 1 else "unnamed"
-        return safe or "unnamed"

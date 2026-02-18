@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from claude_evaluator.benchmark.session_storage import SessionStorage
+from claude_evaluator.benchmark.utils import sanitize_path_component
 from claude_evaluator.models.benchmark.results import (
     BaselineStats,
     BenchmarkBaseline,
@@ -29,7 +30,9 @@ def make_baseline(workflow_name: str, score: int = 80) -> BenchmarkBaseline:
                 timestamp=datetime.now(),
                 evaluation_id="eval-1",
                 duration_seconds=60,
-                metrics=RunMetrics(total_tokens=1000, total_cost_usd=0.01, turn_count=5),
+                metrics=RunMetrics(
+                    total_tokens=1000, total_cost_usd=0.01, turn_count=5
+                ),
             )
         ],
         stats=BaselineStats(
@@ -249,7 +252,9 @@ class TestSessionStorageLoadSessionBaselines:
         _, session_path = storage.create_session()
 
         # Save two workflow summaries
-        storage.save_workflow_summary(session_path, "direct", make_baseline("direct", 80))
+        storage.save_workflow_summary(
+            session_path, "direct", make_baseline("direct", 80)
+        )
         storage.save_workflow_summary(session_path, "plan", make_baseline("plan", 85))
 
         baselines, failures = storage.load_session_baselines(session_path)
@@ -290,17 +295,17 @@ class TestSessionStorageGetSession:
         assert result is None
 
 
-class TestSessionStorageSanitizeName:
-    """Tests for _sanitize_name static method."""
+class TestSanitizePathComponent:
+    """Tests for sanitize_path_component utility function."""
 
     def test_removes_path_separators(self) -> None:
         """Test that path separators are replaced."""
-        result = SessionStorage._sanitize_name("workflow/with/slashes")
+        result = sanitize_path_component("workflow/with/slashes")
         assert "/" not in result
 
     def test_removes_leading_dots(self) -> None:
         """Test that leading dots are removed."""
-        result = SessionStorage._sanitize_name(".hidden")
+        result = sanitize_path_component(".hidden")
         assert not result.startswith(".")
 
 

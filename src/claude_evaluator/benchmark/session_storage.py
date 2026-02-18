@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from claude_evaluator.benchmark.exceptions import StorageError
+from claude_evaluator.benchmark.utils import sanitize_path_component
 from claude_evaluator.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -84,7 +85,7 @@ class SessionStorage:
             Path to the workflow directory.
 
         """
-        safe_name = self._sanitize_name(workflow_name)
+        safe_name = sanitize_path_component(workflow_name)
         workflow_dir = session_path / safe_name
         workflow_dir.mkdir(parents=True, exist_ok=True)
         return workflow_dir
@@ -138,7 +139,7 @@ class SessionStorage:
         try:
             with summary_path.open("w", encoding="utf-8") as f:
                 data = baseline.model_dump(mode="json")
-                json.dump(data, f, indent=2, default=self._json_serializer)
+                json.dump(data, f, indent=2, default=str)
 
             logger.info(
                 "workflow_summary_saved",
@@ -197,7 +198,7 @@ class SessionStorage:
 
         try:
             with comparison_path.open("w", encoding="utf-8") as f:
-                json.dump(comparison_data, f, indent=2, default=self._json_serializer)
+                json.dump(comparison_data, f, indent=2, default=str)
 
             logger.info(
                 "comparison_saved",
@@ -302,23 +303,6 @@ class SessionStorage:
         return None
 
     @staticmethod
-    def _sanitize_name(name: str) -> str:
-        """Sanitize a name for safe use in filesystem paths.
-
-        Args:
-            name: The string to sanitize.
-
-        Returns:
-            A filesystem-safe version of the string.
-
-        """
-        safe = name.replace("/", "-").replace("\\", "-").replace("..", "_")
-        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe)
-        while safe.startswith((".", "-")):
-            safe = safe[1:] if len(safe) > 1 else "unnamed"
-        return safe or "unnamed"
-
-    @staticmethod
     def _is_valid_session_id(name: str) -> bool:
         """Check if a directory name is a valid session ID.
 
@@ -336,21 +320,3 @@ class SessionStorage:
             return True
         except ValueError:
             return False
-
-    @staticmethod
-    def _json_serializer(obj: object) -> str:
-        """Custom JSON serializer for datetime objects.
-
-        Args:
-            obj: Object to serialize.
-
-        Returns:
-            ISO format string for datetime objects.
-
-        Raises:
-            TypeError: If object is not serializable.
-
-        """
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
