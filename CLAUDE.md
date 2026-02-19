@@ -4,6 +4,13 @@
 
 Claude Code Evaluator — a CLI tool for benchmarking Claude Code workflows. Run evaluations multiple times, collect statistics, and compare approaches. Uses a two-agent architecture (Worker + Developer) with an Evaluator agent for scoring.
 
+## Prerequisites
+
+- **Python 3.10+**
+- **Claude Code CLI** — must be installed and authenticated (`claude --version`)
+- **Anthropic API access** — via `ANTHROPIC_API_KEY` env var or Vertex AI credentials
+- **Docker** (optional) — for sandbox isolation mode
+
 ## Build & Run
 
 ```bash
@@ -35,7 +42,7 @@ src/claude_evaluator/
   agents/           # Execution agents (developer/, worker/)
   scoring/          # Scoring and analysis (analyzers/, checks/, reviewers/)
   evaluation/       # Evaluation orchestration, state, git operations
-  workflows/        # Workflow strategies (direct, plan, multi_command)
+  workflows/        # Workflow strategies (direct, plan_then_implement, multi_command)
   benchmark/        # Benchmark system (runner, storage, comparison)
   sandbox/          # Execution isolation (docker, local)
   report/           # Report generation
@@ -48,8 +55,11 @@ src/claude_evaluator/
 - **Typing** — full type annotations on all public functions
 - **Imports** — stdlib, then third-party, then local (enforced by ruff isort)
 - **Docstrings** — Google style
-- **Logging** — structlog (`get_logger(__name__)`)
-- **Models** — Pydantic v2 (`BaseSchema` for data models, `BaseSettings` for config)
+- **Logging** — `from structlog import get_logger; logger = get_logger(__name__)`
+- **Models** — Pydantic v2:
+  - Data models: inherit from `BaseSchema` (`from claude_evaluator.models.base import BaseSchema`)
+  - Config: inherit from `BaseSettings` (`from pydantic_settings import BaseSettings`)
+- **Exceptions** — domain-specific, inherit from `ClaudeEvaluatorError` (`from claude_evaluator.exceptions import ClaudeEvaluatorError`)
 - **Formatting** — ruff (88 char line length, double quotes)
 - **Files** — one class/concern per file, snake_case naming
 - **`__all__`** — explicitly defined in every module
@@ -62,13 +72,27 @@ src/claude_evaluator/
 - Settings via `pydantic-settings` with `CLAUDE_*` env var prefixes
 - Output path validation prevents writes outside CWD or temp dir
 
+## Environment Variables
+
+Settings are configured via env vars with `CLAUDE_*` prefixes. Key variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_WORKER_MODEL` | `claude-haiku-4-5@20251001` | Model for task execution |
+| `CLAUDE_WORKER_MAX_TURNS` | `10` | Max turns per query |
+| `CLAUDE_EVALUATOR_MODEL` | `opus` | Model for scoring |
+| `CLAUDE_EVALUATOR_TEMPERATURE` | `0.1` | Scoring temperature |
+| `CLAUDE_WORKFLOW_TIMEOUT_SECONDS` | `300` | Default execution timeout |
+
+See `config/settings.py` for all options.
+
 ## Docker Sandbox
 
 - `Dockerfile` at project root, `.dockerignore` excludes dev files
 - `--sandbox docker` intercepts dispatch before any evaluation logic
 - Container runs the same CLI without `--sandbox` (no special code paths)
 - Auto-builds image on first use if not found
-- Mounts: output dir (rw), benchmark file (ro), GCloud ADC (ro)
+- Mounts: output dir (rw), benchmark file (ro), `~/.claude/` (ro), GCloud ADC (ro)
 - Forwards `ANTHROPIC_*`, `CLAUDE_*`, `CLOUD_ML_REGION` env vars
 
 ## Benchmark System
@@ -109,6 +133,5 @@ results/
 
 - Benchmarks support per-dimension scoring (e.g., functionality, code_quality, efficiency)
 - Configure criteria in benchmark YAML under `evaluation.criteria` with name, weight, description
-- Scores are computed by `ScoreReportBuilder.calculate_scores_from_criteria()`
-- Per-dimension statistics (mean, std, CI) are stored in `BaselineStats.dimension_stats`
+- Per-dimension statistics (mean, std, CI) computed and stored in `summary.json`
 - Comparison output shows dimension breakdown alongside overall scores
