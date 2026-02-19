@@ -185,17 +185,17 @@ class BenchmarkRunner:
             BenchmarkError: If a workflow is not found or execution fails.
 
         """
-        session_storage = SessionStorage(self.results_dir, self.config.name)
-        session_id, session_path = session_storage.create_session()
-
-        # Determine which workflows to run
+        # Validate workflow names BEFORE creating session to avoid empty directories
         if workflow_names is None:
             workflow_names = list(self.config.workflows.keys())
         else:
-            # Validate all workflow names exist
             for name in workflow_names:
                 if name not in self.config.workflows:
                     raise BenchmarkError(f"Workflow '{name}' not found in config")
+
+        # Create session only after validation passes
+        session_storage = SessionStorage(self.results_dir, self.config.name)
+        session_id, session_path = session_storage.create_session()
 
         logger.info(
             "session_starting",
