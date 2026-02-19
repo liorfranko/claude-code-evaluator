@@ -20,11 +20,20 @@ def sanitize_path_component(name: str) -> str:
         A filesystem-safe version of the string.
 
     """
-    # Replace path separators and parent directory references
-    safe = name.replace("/", "-").replace("\\", "-").replace("..", "_")
-    # Remove any remaining problematic characters
+    if not name:
+        return "unnamed"
+
+    # Replace dangerous path characters
+    replacements = {"/": "-", "\\": "-", "..": "_"}
+    safe = name
+    for old, new in replacements.items():
+        safe = safe.replace(old, new)
+
+    # Keep only safe characters
     safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe)
-    # Ensure it doesn't start with a dot (hidden file) or hyphen
-    while safe.startswith((".", "-")):
-        safe = safe[1:] if len(safe) > 1 else "unnamed"
+
+    # Remove leading dots and hyphens (one at a time to be conservative)
+    while safe and safe[0] in ".-":
+        safe = safe[1:]
+
     return safe or "unnamed"

@@ -387,8 +387,7 @@ class BenchmarkRunner:
             RepositoryError: If repository setup fails.
 
         """
-        safe_workflow_name = sanitize_path_component(workflow_name)
-        run_id = f"run-{run_number}_{safe_workflow_name}_{uuid4().hex[:8]}"
+        run_id = f"run-{run_number}_{self._generate_run_suffix(workflow_name)}"
 
         # Setup repository in provided workspace
         workspace = await self._setup_repository(
@@ -482,14 +481,13 @@ class BenchmarkRunner:
             RepositoryError: If repository setup fails.
 
         """
-        safe_workflow_name = sanitize_path_component(workflow_name)
         now = datetime.now()
-        date_str = now.strftime("%Y-%m-%d")
-        time_str = now.strftime("%H-%M-%S")
-        run_id = f"{time_str}_{safe_workflow_name}_{uuid4().hex[:8]}"
+        run_id = self._generate_run_id(workflow_name, now)
 
         # Setup fresh repository for this run under date-organized directory
-        workspace = await self._setup_repository(run_id=run_id, date_str=date_str)
+        workspace = await self._setup_repository(
+            run_id=run_id, date_str=now.strftime("%Y-%m-%d")
+        )
 
         return await self._execute_run_core(
             workflow_def=workflow_def,
@@ -757,10 +755,20 @@ class BenchmarkRunner:
         report_dir.mkdir(parents=True, exist_ok=True)
         report_path = report_dir / "evaluation.json"
 
-        report_path.write_text(
-            report.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
+        try:
+            report_path.write_text(
+                report.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+        except OSError as e:
+            logger.error(
+                "report_write_failed",
+                report_path=str(report_path),
+                error=str(e),
+            )
+            raise WorkflowExecutionError(
+                f"Failed to write evaluation report to {report_path}: {e}"
+            ) from e
 
         logger.debug(
             "evaluation_report_generated",
@@ -870,3 +878,33 @@ class BenchmarkRunner:
 
         """
         return self._storage
+
+    def _generate_run_id(self, workflow_name: str, timestamp: datetime) -> str:
+        """Generate a unique run ID.
+
+        Args:
+            workflow_name: Name of the workflow.
+            timestamp: Current timestamp.
+
+        Returns:
+            Unique run ID string.
+
+        """
+        time_str = timestamp.strftime("%H-%M-%S")
+        suffix = self._generate_run_suffix(workflow_name)
+        return f"{time_str}_{suffix}"
+
+    @staticmethod
+    def _generate_run_suffix(workflow_name: str) -> str:
+        """Generate a suffix for run IDs.
+
+        Args:
+            workflow_name: Name of the workflow.
+
+        Returns:
+            Suffix containing sanitized workflow name and unique ID.
+
+        """
+        safe_name = sanitize_path_component(workflow_name)
+        unique_id = uuid4().hex[:8]
+        return f"{safe_name}_{unique_id}"

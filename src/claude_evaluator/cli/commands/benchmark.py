@@ -183,10 +183,9 @@ class RunBenchmarkCommand(BaseCommand):
         baselines, failures = storage.load_session_baselines(session_path)
 
         if failures:
-            print(
-                f"Warning: {len(failures)} baseline(s) failed to load. "
-                "Run with --verbose for details."
-            )
+            print(f"\nWarning: {len(failures)} baseline(s) failed to load:")
+            for path, error in failures:
+                print(f"  - {path}: {error}")
 
         if not baselines:
             return CommandResult(
@@ -196,14 +195,8 @@ class RunBenchmarkCommand(BaseCommand):
             )
 
         # Use first baseline as reference if not specified
-        reference = getattr(args, "reference", None) or next(
-            (
-                b.workflow_name
-                for wf_name in config.workflows
-                for b in baselines
-                if b.workflow_name == wf_name
-            ),
-            baselines[0].workflow_name if baselines else None,
+        reference = getattr(args, "reference", None) or self._get_default_reference(
+            config, baselines
         )
 
         comparisons = compare_baselines(baselines, reference_name=reference)
@@ -329,3 +322,32 @@ class RunBenchmarkCommand(BaseCommand):
             lines.append(f"Best: {best.workflow_name} (mean={best.stats.mean:.1f})")
 
         return "\n".join(lines)
+
+    def _get_default_reference(
+        self,
+        config: BenchmarkConfig,
+        baselines: list[BenchmarkBaseline],
+    ) -> str | None:
+        """Get the default reference workflow for comparison.
+
+        Prefers workflows defined in config, falls back to first baseline.
+
+        Args:
+            config: Benchmark configuration.
+            baselines: List of baselines.
+
+        Returns:
+            Workflow name to use as reference, or None if no baselines.
+
+        """
+        if not baselines:
+            return None
+
+        # Find first baseline that matches a configured workflow
+        for workflow_name in config.workflows:
+            for baseline in baselines:
+                if baseline.workflow_name == workflow_name:
+                    return baseline.workflow_name
+
+        # Fallback to first baseline
+        return baselines[0].workflow_name

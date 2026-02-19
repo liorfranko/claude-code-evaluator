@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+import pydantic
+
 from claude_evaluator.benchmark.exceptions import StorageError
 from claude_evaluator.benchmark.utils import sanitize_path_component
 from claude_evaluator.logging_config import get_logger
@@ -55,29 +57,50 @@ class SessionStorage:
 
         """
         self.results_dir = results_dir
-        # Sanitize benchmark_name to prevent path traversal attacks
-        safe_benchmark_name = sanitize_path_component(benchmark_name)
-        self.benchmark_name = safe_benchmark_name
-        self._base_dir = results_dir / safe_benchmark_name
+        self.benchmark_name = sanitize_path_component(benchmark_name)
+        self._base_dir = results_dir / self.benchmark_name
 
         # Verify resolved path stays within results_dir
-        try:
-            resolved_base = self._base_dir.resolve()
-            resolved_results = results_dir.resolve()
-            # Path must start with results_dir/ or be results_dir itself
-            is_within = (
-                str(resolved_base).startswith(str(resolved_results) + "/")
-                or resolved_base == resolved_results
-            )
-            if not is_within:
-                raise StorageError(
-                    f"Benchmark name '{benchmark_name}' would escape results directory"
-                )
-        except OSError as e:
-            raise StorageError(f"Invalid benchmark path: {e}") from e
+        self._validate_path_security(self._base_dir, results_dir, benchmark_name)
 
         # Track workflow name mappings to detect collisions
         self._workflow_name_map: dict[str, str] = {}
+
+    def _validate_path_security(self, path: Path, base_dir: Path, name: str) -> None:
+        """Validate that a path stays within the allowed base directory.
+
+        Args:
+            path: Path to validate.
+            base_dir: Allowed base directory.
+            name: Name being validated (for error messages).
+
+        Raises:
+            StorageError: If path would escape base directory.
+
+        """
+        try:
+            resolved_path = path.resolve()
+            resolved_base = base_dir.resolve()
+            if not self._is_path_within(resolved_path, resolved_base):
+                raise StorageError(f"Name '{name}' would escape base directory")
+        except OSError as e:
+            raise StorageError(f"Invalid path: {e}") from e
+
+    @staticmethod
+    def _is_path_within(path: Path, base: Path) -> bool:
+        """Check if a path is within a base directory.
+
+        Args:
+            path: Path to check.
+            base: Base directory.
+
+        Returns:
+            True if path is within base directory.
+
+        """
+        path_str = str(path)
+        base_str = str(base)
+        return path_str.startswith(base_str + "/") or path == base
 
     def create_session(self) -> tuple[str, Path]:
         """Create a new session with a timestamped ID and unique suffix.
@@ -304,6 +327,10 @@ class SessionStorage:
         from claude_evaluator.models.benchmark.results import BenchmarkBaseline
 
         if not session_path.exists():
+            logger.debug(
+                "session_path_not_found",
+                path=str(session_path),
+            )
             return [], []
 
         baselines: list[BenchmarkBaseline] = []
@@ -322,11 +349,12 @@ class SessionStorage:
                     data = json.load(f)
                 baseline = BenchmarkBaseline.model_validate(data)
                 baselines.append(baseline)
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, pydantic.ValidationError) as e:
                 logger.warning(
                     "summary_load_failed",
                     path=str(summary_path),
                     error=str(e),
+                    error_type=type(e).__name__,
                 )
                 failures.append((summary_path, str(e)))
 
@@ -347,31 +375,32 @@ class SessionStorage:
         """
         # Validate session_id format to prevent path traversal attacks
         if not self._is_valid_session_id(session_id):
-            logger.warning(
-                "invalid_session_id_format",
-                session_id=session_id,
-            )
+            logger.warning("invalid_session_id_format", session_id=session_id)
             return None
 
         session_path = self._base_dir / session_id
 
         # Verify resolved path stays within base directory
         try:
-            resolved_path = session_path.resolve()
-            resolved_base = self._base_dir.resolve()
-            if not str(resolved_path).startswith(str(resolved_base) + "/"):
+            if not self._is_path_within(
+                session_path.resolve(), self._base_dir.resolve()
+            ):
                 logger.warning(
                     "session_path_outside_base_dir",
                     session_id=session_id,
-                    resolved_path=str(resolved_path),
+                    resolved_path=str(session_path.resolve()),
                 )
                 return None
-        except (OSError, ValueError):
+        except (OSError, ValueError) as e:
+            logger.warning(
+                "session_path_resolution_failed",
+                session_id=session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return None
 
-        if session_path.exists() and session_path.is_dir():
-            return session_id, session_path
-        return None
+        return (session_id, session_path) if session_path.is_dir() else None
 
     @staticmethod
     def _is_valid_session_id(name: str) -> bool:
@@ -388,21 +417,21 @@ class SessionStorage:
             True if it matches a valid session ID format.
 
         """
-        # Check for new format with UUID suffix: YYYY-MM-DD_HH-MM-SS_XXXXXXXX
+        # Timestamp format used in both cases
+        TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
+
+        # Check current format with 8-char hex suffix
         if len(name) == 28 and name[19] == "_":
-            timestamp_part = name[:19]
-            suffix_part = name[20:]
             try:
-                datetime.strptime(timestamp_part, "%Y-%m-%d_%H-%M-%S")
-                # Validate hex suffix
-                int(suffix_part, 16)
+                datetime.strptime(name[:19], TIMESTAMP_FORMAT)
+                int(name[20:], 16)  # Validate hex suffix
                 return True
             except ValueError:
                 return False
 
-        # Check for legacy format: YYYY-MM-DD_HH-MM-SS
+        # Check legacy format
         try:
-            datetime.strptime(name, "%Y-%m-%d_%H-%M-%S")
+            datetime.strptime(name, TIMESTAMP_FORMAT)
             return True
         except ValueError:
             return False
