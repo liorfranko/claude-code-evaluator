@@ -164,6 +164,7 @@ class BenchmarkRunner:
         workflow_names: list[str] | None = None,
         runs: int = 5,
         verbose: bool = False,
+        version_override: str | None = None,
     ) -> tuple[str, list[BenchmarkBaseline]]:
         """Execute workflows and store in a timestamped session folder.
 
@@ -174,6 +175,8 @@ class BenchmarkRunner:
             workflow_names: Names of workflows to run. If None, runs all workflows.
             runs: Number of runs per workflow.
             verbose: Whether to print progress output.
+            version_override: Optional version to use instead of workflow.version
+                for all workflows in this session.
 
         Returns:
             Tuple of (session_id, list of baselines for each workflow).
@@ -222,6 +225,7 @@ class BenchmarkRunner:
                 workflow_name=workflow_name,
                 runs=runs,
                 verbose=verbose,
+                version_override=version_override,
             )
             baselines.append(baseline)
 
@@ -303,6 +307,7 @@ class BenchmarkRunner:
         workflow_name: str,
         runs: int,
         verbose: bool,
+        version_override: str | None = None,
     ) -> BenchmarkBaseline:
         """Execute a single workflow within a session.
 
@@ -312,12 +317,14 @@ class BenchmarkRunner:
             workflow_name: Name of the workflow.
             runs: Number of runs.
             verbose: Whether to print progress.
+            version_override: Optional version to use instead of workflow.version.
 
         Returns:
             BenchmarkBaseline with results.
 
         """
         workflow_def = self.config.workflows[workflow_name]
+        effective_version = version_override or workflow_def.version
 
         async def execute_session_run(run_number: int) -> BenchmarkRun:
             workspace_path = session_storage.get_run_workspace(
@@ -343,7 +350,7 @@ class BenchmarkRunner:
         # Build baseline (use workflow_name directly, no version suffix)
         baseline = BenchmarkBaseline(
             workflow_name=workflow_name,
-            workflow_version=workflow_def.version,
+            workflow_version=effective_version,
             model=self.config.defaults.model,
             runs=run_results,
             stats=stats,

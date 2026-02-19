@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from claude_evaluator.benchmark.exceptions import StorageError
 from claude_evaluator.benchmark.utils import sanitize_path_component
@@ -55,15 +56,21 @@ class SessionStorage:
         self._base_dir = results_dir / benchmark_name
 
     def create_session(self) -> tuple[str, Path]:
-        """Create a new session with a timestamped ID.
+        """Create a new session with a timestamped ID and unique suffix.
+
+        The session ID format is: YYYY-MM-DD_HH-MM-SS_XXXXXXXX
+        where XXXXXXXX is a random 8-character hex suffix to prevent
+        collisions when sessions are created within the same second.
 
         Returns:
             Tuple of (session_id, session_path).
 
         """
-        session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        unique_suffix = uuid4().hex[:8]
+        session_id = f"{timestamp}_{unique_suffix}"
         session_path = self._base_dir / session_id
-        session_path.mkdir(parents=True, exist_ok=True)
+        session_path.mkdir(parents=True, exist_ok=False)
 
         logger.info(
             "session_created",
@@ -294,10 +301,34 @@ class SessionStorage:
             session_id: The session ID (timestamp format).
 
         Returns:
-            Tuple of (session_id, session_path), or None if not found.
+            Tuple of (session_id, session_path), or None if not found
+            or if the session_id is invalid.
 
         """
+        # Validate session_id format to prevent path traversal attacks
+        if not self._is_valid_session_id(session_id):
+            logger.warning(
+                "invalid_session_id_format",
+                session_id=session_id,
+            )
+            return None
+
         session_path = self._base_dir / session_id
+
+        # Verify resolved path stays within base directory
+        try:
+            resolved_path = session_path.resolve()
+            resolved_base = self._base_dir.resolve()
+            if not str(resolved_path).startswith(str(resolved_base) + "/"):
+                logger.warning(
+                    "session_path_outside_base_dir",
+                    session_id=session_id,
+                    resolved_path=str(resolved_path),
+                )
+                return None
+        except (OSError, ValueError):
+            return None
+
         if session_path.exists() and session_path.is_dir():
             return session_id, session_path
         return None
@@ -306,15 +337,30 @@ class SessionStorage:
     def _is_valid_session_id(name: str) -> bool:
         """Check if a directory name is a valid session ID.
 
-        Valid format: YYYY-MM-DD_HH-MM-SS
+        Valid formats:
+        - YYYY-MM-DD_HH-MM-SS (legacy)
+        - YYYY-MM-DD_HH-MM-SS_XXXXXXXX (current, with 8-char hex suffix)
 
         Args:
             name: The directory name to check.
 
         Returns:
-            True if it matches the session ID format.
+            True if it matches a valid session ID format.
 
         """
+        # Check for new format with UUID suffix: YYYY-MM-DD_HH-MM-SS_XXXXXXXX
+        if len(name) == 28 and name[19] == "_":
+            timestamp_part = name[:19]
+            suffix_part = name[20:]
+            try:
+                datetime.strptime(timestamp_part, "%Y-%m-%d_%H-%M-%S")
+                # Validate hex suffix
+                int(suffix_part, 16)
+                return True
+            except ValueError:
+                return False
+
+        # Check for legacy format: YYYY-MM-DD_HH-MM-SS
         try:
             datetime.strptime(name, "%Y-%m-%d_%H-%M-%S")
             return True

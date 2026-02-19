@@ -71,12 +71,19 @@ class TestSessionStorageCreateSession:
         assert session_path.is_dir()
 
     def test_session_id_is_timestamp_format(self, tmp_path: Path) -> None:
-        """Test that session_id follows timestamp format."""
+        """Test that session_id follows timestamp format with UUID suffix."""
         storage = SessionStorage(tmp_path, "test-benchmark")
         session_id, _ = storage.create_session()
 
-        # Should match YYYY-MM-DD_HH-MM-SS format
-        datetime.strptime(session_id, "%Y-%m-%d_%H-%M-%S")
+        # Should match YYYY-MM-DD_HH-MM-SS_XXXXXXXX format (28 chars total)
+        assert len(session_id) == 28
+        assert session_id[19] == "_"
+        # Validate timestamp part
+        timestamp_part = session_id[:19]
+        datetime.strptime(timestamp_part, "%Y-%m-%d_%H-%M-%S")
+        # Validate UUID suffix is hex
+        suffix_part = session_id[20:]
+        int(suffix_part, 16)
 
     def test_session_path_under_benchmark_name(self, tmp_path: Path) -> None:
         """Test that session path is under benchmark name."""
@@ -209,10 +216,10 @@ class TestSessionStorageListSessions:
         sessions = storage.list_sessions()
 
         assert len(sessions) == 3
-        # Newest first
-        assert sessions[0][0] == "2026-01-02_10-00-00"
-        assert sessions[1][0] == "2026-01-01_15-00-00"
-        assert sessions[2][0] == "2026-01-01_10-00-00"
+        # Newest first - check timestamp prefix (first 19 chars)
+        assert sessions[0][0][:19] == "2026-01-02_10-00-00"
+        assert sessions[1][0][:19] == "2026-01-01_15-00-00"
+        assert sessions[2][0][:19] == "2026-01-01_10-00-00"
 
 
 class TestSessionStorageGetLatestSession:
@@ -240,7 +247,8 @@ class TestSessionStorageGetLatestSession:
 
         assert result is not None
         session_id, _ = result
-        assert session_id == "2026-01-02_10-00-00"
+        # Check timestamp prefix (first 19 chars)
+        assert session_id[:19] == "2026-01-02_10-00-00"
 
 
 class TestSessionStorageLoadSessionBaselines:
@@ -294,6 +302,27 @@ class TestSessionStorageGetSession:
         result = storage.get_session("2099-01-01_00-00-00")
         assert result is None
 
+    def test_rejects_path_traversal_attempts(self, tmp_path: Path) -> None:
+        """Test that get_session rejects path traversal attempts."""
+        storage = SessionStorage(tmp_path, "test-benchmark")
+
+        # These should all return None due to invalid format
+        assert storage.get_session("../../../etc/passwd") is None
+        assert storage.get_session("..") is None
+        assert storage.get_session("/etc/passwd") is None
+        assert storage.get_session("2026-01-01_10-00-00/../../etc") is None
+
+    def test_rejects_invalid_session_id_format(self, tmp_path: Path) -> None:
+        """Test that get_session rejects invalid session ID formats."""
+        storage = SessionStorage(tmp_path, "test-benchmark")
+
+        # Create a directory that exists but has invalid name format
+        invalid_dir = tmp_path / "test-benchmark" / "not-a-valid-id"
+        invalid_dir.mkdir(parents=True)
+
+        # Should return None because format is invalid
+        assert storage.get_session("not-a-valid-id") is None
+
 
 class TestSanitizePathComponent:
     """Tests for sanitize_path_component utility function."""
@@ -312,12 +341,21 @@ class TestSanitizePathComponent:
 class TestSessionStorageIsValidSessionId:
     """Tests for _is_valid_session_id static method."""
 
-    def test_valid_session_id(self) -> None:
-        """Test that valid session IDs are recognized."""
+    def test_valid_session_id_legacy_format(self) -> None:
+        """Test that legacy session IDs (without UUID) are recognized."""
         assert SessionStorage._is_valid_session_id("2026-01-15_14-30-00")
+
+    def test_valid_session_id_new_format(self) -> None:
+        """Test that new session IDs (with UUID suffix) are recognized."""
+        assert SessionStorage._is_valid_session_id("2026-01-15_14-30-00_abcd1234")
+        assert SessionStorage._is_valid_session_id("2026-01-15_14-30-00_ABCD1234")
 
     def test_invalid_session_id(self) -> None:
         """Test that invalid session IDs are rejected."""
         assert not SessionStorage._is_valid_session_id("not-a-timestamp")
         assert not SessionStorage._is_valid_session_id("baselines")
         assert not SessionStorage._is_valid_session_id("runs")
+        # Invalid UUID suffix (not hex)
+        assert not SessionStorage._is_valid_session_id("2026-01-15_14-30-00_notahex!")
+        # Wrong length suffix
+        assert not SessionStorage._is_valid_session_id("2026-01-15_14-30-00_abc")
