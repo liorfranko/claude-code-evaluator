@@ -178,8 +178,8 @@ evaluator:
         )
         outputs = await registry.run_all(context)
 
-        # Should have 3 outputs (2 executed + 1 skipped)
-        assert len(outputs) == 3
+        # Should have 4 outputs (3 executed + 1 skipped)
+        assert len(outputs) == 4
 
         # Find the error_handling output
         error_output = next(o for o in outputs if o.reviewer_name == "error_handling")
@@ -349,8 +349,8 @@ evaluator:
         )
         outputs = await registry.run_all(context)
 
-        # Should have 3 outputs
-        assert len(outputs) == 3
+        # Should have 4 outputs (3 executed + 1 skipped)
+        assert len(outputs) == 4
 
         # code_quality should be skipped
         code_output = next(o for o in outputs if o.reviewer_name == "code_quality")
@@ -359,8 +359,10 @@ evaluator:
         # Others should execute
         task_output = next(o for o in outputs if o.reviewer_name == "task_completion")
         error_output = next(o for o in outputs if o.reviewer_name == "error_handling")
+        doc_output = next(o for o in outputs if o.reviewer_name == "documentation")
         assert task_output.skipped is False
         assert error_output.skipped is False
+        assert doc_output.skipped is False
 
     def test_aggregated_output_shows_skipped_count(
         self,

@@ -71,13 +71,13 @@ class TestMultiPhaseEvaluationCheckpoint:
         assert hasattr(evaluator_agent, "reviewer_registry")
         assert isinstance(evaluator_agent.reviewer_registry, ReviewerRegistry)
 
-    def test_evaluator_agent_registers_three_core_reviewers(
+    def test_evaluator_agent_registers_four_core_reviewers(
         self, evaluator_agent: EvaluatorAgent
     ) -> None:
-        """Test that EvaluatorAgent registers exactly 3 core reviewers."""
+        """Test that EvaluatorAgent registers exactly 4 core reviewers."""
         registry = evaluator_agent.reviewer_registry
 
-        assert len(registry.reviewers) == 3
+        assert len(registry.reviewers) == 4
 
     def test_evaluator_agent_registers_task_completion_reviewer(
         self, evaluator_agent: EvaluatorAgent
@@ -148,14 +148,15 @@ class TestMultiPhaseEvaluationCheckpoint:
         # Run all reviewers
         outputs = await evaluator_agent.reviewer_registry.run_all(context)
 
-        # Should have output from all 3 reviewers
-        assert len(outputs) == 3
+        # Should have output from all 4 reviewers
+        assert len(outputs) == 4
 
         # Each reviewer should have produced output
         reviewer_names = [o.reviewer_name for o in outputs]
         assert "task_completion" in reviewer_names
         assert "code_quality" in reviewer_names
         assert "error_handling" in reviewer_names
+        assert "documentation" in reviewer_names
 
     @pytest.mark.asyncio
     async def test_registry_run_all_calls_generate_structured(
@@ -178,8 +179,8 @@ class TestMultiPhaseEvaluationCheckpoint:
 
         await evaluator_agent.reviewer_registry.run_all(context)
 
-        # Should have been called 3 times (once per reviewer)
-        assert mock_claude_client.generate_structured.call_count == 3
+        # Should have been called 4 times (once per reviewer)
+        assert mock_claude_client.generate_structured.call_count == 4
 
     def test_aggregate_outputs_produces_expected_structure(
         self, evaluator_agent: EvaluatorAgent
@@ -555,13 +556,13 @@ class TestMultiPhaseEvaluationEndToEnd:
         outputs = await agent.run_reviewers(context)
 
         # Verify outputs
-        assert len(outputs) == 3
+        assert len(outputs) == 4
 
         # Aggregate outputs
         aggregated = agent.aggregate_reviewer_outputs(outputs)
 
         # Verify aggregated structure
-        assert aggregated["reviewer_count"] == 3
+        assert aggregated["reviewer_count"] == 4
         assert aggregated["skipped_count"] == 0
         assert aggregated["total_issues"] >= 0
         assert len(aggregated["all_strengths"]) >= 3

@@ -288,6 +288,43 @@ class ScoreReportBuilder:
             self.SEVERITY_PENALTIES.get(issue.severity.value, 2) for issue in issues
         )
 
+    def _add_missing_reviewer_dimension(
+        self,
+        dimension_scores: list[DimensionScore],
+        dimension_type: DimensionType,
+        criterion_name: str,
+        weight: float,
+        reason: str,
+    ) -> None:
+        """Add a dimension score for a criterion with no reviewer.
+
+        Helper method to handle the common case where a criterion has no
+        matching reviewer output. Logs a warning and adds a zero score.
+
+        Args:
+            dimension_scores: List to append the dimension score to.
+            dimension_type: The dimension type to use.
+            criterion_name: Name of the criterion.
+            weight: Weight for the dimension.
+            reason: Reason why no reviewer was available.
+
+        """
+        logger.warning(
+            "criterion_no_reviewer",
+            criterion_name=criterion_name,
+            reason=reason,
+            hint="Add a reviewer with reviewer_id matching the criterion name",
+        )
+        dimension_scores.append(
+            DimensionScore(
+                dimension_name=dimension_type,
+                score=0,
+                weight=weight,
+                rationale=f"No reviewer registered for '{criterion_name}'; scored 0.",
+                criterion_name=criterion_name,
+            )
+        )
+
     def calculate_scores_from_criteria(
         self,
         criteria: list[BenchmarkCriterion],
@@ -359,21 +396,13 @@ class ScoreReportBuilder:
                         )
                     )
                 else:
-                    # Fallback if no code quality reviewer output
-                    logger.warning(
-                        "criterion_fallback_score",
+                    # No code quality reviewer output - use zero score
+                    self._add_missing_reviewer_dimension(
+                        dimension_scores=dimension_scores,
+                        dimension_type=DimensionType.code_quality,
                         criterion_name=name,
-                        fallback_score=70,
+                        weight=weight,
                         reason="No code quality reviewer output available",
-                    )
-                    dimension_scores.append(
-                        DimensionScore(
-                            dimension_name=DimensionType.code_quality,
-                            score=70,
-                            weight=weight,
-                            rationale="No code quality analysis available; default score assigned.",
-                            criterion_name=name,
-                        )
                     )
 
             elif name == "efficiency":
@@ -406,28 +435,24 @@ class ScoreReportBuilder:
                         f"Error handling scored {error_score}/100 based on reviewer. "
                         f"Found {len(error_output.issues)} issues."
                     )
-                else:
-                    # Fallback when no error_handling reviewer available
-                    error_score = 70
-                    rationale = (
-                        "No error handling review available; default score assigned."
+                    dimension_scores.append(
+                        DimensionScore(
+                            dimension_name=DimensionType.error_handling,
+                            score=error_score,
+                            weight=weight,
+                            rationale=rationale,
+                            criterion_name=name,
+                        )
                     )
-                    logger.warning(
-                        "criterion_fallback_score",
+                else:
+                    # No error_handling reviewer output - use zero score
+                    self._add_missing_reviewer_dimension(
+                        dimension_scores=dimension_scores,
+                        dimension_type=DimensionType.error_handling,
                         criterion_name=name,
-                        fallback_score=70,
+                        weight=weight,
                         reason="No error_handling reviewer output available",
                     )
-
-                dimension_scores.append(
-                    DimensionScore(
-                        dimension_name=DimensionType.error_handling,
-                        score=error_score,
-                        weight=weight,
-                        rationale=rationale,
-                        criterion_name=name,
-                    )
-                )
 
             else:
                 # Unknown criterion - try to find matching reviewer
@@ -443,17 +468,17 @@ class ScoreReportBuilder:
                         f"Found {len(reviewer_output.issues)} issues."
                     )
                 else:
-                    # Default score for unknown criterion
-                    score = 70
+                    # No reviewer registered for this criterion - score 0
+                    score = 0
                     rationale = (
-                        f"No reviewer found for '{name}'; default score assigned."
+                        f"No reviewer registered for '{name}'; scored 0. "
+                        f"Add a reviewer with reviewer_id='{name}' to evaluate this criterion."
                     )
                     logger.warning(
-                        "criterion_fallback_score",
+                        "criterion_no_reviewer",
                         criterion_name=name,
-                        fallback_score=70,
                         reason="No matching reviewer found",
-                        hint="Check that criterion name matches a registered reviewer",
+                        hint="Add a reviewer with reviewer_id matching the criterion name",
                     )
 
                 # Use task_completion as fallback dimension type, but preserve

@@ -475,7 +475,9 @@ class TestBenchmarkRunnerWorkflowIntegration:
         ):
             mock_repo.return_value = tmp_path / "workspace"
             (tmp_path / "workspace").mkdir(exist_ok=True)
-            mock_report.return_value = tmp_path / "report.json"
+            report_path = tmp_path / "report.json"
+            report_path.write_text("{}")  # Create mock report file
+            mock_report.return_value = report_path
             mock_score.return_value = MagicMock(aggregate_score=85)
 
             workflow_def = minimal_config.workflows["direct"]
@@ -548,7 +550,9 @@ class TestBenchmarkRunnerWorkflowIntegration:
         ):
             mock_repo.return_value = tmp_path / "workspace"
             (tmp_path / "workspace").mkdir(exist_ok=True)
-            mock_report.return_value = tmp_path / "report.json"
+            report_path = tmp_path / "report.json"
+            report_path.write_text("{}")  # Create mock report file
+            mock_report.return_value = report_path
             mock_score.return_value = MagicMock(aggregate_score=90)
 
             workflow_def = minimal_config.workflows["direct"]
