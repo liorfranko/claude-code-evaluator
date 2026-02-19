@@ -562,10 +562,25 @@ class BenchmarkRunner:
         except (WorkflowExecutionError, RepositoryError):
             raise
         except Exception as e:
+            error_str = str(e)
+
+            # Provide user-friendly message for SDK initialization timeout
+            if "Control request timeout: initialize" in error_str:
+                logger.error(
+                    "claude_code_connection_timeout",
+                    run_id=run_id,
+                    error=error_str,
+                )
+                raise WorkflowExecutionError(
+                    f"Failed to connect to Claude Code for run {run_id}. "
+                    "Ensure Claude Code is installed and accessible. "
+                    "In Docker, verify the container has network access."
+                ) from e
+
             logger.error(
                 "benchmark_run_unexpected_error",
                 run_id=run_id,
-                error=str(e),
+                error=error_str,
                 error_type=type(e).__name__,
             )
             raise WorkflowExecutionError(
