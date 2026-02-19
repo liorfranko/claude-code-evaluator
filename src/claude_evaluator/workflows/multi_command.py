@@ -392,17 +392,18 @@ class MultiCommandWorkflow(BaseWorkflow):
             return task
 
         # Substitute placeholders (support both {{var}} and {var} syntax)
+        # IMPORTANT: Replace {prompt} and {task} FIRST, then {previous_result} LAST.
+        # This prevents content in previous_result (which may contain template-like
+        # strings such as "{prompt}") from being unintentionally substituted.
+        prompt_text = prompt_text.replace("{{prompt}}", task)
+        prompt_text = prompt_text.replace("{{task}}", task)
+        prompt_text = prompt_text.replace("{prompt}", task)
+        prompt_text = prompt_text.replace("{task}", task)
+
+        # Substitute previous_result last to avoid reprocessing its content
         prev = previous_result or ""
-        replacements = {
-            "{{prompt}}": task,
-            "{{task}}": task,
-            "{{previous_result}}": prev,
-            "{prompt}": task,
-            "{task}": task,
-            "{previous_result}": prev,
-        }
-        for placeholder, value in replacements.items():
-            prompt_text = prompt_text.replace(placeholder, value)
+        prompt_text = prompt_text.replace("{{previous_result}}", prev)
+        prompt_text = prompt_text.replace("{previous_result}", prev)
 
         return prompt_text
 

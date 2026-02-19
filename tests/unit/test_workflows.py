@@ -2208,3 +2208,54 @@ class TestMultiCommandWorkflowPromptBuilding:
         )
 
         assert result == "Default task"
+
+    def test_build_prompt_preserves_template_strings_in_previous_result(self) -> None:
+        """Test that {prompt} or {task} in previous_result are not substituted.
+
+        This is a regression test for a bug where chained str.replace would
+        unintentionally replace template-like strings in previous_result content.
+        """
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt_template="Task: {task}, Previous: {previous_result}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        # previous_result contains template-like strings that should NOT be replaced
+        previous_content = "Use {prompt} to format and {task} to describe"
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="My task",
+            previous_result=previous_content,
+        )
+
+        # The {prompt} and {task} inside previous_result should be preserved
+        assert result == "Task: My task, Previous: Use {prompt} to format and {task} to describe"
+
+    def test_build_prompt_preserves_double_brace_in_previous_result(self) -> None:
+        """Test that {{prompt}} in previous_result is not substituted."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt_template="Result: {{previous_result}}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        # previous_result contains double-brace template strings
+        previous_content = "Template uses {{prompt}} and {{task}}"
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="My task",
+            previous_result=previous_content,
+        )
+
+        assert result == "Result: Template uses {{prompt}} and {{task}}"
