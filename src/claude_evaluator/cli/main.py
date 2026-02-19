@@ -100,10 +100,21 @@ def main(argv: list[str] | None = None) -> int:
         return 130
 
     except Exception as e:
-        logger.exception("fatal_error", error=str(e))
-        print(f"Error: {e}", file=sys.stderr)
-        if args.verbose:
-            traceback.print_exc()
+        # Import here to avoid circular imports
+        from claude_evaluator.benchmark.exceptions import BenchmarkError
+
+        # Known operational errors: log without traceback unless verbose
+        if isinstance(e, BenchmarkError):
+            logger.error("fatal_error", error=str(e))
+            print(f"Error: {e}", file=sys.stderr)
+            if args.verbose:
+                traceback.print_exc()
+        else:
+            # Unknown errors: always log with traceback for debugging
+            logger.exception("fatal_error", error=str(e))
+            print(f"Error: {e}", file=sys.stderr)
+            if args.verbose:
+                traceback.print_exc()
         return 1
 
 
