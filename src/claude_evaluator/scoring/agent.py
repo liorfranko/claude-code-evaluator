@@ -43,6 +43,9 @@ from claude_evaluator.scoring.exceptions import (
 from claude_evaluator.scoring.reviewers.code_quality import (
     CodeQualityReviewer,
 )
+from claude_evaluator.scoring.reviewers.documentation import (
+    DocumentationReviewer,
+)
 from claude_evaluator.scoring.reviewers.error_handling import (
     ErrorHandlingReviewer,
 )
@@ -57,6 +60,9 @@ __all__ = [
 ]
 
 logger = structlog.get_logger(__name__)
+
+# Maximum characters of a query response included in reviewer context
+_CONTEXT_MAX_CHARS = 2000
 
 
 class EvaluatorAgent:
@@ -136,6 +142,9 @@ class EvaluatorAgent:
         self.reviewer_registry.register(
             ErrorHandlingReviewer(client=self.claude_client)
         )
+        self.reviewer_registry.register(
+            DocumentationReviewer(client=self.claude_client)
+        )
 
     def load_evaluation(self, evaluation_path: Path | str) -> EvaluationReport:
         """Load and parse an evaluation.json file.
@@ -163,6 +172,37 @@ class EvaluatorAgent:
             raise ParsingError(f"Invalid JSON in evaluation file: {e}") from e
         except Exception as e:
             raise ParsingError(f"Failed to parse evaluation file: {e}") from e
+
+    def _extract_execution_context(self, evaluation: EvaluationReport) -> str:
+        """Extract a summary of the workflow execution from query responses.
+
+        Uses the final query's response text (truncated) so reviewers understand
+        what the workflow actually produced — especially useful for multi-command
+        workflows where the implement phase may report partial completion.
+
+        Args:
+            evaluation: The loaded evaluation report.
+
+        Returns:
+            A formatted context string, or empty string if no responses available.
+
+        """
+        if not evaluation.metrics or not evaluation.metrics.queries:
+            return ""
+
+        queries = evaluation.metrics.queries
+        # Use the last query's response as it reflects the final state of the workflow
+        last_query = queries[-1]
+        response = last_query.response
+        if not response:
+            return ""
+
+        phase = last_query.phase or "unknown"
+        truncated = response[:_CONTEXT_MAX_CHARS]
+        if len(response) > _CONTEXT_MAX_CHARS:
+            truncated += f"\n... (truncated, {len(response) - _CONTEXT_MAX_CHARS} chars omitted)"
+
+        return f"Workflow phase '{phase}' final output:\n{truncated}"
 
     def _extract_steps(self, evaluation: EvaluationReport) -> list[dict]:
         """Extract tool call steps from evaluation messages."""
@@ -356,6 +396,10 @@ class EvaluatorAgent:
         except Exception as e:
             logger.warning("code_analysis_failed", error=str(e))
 
+        # When no explicit context is provided, extract from evaluation queries
+        # so reviewers understand what the workflow actually produced
+        evaluation_context = context or self._extract_execution_context(evaluation)
+
         # Run phase reviewers for multi-phase evaluation
         reviewer_outputs: list[ReviewerOutput] = []
         reviewer_summary: dict[str, Any] | None = None
@@ -363,7 +407,7 @@ class EvaluatorAgent:
             review_context = self._build_review_context(
                 task_description=evaluation.task_description,
                 code_analysis=code_analysis,
-                evaluation_context=context,
+                evaluation_context=evaluation_context,
             )
             reviewer_outputs = await self.run_reviewers(review_context)
             reviewer_summary = self.aggregate_reviewer_outputs(reviewer_outputs)

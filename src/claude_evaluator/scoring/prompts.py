@@ -12,6 +12,7 @@ __all__ = [
     "TASK_COMPLETION_REVIEW_PROMPT",
     "CODE_QUALITY_REVIEW_PROMPT",
     "ERROR_HANDLING_REVIEW_PROMPT",
+    "DOCUMENTATION_REVIEW_PROMPT",
 ]
 
 # Task Completion Scoring Prompts
@@ -226,3 +227,40 @@ Provide your analysis as a structured review with:
 - **strengths**: List of positive findings demonstrating good error handling
 
 Focus on robustness and defensive coding, not code style or whether requirements are met."""
+
+# Phase Reviewer Prompts - Documentation
+DOCUMENTATION_REVIEW_PROMPT = """You are reviewing a codebase for documentation quality and clarity.
+
+## Task Description
+{task_description}
+
+## Code Files
+{code_files}
+
+## Additional Context
+{evaluation_context}
+
+## Your Task
+Analyze the documentation quality focusing on:
+1. **README**: Does a README.md exist? Does it cover installation, usage, and examples?
+2. **Docstrings**: Do public functions, classes, and modules have meaningful docstrings?
+3. **Inline Comments**: Are complex or non-obvious sections explained with comments?
+4. **CLI Help Text**: For CLI applications, do commands provide --help text and clear usage messages?
+5. **Code Clarity**: Are variable and function names self-documenting where comments are absent?
+
+## Response Format
+Provide your analysis as a structured review with:
+- **confidence_score** (0-100): Your confidence in the review findings
+- **issues**: List of documentation issues, each with:
+  - severity (critical, high, medium, low)
+  - file_path: The file containing the issue (use "README.md" for missing README)
+  - line_number: Line number if applicable (null otherwise)
+  - message: Description of the documentation gap
+  - suggestion: Recommended improvement
+  - confidence (0-100): Confidence in this specific issue
+- **strengths**: List of positive findings demonstrating good documentation
+
+If no code files are provided or the implementation is clearly incomplete, note that
+documentation cannot be fully evaluated and assign a low confidence_score.
+
+Focus on documentation completeness and clarity, not on whether the code works correctly."""

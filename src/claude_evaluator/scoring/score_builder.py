@@ -443,17 +443,17 @@ class ScoreReportBuilder:
                         f"Found {len(reviewer_output.issues)} issues."
                     )
                 else:
-                    # Default score for unknown criterion
-                    score = 70
+                    # No reviewer registered for this criterion - score 0
+                    score = 0
                     rationale = (
-                        f"No reviewer found for '{name}'; default score assigned."
+                        f"No reviewer registered for '{name}'; scored 0. "
+                        f"Add a reviewer with reviewer_id='{name}' to evaluate this criterion."
                     )
                     logger.warning(
-                        "criterion_fallback_score",
+                        "criterion_no_reviewer",
                         criterion_name=name,
-                        fallback_score=70,
                         reason="No matching reviewer found",
-                        hint="Check that criterion name matches a registered reviewer",
+                        hint="Add a reviewer with reviewer_id matching the criterion name",
                     )
 
                 # Use task_completion as fallback dimension type, but preserve

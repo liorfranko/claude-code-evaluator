@@ -160,6 +160,16 @@ class TestFullEvaluationWorkflow:
                 ],
                 execution_time_ms=800,
             ),
+            ReviewerOutput(
+                reviewer_name="documentation",
+                confidence_score=75,
+                issues=[],
+                strengths=[
+                    "README present with usage examples",
+                    "Functions have docstrings",
+                ],
+                execution_time_ms=600,
+            ),
         ]
 
     def test_load_evaluation_parses_valid_json(
@@ -202,7 +212,7 @@ class TestFullEvaluationWorkflow:
 
         outputs = await evaluator_agent.run_reviewers(context)
 
-        assert len(outputs) == 3
+        assert len(outputs) == 4
         assert all(isinstance(o, ReviewerOutput) for o in outputs)
 
     @pytest.mark.asyncio
@@ -260,7 +270,7 @@ class TestFullEvaluationWorkflow:
         summary = evaluator_agent.aggregate_reviewer_outputs(mock_reviewer_outputs)
 
         # Each reviewer has 2 strengths = 6 total
-        assert len(summary["all_strengths"]) == 6
+        assert len(summary["all_strengths"]) == 8
         # Strengths should include reviewer prefix
         assert any("[task_completion]" in s for s in summary["all_strengths"])
         assert any("[code_quality]" in s for s in summary["all_strengths"])
@@ -274,8 +284,8 @@ class TestFullEvaluationWorkflow:
         """Test that aggregate_reviewer_outputs calculates average confidence."""
         summary = evaluator_agent.aggregate_reviewer_outputs(mock_reviewer_outputs)
 
-        # (85 + 80 + 90) / 3 = 85
-        assert summary["average_confidence"] == 85.0
+        # (85 + 80 + 90 + 75) / 4 = 82.5
+        assert summary["average_confidence"] == 82.5
 
     def test_aggregate_reviewer_outputs_totals_execution_time(
         self,
@@ -285,8 +295,8 @@ class TestFullEvaluationWorkflow:
         """Test that aggregate_reviewer_outputs totals execution time."""
         summary = evaluator_agent.aggregate_reviewer_outputs(mock_reviewer_outputs)
 
-        # 1500 + 1200 + 800 = 3500
-        assert summary["total_execution_time_ms"] == 3500
+        # 1500 + 1200 + 800 + 600 = 4100
+        assert summary["total_execution_time_ms"] == 4100
 
     @pytest.mark.asyncio
     async def test_evaluate_produces_score_report(
@@ -340,7 +350,7 @@ class TestFullEvaluationWorkflow:
         score_report = await evaluator_agent.evaluate(evaluation_file)
 
         assert score_report.reviewer_outputs is not None
-        assert len(score_report.reviewer_outputs) == 3
+        assert len(score_report.reviewer_outputs) == 4
 
     @pytest.mark.asyncio
     async def test_evaluate_includes_reviewer_summary(

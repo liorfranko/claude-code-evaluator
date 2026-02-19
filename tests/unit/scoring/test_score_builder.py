@@ -455,11 +455,11 @@ class TestCalculateScoresFromCriteria:
         )
         assert len(result) == 5
 
-    def test_unknown_criterion_gets_default_score(
+    def test_unknown_criterion_gets_zero_score(
         self,
         builder: ScoreReportBuilder,
     ) -> None:
-        """Test that unknown criteria get default scores."""
+        """Test that unknown criteria (no matching reviewer) get a score of 0."""
         criteria = [
             BenchmarkCriterion(name="unknown_dimension", weight=0.5),
         ]
@@ -472,8 +472,8 @@ class TestCalculateScoresFromCriteria:
             total_cost=0.05,
         )
         assert len(result) == 1
-        assert result[0].score == 70  # Default score for unknown
-        assert "default" in result[0].rationale.lower()
+        assert result[0].score == 0  # No reviewer = not evaluated
+        assert "no reviewer" in result[0].rationale.lower()
 
     def test_preserves_criterion_weights(
         self,
