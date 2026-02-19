@@ -50,10 +50,34 @@ class SessionStorage:
             results_dir: Root results directory.
             benchmark_name: Name of the benchmark.
 
+        Raises:
+            StorageError: If benchmark_name would escape results_dir.
+
         """
         self.results_dir = results_dir
-        self.benchmark_name = benchmark_name
-        self._base_dir = results_dir / benchmark_name
+        # Sanitize benchmark_name to prevent path traversal attacks
+        safe_benchmark_name = sanitize_path_component(benchmark_name)
+        self.benchmark_name = safe_benchmark_name
+        self._base_dir = results_dir / safe_benchmark_name
+
+        # Verify resolved path stays within results_dir
+        try:
+            resolved_base = self._base_dir.resolve()
+            resolved_results = results_dir.resolve()
+            # Path must start with results_dir/ or be results_dir itself
+            is_within = (
+                str(resolved_base).startswith(str(resolved_results) + "/")
+                or resolved_base == resolved_results
+            )
+            if not is_within:
+                raise StorageError(
+                    f"Benchmark name '{benchmark_name}' would escape results directory"
+                )
+        except OSError as e:
+            raise StorageError(f"Invalid benchmark path: {e}") from e
+
+        # Track workflow name mappings to detect collisions
+        self._workflow_name_map: dict[str, str] = {}
 
     def create_session(self) -> tuple[str, Path]:
         """Create a new session with a timestamped ID and unique suffix.
@@ -91,8 +115,24 @@ class SessionStorage:
         Returns:
             Path to the workflow directory.
 
+        Raises:
+            StorageError: If workflow_name collides with another workflow
+                after sanitization (e.g., "a/b" and "a-b" both become "a-b").
+
         """
         safe_name = sanitize_path_component(workflow_name)
+
+        # Check for collision: different workflow names mapping to same directory
+        if safe_name in self._workflow_name_map:
+            original_name = self._workflow_name_map[safe_name]
+            if original_name != workflow_name:
+                raise StorageError(
+                    f"Workflow name collision: '{workflow_name}' and '{original_name}' "
+                    f"both sanitize to '{safe_name}'"
+                )
+        else:
+            self._workflow_name_map[safe_name] = workflow_name
+
         workflow_dir = session_path / safe_name
         workflow_dir.mkdir(parents=True, exist_ok=True)
         return workflow_dir

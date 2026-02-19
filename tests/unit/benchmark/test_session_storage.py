@@ -58,6 +58,19 @@ class TestSessionStorageInit:
         storage = SessionStorage(tmp_path, "test-benchmark")
         assert storage.benchmark_name == "test-benchmark"
 
+    def test_sanitizes_benchmark_name(self, tmp_path: Path) -> None:
+        """Test that benchmark_name is sanitized to prevent path traversal."""
+        storage = SessionStorage(tmp_path, "../../etc/passwd")
+        # Should be sanitized, not contain path separators
+        assert "/" not in storage.benchmark_name
+        assert ".." not in storage.benchmark_name
+
+    def test_benchmark_name_with_slashes_sanitized(self, tmp_path: Path) -> None:
+        """Test that slashes in benchmark_name are sanitized."""
+        storage = SessionStorage(tmp_path, "my/benchmark/name")
+        assert "/" not in storage.benchmark_name
+        assert storage.benchmark_name == "my-benchmark-name"
+
 
 class TestSessionStorageCreateSession:
     """Tests for create_session method."""
@@ -116,6 +129,31 @@ class TestSessionStorageGetWorkflowDir:
 
         assert "/" not in workflow_dir.name
         assert workflow_dir.exists()
+
+    def test_detects_workflow_name_collision(self, tmp_path: Path) -> None:
+        """Test that colliding workflow names after sanitization raise an error."""
+        from claude_evaluator.benchmark.exceptions import StorageError
+
+        storage = SessionStorage(tmp_path, "test-benchmark")
+        _, session_path = storage.create_session()
+
+        # First workflow with slashes
+        storage.get_workflow_dir(session_path, "a/b")
+
+        # Second workflow that sanitizes to the same name should raise
+        with pytest.raises(StorageError, match="collision"):
+            storage.get_workflow_dir(session_path, "a-b")
+
+    def test_allows_same_workflow_name_multiple_times(self, tmp_path: Path) -> None:
+        """Test that the same workflow name can be used multiple times."""
+        storage = SessionStorage(tmp_path, "test-benchmark")
+        _, session_path = storage.create_session()
+
+        # Same workflow name should work multiple times (e.g., multiple runs)
+        dir1 = storage.get_workflow_dir(session_path, "direct")
+        dir2 = storage.get_workflow_dir(session_path, "direct")
+
+        assert dir1 == dir2
 
 
 class TestSessionStorageGetRunWorkspace:
