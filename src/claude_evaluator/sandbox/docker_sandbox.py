@@ -42,7 +42,6 @@ _VALUE_FLAGS = [
     ("workflow", "--workflow"),
     ("task", "--task"),
     ("timeout", "--timeout"),
-    ("benchmark_version", "--benchmark-version"),
     ("session", "--session"),
 ]
 
@@ -201,6 +200,11 @@ class DockerSandbox(BaseSandbox):
             )
             flags.extend(["-v", f"{adc_path}:{container_adc}:ro"])
             flags.extend(["-e", f"GOOGLE_APPLICATION_CREDENTIALS={container_adc}"])
+
+        # Claude Code config directory (read-only) — includes plugins, settings
+        claude_config = Path.home() / ".claude"
+        if claude_config.exists():
+            flags.extend(["-v", f"{claude_config}:/home/evaluator/.claude:ro"])
 
         return flags
 

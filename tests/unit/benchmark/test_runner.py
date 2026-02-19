@@ -253,7 +253,7 @@ class TestBenchmarkRunnerExecuteMocked:
             baseline = await runner.execute(workflow_name="direct", runs=1)
 
             assert mock_execute.called
-            assert baseline.workflow_name == "direct-v1.0.0"
+            assert baseline.workflow_name == "direct"
             assert len(baseline.runs) == 1
             assert baseline.runs[0].score == 85
 
@@ -284,37 +284,6 @@ class TestBenchmarkRunnerExecuteMocked:
             assert len(baseline.runs) == 3
             assert baseline.stats.n == 3
             assert call_count == 3
-
-    @pytest.mark.asyncio
-    async def test_execute_with_version_override(
-        self, minimal_config: BenchmarkConfig, tmp_path: Path
-    ) -> None:
-        """Test execute with version override."""
-        runner = BenchmarkRunner(config=minimal_config, results_dir=tmp_path)
-
-        mock_run = BenchmarkRun(
-            run_id="test-0",
-            workflow_name="direct",
-            score=80,
-            timestamp=datetime.now(),
-            evaluation_id="eval-1",
-            duration_seconds=100,
-        )
-
-        with patch.object(
-            runner, "_execute_single_run", new_callable=AsyncMock
-        ) as mock_execute:
-            mock_execute.return_value = mock_run
-
-            baseline = await runner.execute(
-                workflow_name="direct",
-                runs=1,
-                version_override="2.0.0",
-            )
-
-            assert baseline.workflow_name == "direct-v2.0.0"
-            assert baseline.workflow_version == "2.0.0"
-
 
 class TestBenchmarkRunnerScoringIntegration:
     """Tests for scoring integration.

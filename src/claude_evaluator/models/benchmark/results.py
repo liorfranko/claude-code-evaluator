@@ -118,7 +118,6 @@ class BenchmarkBaseline(BaseSchema):
 
     Attributes:
         workflow_name: Name of the workflow.
-        workflow_version: User-provided version string.
         model: Model used for runs.
         runs: List of individual run results.
         stats: Computed statistics.
@@ -127,7 +126,6 @@ class BenchmarkBaseline(BaseSchema):
     """
 
     workflow_name: str
-    workflow_version: str
     model: str
     runs: list[BenchmarkRun]
     stats: BaselineStats

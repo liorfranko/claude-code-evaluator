@@ -45,8 +45,7 @@ def sample_baseline() -> BenchmarkBaseline:
         for i in range(5)
     ]
     return BenchmarkBaseline(
-        workflow_name="direct-v1.0.0",
-        workflow_version="1.0.0",
+        workflow_name="direct",
         model="claude-sonnet-4-20250514",
         runs=runs,
         stats=BaselineStats(mean=77.0, std=1.58, ci_95=(75.2, 78.8), n=5),
@@ -80,7 +79,7 @@ class TestBenchmarkStorageSave:
     ) -> None:
         """Test saving creates a JSON file."""
         storage.save_baseline(sample_baseline)
-        expected_path = storage.storage_dir / "direct-v1.0.0.json"
+        expected_path = storage.storage_dir / "direct.json"
         assert expected_path.exists()
 
     def test_save_writes_valid_json(
@@ -88,10 +87,9 @@ class TestBenchmarkStorageSave:
     ) -> None:
         """Test saved file contains valid JSON."""
         storage.save_baseline(sample_baseline)
-        file_path = storage.storage_dir / "direct-v1.0.0.json"
+        file_path = storage.storage_dir / "direct.json"
         content = json.loads(file_path.read_text())
-        assert content["workflow_name"] == "direct-v1.0.0"
-        assert content["workflow_version"] == "1.0.0"
+        assert content["workflow_name"] == "direct"
         assert len(content["runs"]) == 5
 
     def test_save_overwrites_existing(
@@ -106,7 +104,7 @@ class TestBenchmarkStorageSave:
         )
         storage.save_baseline(sample_baseline)
 
-        loaded = storage.load_baseline("direct-v1.0.0")
+        loaded = storage.load_baseline("direct")
         assert loaded is not None
         assert loaded.stats.mean == 80.0
 
@@ -114,7 +112,6 @@ class TestBenchmarkStorageSave:
         """Test workflow names are sanitized for filenames."""
         baseline = BenchmarkBaseline(
             workflow_name="test/with:special<chars",
-            workflow_version="1.0.0",
             model="test",
             runs=[],
             stats=BaselineStats(mean=0.0, std=0.0, ci_95=(0.0, 0.0), n=0),
@@ -134,7 +131,7 @@ class TestBenchmarkStorageLoad:
     ) -> None:
         """Test loading returns a valid baseline."""
         storage.save_baseline(sample_baseline)
-        loaded = storage.load_baseline("direct-v1.0.0")
+        loaded = storage.load_baseline("direct")
         assert loaded is not None
         assert loaded.workflow_name == sample_baseline.workflow_name
         assert loaded.stats.mean == sample_baseline.stats.mean
@@ -149,9 +146,8 @@ class TestBenchmarkStorageLoad:
     ) -> None:
         """Test all fields are preserved after save/load."""
         storage.save_baseline(sample_baseline)
-        loaded = storage.load_baseline("direct-v1.0.0")
+        loaded = storage.load_baseline("direct")
         assert loaded is not None
-        assert loaded.workflow_version == sample_baseline.workflow_version
         assert loaded.model == sample_baseline.model
         assert len(loaded.runs) == len(sample_baseline.runs)
         assert loaded.stats.ci_95 == sample_baseline.stats.ci_95
@@ -161,7 +157,7 @@ class TestBenchmarkStorageLoad:
     ) -> None:
         """Test run metrics are preserved."""
         storage.save_baseline(sample_baseline)
-        loaded = storage.load_baseline("direct-v1.0.0")
+        loaded = storage.load_baseline("direct")
         assert loaded is not None
         assert loaded.runs[0].metrics.total_tokens == 10000
 
@@ -181,7 +177,6 @@ class TestBenchmarkStorageLoadAll:
         for i in range(3):
             baseline = BenchmarkBaseline(
                 workflow_name=f"workflow-{i}",
-                workflow_version="1.0.0",
                 model="test",
                 runs=[],
                 stats=BaselineStats(mean=float(i * 10), std=1.0, ci_95=(0.0, 0.0), n=1),
@@ -207,7 +202,7 @@ class TestBenchmarkStorageLoadAll:
 
         baselines, failures = storage.load_all_baselines()
         assert len(baselines) == 1
-        assert baselines[0].workflow_name == "direct-v1.0.0"
+        assert baselines[0].workflow_name == "direct"
         # Should report 2 failures (invalid.txt is not a .json file, so only bad.json fails)
         assert len(failures) == 1
         assert "bad.json" in str(failures[0][0])
@@ -221,7 +216,7 @@ class TestBenchmarkStorageExists:
     ) -> None:
         """Test exists returns True for saved baseline."""
         storage.save_baseline(sample_baseline)
-        assert storage.baseline_exists("direct-v1.0.0") is True
+        assert storage.baseline_exists("direct") is True
 
     def test_exists_false(self, storage: BenchmarkStorage) -> None:
         """Test exists returns False for missing baseline."""

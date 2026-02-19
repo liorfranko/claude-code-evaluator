@@ -45,7 +45,6 @@ defaults:
 workflows:
   direct:
     type: direct
-    version: "1.0.0"
 ```
 
 ### 2. Run the benchmark
@@ -89,7 +88,6 @@ The evaluator supports three workflow types:
 workflows:
   spectra:
     type: multi_command
-    version: "1.0.0"
     phases:
       - name: specify
         permission_mode: acceptEdits
@@ -116,6 +114,7 @@ The sandbox:
 - Auto-builds the image on first use
 - Forwards `ANTHROPIC_*`, `CLAUDE_*` env vars
 - Mounts GCloud ADC for Vertex AI authentication
+- Mounts `~/.claude/` (read-only) for plugins and settings
 - Limits resources to 4GB RAM, 2 CPUs (configurable)
 
 ## CLI Reference
@@ -177,15 +176,12 @@ evaluation:                                 # Custom scoring criteria (optional)
 workflows:                                  # Workflows to compare
   direct:
     type: direct
-    version: "1.0.0"
 
   with-planning:
     type: plan_then_implement
-    version: "1.0.0"
 
   custom-phases:
     type: multi_command
-    version: "1.0.0"
     phases:
       - name: plan
         permission_mode: acceptEdits
@@ -232,6 +228,12 @@ claude-evaluator --score path/to/evaluation.json --verbose
 ## User Plugins
 
 Evaluations automatically inherit your user-level Claude Code plugins and skills. This allows workflows to use custom skills like `/spectra:specify` or any other plugins you have configured.
+
+**Plugin management:**
+- Plugins are read from your local `~/.claude/` directory
+- To test a new plugin version, update it locally and re-run the benchmark
+- No workflow changes or Docker image rebuilds required—plugins are mounted at runtime
+- In Docker mode, `~/.claude/` is mounted read-only (plugins work but cannot be modified during evaluation)
 
 ## Architecture
 

@@ -182,15 +182,13 @@ class TestBenchmarkBaseline:
             for i in range(5)
         ]
         baseline = BenchmarkBaseline(
-            workflow_name="direct-v1.0.0",
-            workflow_version="1.0.0",
+            workflow_name="direct",
             model="claude-sonnet-4-20250514",
             runs=runs,
             stats=BaselineStats(mean=77.0, std=1.58, ci_95=(75.2, 78.8), n=5),
             updated_at=now,
         )
-        assert baseline.workflow_name == "direct-v1.0.0"
-        assert baseline.workflow_version == "1.0.0"
+        assert baseline.workflow_name == "direct"
         assert len(baseline.runs) == 5
         assert baseline.stats.n == 5
 
@@ -198,7 +196,6 @@ class TestBenchmarkBaseline:
         """Test baseline can have empty runs (for edge case handling)."""
         baseline = BenchmarkBaseline(
             workflow_name="empty",
-            workflow_version="1.0.0",
             model="test-model",
             runs=[],
             stats=BaselineStats(mean=0.0, std=0.0, ci_95=(0.0, 0.0), n=0),
@@ -211,8 +208,7 @@ class TestBenchmarkBaseline:
         """Test baseline can be serialized and deserialized."""
         now = datetime.now()
         baseline = BenchmarkBaseline(
-            workflow_name="test-v1.0.0",
-            workflow_version="1.0.0",
+            workflow_name="test",
             model="test-model",
             runs=[
                 BenchmarkRun(
