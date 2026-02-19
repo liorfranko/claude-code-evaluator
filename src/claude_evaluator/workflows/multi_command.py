@@ -7,12 +7,14 @@ commands to be executed in order.
 """
 
 import asyncio
+import traceback
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from claude_evaluator.config.models import Phase
 from claude_evaluator.logging_config import get_logger
 from claude_evaluator.models.execution.progress import ProgressEvent, ProgressEventType
+from claude_evaluator.models.execution.query_metrics import QueryMetrics
 from claude_evaluator.models.interaction.question import QuestionContext, QuestionItem
 from claude_evaluator.workflows.base import BaseWorkflow
 
@@ -249,29 +251,9 @@ class MultiCommandWorkflow(BaseWorkflow):
         # Have developer agent analyze response and continue if needed
         response = query_metrics.response
 
-        # Log warning if response is None and we may have hit max_turns
+        # Log warning if response is None
         if response is None:
-            effective_max_turns = phase.max_turns or self._agent_factory.max_turns
-            if (
-                effective_max_turns is not None
-                and query_metrics.num_turns >= effective_max_turns
-            ):
-                logger.warning(
-                    "max_turns_limit_reached",
-                    phase=phase.name,
-                    num_turns=query_metrics.num_turns,
-                    max_turns=effective_max_turns,
-                    message=f"Phase '{phase.name}' reached max_turns limit ({query_metrics.num_turns}/{effective_max_turns}). "
-                    "Consider increasing max_turns in defaults or phase configuration.",
-                )
-            else:
-                logger.warning(
-                    "empty_response_received",
-                    phase=phase.name,
-                    num_turns=query_metrics.num_turns,
-                    max_turns=effective_max_turns,
-                    message=f"Phase '{phase.name}' returned empty response after {query_metrics.num_turns} turns.",
-                )
+            self._log_empty_response(phase, query_metrics)
 
         logger.info(
             "developer_continuation_starting",
@@ -346,6 +328,7 @@ class MultiCommandWorkflow(BaseWorkflow):
                     "developer_continuation_skipped",
                     error_type=type(e).__name__,
                     error=str(e),
+                    traceback=traceback.format_exc(),
                     phase=phase.name,
                     continuation_attempt=continuation_count,
                     message="Developer continuation failed, proceeding without further interaction",
@@ -366,9 +349,10 @@ class MultiCommandWorkflow(BaseWorkflow):
     ) -> str:
         """Build the prompt for a phase from its template.
 
-        Substitutes placeholders in the prompt template:
-        - {task}: The evaluation task description
-        - {previous_result}: The result from the previous phase
+        Substitutes placeholders in the prompt:
+        - {{prompt}} or {prompt}: The evaluation task description (benchmark prompt)
+        - {{task}} or {task}: Alias for prompt
+        - {{previous_result}} or {previous_result}: The result from the previous phase
 
         Args:
             phase: The Phase configuration.
@@ -379,18 +363,28 @@ class MultiCommandWorkflow(BaseWorkflow):
             The formatted prompt string.
 
         """
-        # Use static prompt if provided, otherwise use template
-        if phase.prompt:
-            return phase.prompt
+        # Get the prompt text from phase configuration
+        prompt_text = phase.prompt or phase.prompt_template
+        if not prompt_text:
+            return task
 
-        if phase.prompt_template:
-            return phase.prompt_template.format(
-                task=task,
-                previous_result=previous_result or "",
-            )
+        # Replace task-related placeholders first
+        replacements = [
+            ("{{prompt}}", task),
+            ("{{task}}", task),
+            ("{prompt}", task),
+            ("{task}", task),
+        ]
 
-        # Default: just use the task description
-        return task
+        for placeholder, value in replacements:
+            prompt_text = prompt_text.replace(placeholder, value)
+
+        # Replace previous_result placeholders last to avoid reprocessing
+        prev = previous_result or ""
+        prompt_text = prompt_text.replace("{{previous_result}}", prev)
+        prompt_text = prompt_text.replace("{previous_result}", prev)
+
+        return prompt_text
 
     def reset(self) -> None:
         """Reset the workflow state for re-execution.
@@ -400,3 +394,32 @@ class MultiCommandWorkflow(BaseWorkflow):
         self._phase_results.clear()
         self._current_phase_index = 0
         self.reset_metrics()
+
+    def _log_empty_response(self, phase: Phase, query_metrics: QueryMetrics) -> None:
+        """Log appropriate warning when a phase returns an empty response.
+
+        Args:
+            phase: The phase that returned empty response.
+            query_metrics: Metrics from the query execution.
+
+        """
+        effective_max_turns = phase.max_turns or self._agent_factory.max_turns
+        num_turns = query_metrics.num_turns
+
+        if effective_max_turns is not None and num_turns >= effective_max_turns:
+            logger.warning(
+                "max_turns_limit_reached",
+                phase=phase.name,
+                num_turns=num_turns,
+                max_turns=effective_max_turns,
+                message=f"Phase '{phase.name}' reached max_turns limit ({num_turns}/{effective_max_turns}). "
+                "Consider increasing max_turns in defaults or phase configuration.",
+            )
+        else:
+            logger.warning(
+                "empty_response_received",
+                phase=phase.name,
+                num_turns=num_turns,
+                max_turns=effective_max_turns,
+                message=f"Phase '{phase.name}' returned empty response after {num_turns} turns.",
+            )

@@ -142,8 +142,8 @@ class TestValidateArgs:
         )
         assert validate_args(args) is None
 
-    def test_error_benchmark_without_workflow_or_flags(self, tmp_path: Path) -> None:
-        """Test error when --benchmark provided without --workflow, --compare, or --list."""
+    def test_benchmark_without_workflow_is_valid(self, tmp_path: Path) -> None:
+        """Test that --benchmark without --workflow is valid (runs all workflows)."""
         bench_file = tmp_path / "test.yaml"
         bench_file.write_text("name: test")
 
@@ -154,8 +154,8 @@ class TestValidateArgs:
             list_workflows=False,
         )
         error = validate_args(args)
-        assert error is not None
-        assert "--benchmark requires --workflow" in error
+        # Now valid: runs ALL workflows in a session
+        assert error is None
 
     def test_error_results_dir_outside_cwd(self, tmp_path: Path) -> None:
         """Test error when --results-dir is outside CWD and temp dir."""

@@ -33,13 +33,19 @@ Examples:
   # Score an evaluation result
   claude-evaluator --score evaluations/2026-02-02T14-51-21/evaluation.json
 
-  # Run a benchmark workflow
+  # Run ALL benchmark workflows in a session (auto-compares at end)
+  claude-evaluator --benchmark benchmarks/task-cli.yaml --runs 5
+
+  # Run a specific workflow only
   claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct --runs 5
 
-  # Compare all benchmark baselines
+  # Compare baselines from latest session
   claude-evaluator --benchmark benchmarks/task-cli.yaml --compare
 
-  # List benchmark workflows and their status
+  # Compare baselines from a specific session
+  claude-evaluator --benchmark benchmarks/task-cli.yaml --compare --session 2026-02-19_14-30-00
+
+  # List all benchmark sessions
   claude-evaluator --benchmark benchmarks/task-cli.yaml --list
 
   # Score with verbose output
@@ -164,7 +170,14 @@ For more information, see the documentation.
         "--list",
         action="store_true",
         dest="list_workflows",
-        help="List benchmark workflows and their baseline status (requires --benchmark)",
+        help="List benchmark sessions and their status (requires --benchmark)",
+    )
+
+    parser.add_argument(
+        "--session",
+        type=str,
+        metavar="ID",
+        help="Session ID to compare (default: latest). Use with --compare.",
     )
 
     parser.add_argument(

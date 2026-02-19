@@ -11,6 +11,7 @@ import pytest
 
 from claude_evaluator.benchmark.exceptions import BenchmarkError
 from claude_evaluator.benchmark.runner import BenchmarkRunner
+from claude_evaluator.benchmark.utils import sanitize_path_component
 from claude_evaluator.config.models import RepositorySource
 from claude_evaluator.models.benchmark.config import (
     BenchmarkConfig,
@@ -921,56 +922,56 @@ class TestBenchmarkRunnerVerboseOutput:
 
 
 class TestSanitizePathComponent:
-    """Tests for path component sanitization."""
+    """Tests for sanitize_path_component utility function."""
 
     def test_removes_path_separators(self) -> None:
         """Test that forward and back slashes are replaced."""
-        result = BenchmarkRunner._sanitize_path_component("foo/bar\\baz")
+        result = sanitize_path_component("foo/bar\\baz")
         assert "/" not in result
         assert "\\" not in result
         assert result == "foo-bar-baz"
 
     def test_removes_parent_directory_references(self) -> None:
         """Test that .. is replaced to prevent path traversal."""
-        result = BenchmarkRunner._sanitize_path_component("../../../etc/passwd")
+        result = sanitize_path_component("../../../etc/passwd")
         assert ".." not in result
         # Should be sanitized to something safe
         assert "etc" in result or "passwd" in result
 
     def test_removes_special_characters(self) -> None:
         """Test that special characters are replaced."""
-        result = BenchmarkRunner._sanitize_path_component("foo:bar*baz?")
+        result = sanitize_path_component("foo:bar*baz?")
         assert ":" not in result
         assert "*" not in result
         assert "?" not in result
 
     def test_handles_normal_names(self) -> None:
         """Test that normal workflow names pass through."""
-        result = BenchmarkRunner._sanitize_path_component("my-workflow")
+        result = sanitize_path_component("my-workflow")
         assert result == "my-workflow"
 
     def test_handles_names_with_underscores(self) -> None:
         """Test that underscores are preserved."""
-        result = BenchmarkRunner._sanitize_path_component("my_workflow_v1")
+        result = sanitize_path_component("my_workflow_v1")
         assert result == "my_workflow_v1"
 
     def test_removes_leading_dots(self) -> None:
         """Test that leading dots are removed (hidden files)."""
-        result = BenchmarkRunner._sanitize_path_component(".hidden")
+        result = sanitize_path_component(".hidden")
         assert not result.startswith(".")
 
     def test_removes_leading_hyphens(self) -> None:
         """Test that leading hyphens are removed."""
-        result = BenchmarkRunner._sanitize_path_component("--flag")
+        result = sanitize_path_component("--flag")
         assert not result.startswith("-")
 
     def test_empty_string_returns_unnamed(self) -> None:
         """Test that empty string returns 'unnamed'."""
-        result = BenchmarkRunner._sanitize_path_component("")
+        result = sanitize_path_component("")
         assert result == "unnamed"
 
     def test_only_special_chars_returns_unnamed(self) -> None:
         """Test that string with only special chars returns 'unnamed'."""
-        result = BenchmarkRunner._sanitize_path_component("...")
+        result = sanitize_path_component("...")
         # After removing dots, should be unnamed
         assert result == "unnamed" or len(result) > 0

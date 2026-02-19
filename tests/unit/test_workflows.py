@@ -2089,3 +2089,173 @@ class TestMultiCommandWorkflowReset:
 
         assert workflow.phase_results == {}
         assert workflow.current_phase_index == 0
+
+
+class TestMultiCommandWorkflowPromptBuilding:
+    """Tests for prompt building with placeholder substitution."""
+
+    def test_build_prompt_substitutes_double_brace_prompt(self) -> None:
+        """Test that {{prompt}} is substituted with task description."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt="/spectra:specify {{prompt}}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="Build a CLI app",
+            previous_result=None,
+        )
+
+        assert result == "/spectra:specify Build a CLI app"
+        assert "{{prompt}}" not in result
+
+    def test_build_prompt_substitutes_double_brace_task(self) -> None:
+        """Test that {{task}} is substituted with task description."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt="Do this: {{task}}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="Build a REST API",
+            previous_result=None,
+        )
+
+        assert result == "Do this: Build a REST API"
+
+    def test_build_prompt_substitutes_previous_result(self) -> None:
+        """Test that {{previous_result}} is substituted."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt="Based on: {{previous_result}}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="Any task",
+            previous_result="Previous phase output",
+        )
+
+        assert result == "Based on: Previous phase output"
+
+    def test_build_prompt_substitutes_single_brace_prompt(self) -> None:
+        """Test that {prompt} is substituted (backwards compatibility)."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt="Execute: {prompt}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="My task description",
+            previous_result=None,
+        )
+
+        assert result == "Execute: My task description"
+
+    def test_build_prompt_handles_none_previous_result(self) -> None:
+        """Test that None previous_result is handled gracefully."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt="Task: {{prompt}}, Previous: {{previous_result}}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="My task",
+            previous_result=None,
+        )
+
+        assert result == "Task: My task, Previous: "
+
+    def test_build_prompt_returns_task_when_no_prompt(self) -> None:
+        """Test that task is returned when no prompt or template specified."""
+        collector = MetricsCollector()
+        phases = [Phase(name="test", permission_mode=PermissionMode.plan)]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="Default task",
+            previous_result=None,
+        )
+
+        assert result == "Default task"
+
+    def test_build_prompt_preserves_template_strings_in_previous_result(self) -> None:
+        """Test that {prompt} or {task} in previous_result are not substituted.
+
+        This is a regression test for a bug where chained str.replace would
+        unintentionally replace template-like strings in previous_result content.
+        """
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt_template="Task: {task}, Previous: {previous_result}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        # previous_result contains template-like strings that should NOT be replaced
+        previous_content = "Use {prompt} to format and {task} to describe"
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="My task",
+            previous_result=previous_content,
+        )
+
+        # The {prompt} and {task} inside previous_result should be preserved
+        assert result == "Task: My task, Previous: Use {prompt} to format and {task} to describe"
+
+    def test_build_prompt_preserves_double_brace_in_previous_result(self) -> None:
+        """Test that {{prompt}} in previous_result is not substituted."""
+        collector = MetricsCollector()
+        phases = [
+            Phase(
+                name="test",
+                permission_mode=PermissionMode.plan,
+                prompt_template="Result: {{previous_result}}",
+            )
+        ]
+        workflow = MultiCommandWorkflow(collector, phases)
+
+        # previous_result contains double-brace template strings
+        previous_content = "Template uses {{prompt}} and {{task}}"
+
+        result = workflow._build_prompt(
+            phase=phases[0],
+            task="My task",
+            previous_result=previous_content,
+        )
+
+        assert result == "Result: Template uses {{prompt}} and {{task}}"

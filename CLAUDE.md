@@ -2,18 +2,18 @@
 
 ## Project Overview
 
-Claude Code Evaluator — a CLI tool that runs automated evaluations of Claude Code agent implementations. It uses a two-agent architecture (Worker + Developer) with an Evaluator agent for scoring.
+Claude Code Evaluator — a CLI tool for benchmarking Claude Code workflows. Run evaluations multiple times, collect statistics, and compare approaches. Uses a two-agent architecture (Worker + Developer) with an Evaluator agent for scoring.
 
 ## Build & Run
 
 ```bash
-pip install -e .                          # Install in dev mode
-claude-evaluator --workflow direct --task "..." # Ad-hoc evaluation
-claude-evaluator --score evaluations/.../evaluation.json # Score results
-claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct --runs 5 # Run benchmark
-claude-evaluator --benchmark benchmarks/task-cli.yaml --compare  # Compare baselines
-claude-evaluator --benchmark benchmarks/task-cli.yaml --list     # List workflows
-claude-evaluator --benchmark benchmarks/task-cli.yaml --sandbox docker # Run in Docker
+pip install -e .                                              # Install in dev mode
+claude-evaluator --benchmark benchmarks/task-cli.yaml         # Run all workflows (5 runs each)
+claude-evaluator --benchmark benchmarks/task-cli.yaml --workflow direct --runs 3  # Single workflow
+claude-evaluator --benchmark benchmarks/task-cli.yaml --compare   # Compare results
+claude-evaluator --benchmark benchmarks/task-cli.yaml --list      # List sessions
+claude-evaluator --benchmark benchmarks/task-cli.yaml --sandbox docker  # Run in Docker
+claude-evaluator --score path/to/evaluation.json              # Score manually
 ```
 
 ## Test
@@ -73,13 +73,15 @@ src/claude_evaluator/
 
 ## Benchmark System
 
-- `--benchmark FILE --workflow NAME` runs workflow N times and stores baseline
-- `--benchmark FILE --compare` compares all stored baselines with statistical analysis
-- `--benchmark FILE --list` shows workflows and their baseline status
+- `--benchmark FILE` runs ALL workflows in a session (default: 5 runs each)
+- `--benchmark FILE --workflow NAME` runs a single workflow only
+- `--benchmark FILE --compare` compares baselines from latest session
+- `--benchmark FILE --compare --session ID` compares a specific session
+- `--benchmark FILE --list` shows all sessions and their results
 - `--runs N` overrides number of runs (default: 5)
 - `--verbose` shows progress output including tool usage
 - Config loader: `load_benchmark()` in `config/loaders/benchmark.py`
-- Runtime: `benchmark/runner.py` (orchestration), `benchmark/storage.py` (JSON persistence), `benchmark/comparison.py` (bootstrap CI, effect size)
+- Runtime: `benchmark/runner.py` (orchestration), `benchmark/session_storage.py` (session management), `benchmark/comparison.py` (bootstrap CI, effect size)
 - Models: `models/benchmark/config.py` (YAML config), `models/benchmark/results.py` (baseline, stats, dimension scores)
 - Each run: clones repository, executes workflow, generates report, scores with EvaluatorAgent
 
@@ -88,18 +90,20 @@ src/claude_evaluator/
 ```
 results/
 └── {benchmark-name}/
-    ├── baselines/                          # Baseline JSON files
-    │   ├── {workflow}-v{version}.json
-    │   └── ...
-    └── runs/                               # Date-organized run data
-        └── {YYYY-MM-DD}/                   # Date directory
-            └── {HH-MM-SS}_{workflow}_{uuid}/
-                └── workspace/              # Cloned repo + evaluations
+    └── sessions/
+        └── {YYYY-MM-DD_HH-MM-SS}/          # Session directory
+            ├── comparison.json              # Cross-workflow comparison
+            └── {workflow}/                  # Per-workflow results
+                ├── summary.json             # Stats: mean, std, CI
+                └── runs/
+                    └── run-{n}/
+                        └── workspace/       # Cloned repo + evaluation.json
 ```
 
-- **baselines/** — Persisted baseline summaries for comparison
-- **runs/{date}/{time_workflow_uuid}/** — Individual run artifacts, organized by date
-- **workspace/** — Cloned repository with evaluation results (not in git)
+- **sessions/** — Timestamped session directories
+- **comparison.json** — Statistical comparison across workflows in the session
+- **summary.json** — Per-workflow baseline stats (mean, std, CI, dimension scores)
+- **workspace/** — Cloned repository with evaluation results
 
 ### Dimension Scoring
 

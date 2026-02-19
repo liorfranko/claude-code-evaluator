@@ -72,13 +72,6 @@ def validate_args(args: argparse.Namespace) -> str | None:
             return f"Error: Benchmark file not found: {benchmark}"
         if bench_path.suffix not in (".yaml", ".yml"):
             return f"Error: Benchmark file must be YAML: {benchmark}"
-        # --compare and --list don't require --workflow, but run mode does
-        compare = getattr(args, "compare", False)
-        list_wf = getattr(args, "list_workflows", False)
-        workflow = getattr(args, "workflow", None)
-        if not compare and not list_wf and workflow is None:
-            return "Error: --benchmark requires --workflow (or use --compare or --list)"
-
         # Validate --results-dir is within safe boundaries
         results_dir = getattr(args, "results_dir", None)
         if results_dir is not None:

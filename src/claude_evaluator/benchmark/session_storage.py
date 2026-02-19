@@ -1,0 +1,437 @@
+"""Session-based storage for benchmark results.
+
+This module provides session-based organization for benchmark runs,
+where each session contains all workflow results in a timestamped folder.
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import TYPE_CHECKING
+from uuid import uuid4
+
+import pydantic
+
+from claude_evaluator.benchmark.exceptions import StorageError
+from claude_evaluator.benchmark.utils import sanitize_path_component
+from claude_evaluator.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from claude_evaluator.models.benchmark.results import BenchmarkBaseline
+
+__all__ = ["SessionStorage"]
+
+logger = get_logger(__name__)
+
+
+class SessionStorage:
+    """Manages session-based storage for benchmark results.
+
+    Sessions are timestamped directories containing results for all
+    workflows executed together, with automatic comparison generation.
+
+    Structure:
+        results/{benchmark_name}/{session_id}/
+            {workflow_name}/
+                summary.json          <- baseline stats
+                run-{n}/workspace/    <- cloned repo + evaluation
+            comparison.json           <- auto-generated comparison
+
+    Attributes:
+        results_dir: Root results directory.
+        benchmark_name: Name of the benchmark.
+
+    """
+
+    def __init__(self, results_dir: Path, benchmark_name: str) -> None:
+        """Initialize the session storage manager.
+
+        Args:
+            results_dir: Root results directory.
+            benchmark_name: Name of the benchmark.
+
+        Raises:
+            StorageError: If benchmark_name would escape results_dir.
+
+        """
+        self.results_dir = results_dir
+        self.benchmark_name = sanitize_path_component(benchmark_name)
+        self._base_dir = results_dir / self.benchmark_name
+
+        # Verify resolved path stays within results_dir
+        self._validate_path_security(self._base_dir, results_dir, benchmark_name)
+
+        # Track workflow name mappings to detect collisions
+        self._workflow_name_map: dict[str, str] = {}
+
+    def _validate_path_security(self, path: Path, base_dir: Path, name: str) -> None:
+        """Validate that a path stays within the allowed base directory.
+
+        Args:
+            path: Path to validate.
+            base_dir: Allowed base directory.
+            name: Name being validated (for error messages).
+
+        Raises:
+            StorageError: If path would escape base directory.
+
+        """
+        try:
+            resolved_path = path.resolve()
+            resolved_base = base_dir.resolve()
+            if not self._is_path_within(resolved_path, resolved_base):
+                raise StorageError(f"Name '{name}' would escape base directory")
+        except OSError as e:
+            raise StorageError(f"Invalid path: {e}") from e
+
+    @staticmethod
+    def _is_path_within(path: Path, base: Path) -> bool:
+        """Check if a path is within a base directory.
+
+        Args:
+            path: Path to check.
+            base: Base directory.
+
+        Returns:
+            True if path is within base directory.
+
+        """
+        path_str = str(path)
+        base_str = str(base)
+        return path_str.startswith(base_str + "/") or path == base
+
+    def create_session(self) -> tuple[str, Path]:
+        """Create a new session with a timestamped ID and unique suffix.
+
+        The session ID format is: YYYY-MM-DD_HH-MM-SS_XXXXXXXX
+        where XXXXXXXX is a random 8-character hex suffix to prevent
+        collisions when sessions are created within the same second.
+
+        Returns:
+            Tuple of (session_id, session_path).
+
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        unique_suffix = uuid4().hex[:8]
+        session_id = f"{timestamp}_{unique_suffix}"
+        session_path = self._base_dir / session_id
+        session_path.mkdir(parents=True, exist_ok=False)
+
+        logger.info(
+            "session_created",
+            benchmark=self.benchmark_name,
+            session_id=session_id,
+            path=str(session_path),
+        )
+
+        return session_id, session_path
+
+    def get_workflow_dir(self, session_path: Path, workflow_name: str) -> Path:
+        """Get the directory for a specific workflow in a session.
+
+        Args:
+            session_path: Path to the session directory.
+            workflow_name: Name of the workflow.
+
+        Returns:
+            Path to the workflow directory.
+
+        Raises:
+            StorageError: If workflow_name collides with another workflow
+                after sanitization (e.g., "a/b" and "a-b" both become "a-b").
+
+        """
+        safe_name = sanitize_path_component(workflow_name)
+
+        # Check for collision: different workflow names mapping to same directory
+        if safe_name in self._workflow_name_map:
+            original_name = self._workflow_name_map[safe_name]
+            if original_name != workflow_name:
+                raise StorageError(
+                    f"Workflow name collision: '{workflow_name}' and '{original_name}' "
+                    f"both sanitize to '{safe_name}'"
+                )
+        else:
+            self._workflow_name_map[safe_name] = workflow_name
+
+        workflow_dir = session_path / safe_name
+        workflow_dir.mkdir(parents=True, exist_ok=True)
+        return workflow_dir
+
+    def get_run_workspace(
+        self,
+        session_path: Path,
+        workflow_name: str,
+        run_number: int,
+    ) -> Path:
+        """Get the workspace path for a specific run.
+
+        Args:
+            session_path: Path to the session directory.
+            workflow_name: Name of the workflow.
+            run_number: The run number (1-based).
+
+        Returns:
+            Path to the run workspace directory.
+
+        """
+        workflow_dir = self.get_workflow_dir(session_path, workflow_name)
+        run_dir = workflow_dir / f"run-{run_number}"
+        workspace = run_dir / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        return workspace
+
+    def save_workflow_summary(
+        self,
+        session_path: Path,
+        workflow_name: str,
+        baseline: BenchmarkBaseline,
+    ) -> Path:
+        """Save a workflow summary (baseline) to the session.
+
+        Args:
+            session_path: Path to the session directory.
+            workflow_name: Name of the workflow.
+            baseline: The baseline to save.
+
+        Returns:
+            Path to the saved summary file.
+
+        Raises:
+            StorageError: If the file cannot be written.
+
+        """
+        workflow_dir = self.get_workflow_dir(session_path, workflow_name)
+        summary_path = workflow_dir / "summary.json"
+
+        try:
+            with summary_path.open("w", encoding="utf-8") as f:
+                data = baseline.model_dump(mode="json")
+                json.dump(data, f, indent=2, default=str)
+
+            logger.info(
+                "workflow_summary_saved",
+                workflow=workflow_name,
+                path=str(summary_path),
+            )
+            return summary_path
+
+        except OSError as e:
+            raise StorageError(f"Failed to save summary to {summary_path}: {e}") from e
+
+    def save_comparison(
+        self,
+        session_path: Path,
+        baselines: list[BenchmarkBaseline],
+    ) -> Path:
+        """Save comparison results for all baselines in a session.
+
+        Args:
+            session_path: Path to the session directory.
+            baselines: List of baselines to compare.
+
+        Returns:
+            Path to the saved comparison file.
+
+        Raises:
+            StorageError: If the file cannot be written.
+
+        """
+        from claude_evaluator.benchmark.comparison import compare_baselines
+
+        if not baselines:
+            raise StorageError("Cannot save comparison with no baselines")
+
+        # Use first baseline as reference
+        reference_name = baselines[0].workflow_name
+        comparisons = compare_baselines(baselines, reference_name=reference_name)
+
+        comparison_path = session_path / "comparison.json"
+
+        comparison_data = {
+            "reference": reference_name,
+            "baselines": [b.model_dump(mode="json") for b in baselines],
+            "comparisons": [
+                {
+                    "baseline_name": c.baseline_name,
+                    "comparison_name": c.comparison_name,
+                    "difference": c.difference,
+                    "p_value": c.p_value,
+                    "significant": c.significant,
+                }
+                for c in comparisons
+            ],
+            "generated_at": datetime.now().isoformat(),
+        }
+
+        try:
+            with comparison_path.open("w", encoding="utf-8") as f:
+                json.dump(comparison_data, f, indent=2, default=str)
+
+            logger.info(
+                "comparison_saved",
+                path=str(comparison_path),
+                workflow_count=len(baselines),
+            )
+            return comparison_path
+
+        except OSError as e:
+            raise StorageError(
+                f"Failed to save comparison to {comparison_path}: {e}"
+            ) from e
+
+    def list_sessions(self) -> list[tuple[str, Path]]:
+        """List all sessions for this benchmark.
+
+        Returns:
+            List of (session_id, session_path) tuples, sorted newest first.
+
+        """
+        if not self._base_dir.exists():
+            return []
+
+        sessions: list[tuple[str, Path]] = []
+        for path in self._base_dir.iterdir():
+            if path.is_dir() and self._is_valid_session_id(path.name):
+                sessions.append((path.name, path))
+
+        # Sort by session_id (timestamp format), newest first
+        sessions.sort(key=lambda x: x[0], reverse=True)
+        return sessions
+
+    def get_latest_session(self) -> tuple[str, Path] | None:
+        """Get the most recent session.
+
+        Returns:
+            Tuple of (session_id, session_path), or None if no sessions exist.
+
+        """
+        sessions = self.list_sessions()
+        return sessions[0] if sessions else None
+
+    def load_session_baselines(
+        self,
+        session_path: Path,
+    ) -> tuple[list[BenchmarkBaseline], list[tuple[Path, str]]]:
+        """Load all workflow baselines from a session.
+
+        Args:
+            session_path: Path to the session directory.
+
+        Returns:
+            Tuple of (successfully loaded baselines, list of (failed_path, error_msg)).
+
+        """
+        from claude_evaluator.models.benchmark.results import BenchmarkBaseline
+
+        if not session_path.exists():
+            logger.debug(
+                "session_path_not_found",
+                path=str(session_path),
+            )
+            return [], []
+
+        baselines: list[BenchmarkBaseline] = []
+        failures: list[tuple[Path, str]] = []
+
+        for workflow_dir in session_path.iterdir():
+            if not workflow_dir.is_dir():
+                continue
+
+            summary_path = workflow_dir / "summary.json"
+            if not summary_path.exists():
+                continue
+
+            try:
+                with summary_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                baseline = BenchmarkBaseline.model_validate(data)
+                baselines.append(baseline)
+            except (OSError, json.JSONDecodeError, pydantic.ValidationError) as e:
+                logger.warning(
+                    "summary_load_failed",
+                    path=str(summary_path),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                failures.append((summary_path, str(e)))
+
+        # Sort by workflow name for consistent ordering
+        baselines.sort(key=lambda b: b.workflow_name)
+        return baselines, failures
+
+    def get_session(self, session_id: str) -> tuple[str, Path] | None:
+        """Get a specific session by ID.
+
+        Args:
+            session_id: The session ID (timestamp format).
+
+        Returns:
+            Tuple of (session_id, session_path), or None if not found
+            or if the session_id is invalid.
+
+        """
+        # Validate session_id format to prevent path traversal attacks
+        if not self._is_valid_session_id(session_id):
+            logger.warning("invalid_session_id_format", session_id=session_id)
+            return None
+
+        session_path = self._base_dir / session_id
+
+        # Verify resolved path stays within base directory
+        try:
+            if not self._is_path_within(
+                session_path.resolve(), self._base_dir.resolve()
+            ):
+                logger.warning(
+                    "session_path_outside_base_dir",
+                    session_id=session_id,
+                    resolved_path=str(session_path.resolve()),
+                )
+                return None
+        except (OSError, ValueError) as e:
+            logger.warning(
+                "session_path_resolution_failed",
+                session_id=session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return None
+
+        return (session_id, session_path) if session_path.is_dir() else None
+
+    @staticmethod
+    def _is_valid_session_id(name: str) -> bool:
+        """Check if a directory name is a valid session ID.
+
+        Valid formats:
+        - YYYY-MM-DD_HH-MM-SS (legacy)
+        - YYYY-MM-DD_HH-MM-SS_XXXXXXXX (current, with 8-char hex suffix)
+
+        Args:
+            name: The directory name to check.
+
+        Returns:
+            True if it matches a valid session ID format.
+
+        """
+        # Timestamp format used in both cases
+        TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
+
+        # Check current format with 8-char hex suffix
+        if len(name) == 28 and name[19] == "_":
+            try:
+                datetime.strptime(name[:19], TIMESTAMP_FORMAT)
+                int(name[20:], 16)  # Validate hex suffix
+                return True
+            except ValueError:
+                return False
+
+        # Check legacy format
+        try:
+            datetime.strptime(name, TIMESTAMP_FORMAT)
+            return True
+        except ValueError:
+            return False
