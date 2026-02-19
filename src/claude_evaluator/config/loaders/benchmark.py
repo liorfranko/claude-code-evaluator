@@ -303,9 +303,6 @@ def _parse_workflow_definition(
             f"Valid values are: {', '.join(valid_types)}"
         ) from None
 
-    # Parse version (optional)
-    version = v.optional("version", str, default="1.0.0")
-
     # Parse phases (required for multi_command, optional for others)
     phases: list[Phase] = []
     phases_data = data.get("phases")
@@ -325,7 +322,6 @@ def _parse_workflow_definition(
 
     return WorkflowDefinition(
         type=workflow_type,
-        version=version or "1.0.0",
         phases=phases,
     )
 

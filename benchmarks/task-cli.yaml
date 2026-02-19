@@ -41,15 +41,12 @@ evaluation:
 workflows:
   direct:
     type: direct
-    version: "1.0.0"
 
   native-plan:
     type: plan_then_implement
-    version: "1.0.0"
 
   spectra-v1.0:
     type: multi_command
-    version: "1.0.0"
     phases:
       - name: specify
         permission_mode: acceptEdits
@@ -69,7 +66,6 @@ workflows:
 
   spectra-v1.1:
     type: multi_command
-    version: "1.1.0"
     phases:
       - name: specify
         permission_mode: acceptEdits

@@ -89,7 +89,6 @@ class RunBenchmarkCommand(BaseCommand):
         workflow_name = getattr(args, "workflow", None)
         runs = getattr(args, "runs", None) or 5
         verbose = getattr(args, "verbose", False)
-        version_override = getattr(args, "benchmark_version", None)
 
         # Determine which workflows to run
         if workflow_name:
@@ -118,7 +117,6 @@ class RunBenchmarkCommand(BaseCommand):
             workflow_names=workflow_names,
             runs=runs,
             verbose=verbose,
-            version_override=version_override,
         )
 
         # Format summary message
@@ -304,7 +302,7 @@ class RunBenchmarkCommand(BaseCommand):
             lines.append(
                 f"    Mean: {stats.mean:.1f}  Std: {stats.std:.1f}  95% CI: {ci_str}"
             )
-            lines.append(f"    Runs: {stats.n}  Version: {baseline.workflow_version}")
+            lines.append(f"    Runs: {stats.n}")
 
             # Add dimension breakdown if available
             if stats.dimension_stats:

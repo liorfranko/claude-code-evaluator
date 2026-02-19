@@ -53,13 +53,11 @@ class WorkflowDefinition(BaseSchema):
 
     Attributes:
         type: Workflow type (direct, plan_then_implement, multi_command).
-        version: User-provided version string for tracking.
         phases: Execution phases (for multi_command workflows).
 
     """
 
     type: WorkflowType
-    version: str = "1.0.0"
     phases: list[Phase] = Field(default_factory=list)
 
 

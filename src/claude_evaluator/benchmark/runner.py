@@ -88,7 +88,6 @@ class BenchmarkRunner:
         self,
         workflow_name: str,
         runs: int = 5,
-        version_override: str | None = None,
         verbose: bool = False,
     ) -> BenchmarkBaseline:
         """Execute a workflow N times and return baseline.
@@ -96,7 +95,6 @@ class BenchmarkRunner:
         Args:
             workflow_name: Name of workflow from config.
             runs: Number of runs to execute.
-            version_override: Optional version to use instead of workflow.version.
             verbose: Whether to print progress output.
 
         Returns:
@@ -110,13 +108,11 @@ class BenchmarkRunner:
             raise BenchmarkError(f"Workflow '{workflow_name}' not found in config")
 
         workflow_def = self.config.workflows[workflow_name]
-        effective_version = version_override or workflow_def.version
 
         logger.info(
             "benchmark_starting",
             benchmark=self.config.name,
             workflow=workflow_name,
-            version=effective_version,
             runs=runs,
         )
 
@@ -133,13 +129,8 @@ class BenchmarkRunner:
         # Compute stats using bootstrap CI
         stats = self._compute_stats(run_results)
 
-        # Build and save baseline
-        # Storage key includes version: e.g., "spectra-v1.1.0"
-        storage_key = f"{workflow_name}-v{effective_version}"
-
         baseline = BenchmarkBaseline(
-            workflow_name=storage_key,
-            workflow_version=effective_version,
+            workflow_name=workflow_name,
             model=self.config.defaults.model,
             runs=run_results,
             stats=stats,
@@ -150,8 +141,7 @@ class BenchmarkRunner:
 
         logger.info(
             "benchmark_complete",
-            workflow=storage_key,
-            version=effective_version,
+            workflow=workflow_name,
             mean=stats.mean,
             ci_95=stats.ci_95,
             n=stats.n,
@@ -164,7 +154,6 @@ class BenchmarkRunner:
         workflow_names: list[str] | None = None,
         runs: int = 5,
         verbose: bool = False,
-        version_override: str | None = None,
     ) -> tuple[str, list[BenchmarkBaseline]]:
         """Execute workflows and store in a timestamped session folder.
 
@@ -175,8 +164,6 @@ class BenchmarkRunner:
             workflow_names: Names of workflows to run. If None, runs all workflows.
             runs: Number of runs per workflow.
             verbose: Whether to print progress output.
-            version_override: Optional version to use instead of workflow.version
-                for all workflows in this session.
 
         Returns:
             Tuple of (session_id, list of baselines for each workflow).
@@ -225,7 +212,6 @@ class BenchmarkRunner:
                 workflow_name=workflow_name,
                 runs=runs,
                 verbose=verbose,
-                version_override=version_override,
             )
             baselines.append(baseline)
 
@@ -307,7 +293,6 @@ class BenchmarkRunner:
         workflow_name: str,
         runs: int,
         verbose: bool,
-        version_override: str | None = None,
     ) -> BenchmarkBaseline:
         """Execute a single workflow within a session.
 
@@ -317,14 +302,12 @@ class BenchmarkRunner:
             workflow_name: Name of the workflow.
             runs: Number of runs.
             verbose: Whether to print progress.
-            version_override: Optional version to use instead of workflow.version.
 
         Returns:
             BenchmarkBaseline with results.
 
         """
         workflow_def = self.config.workflows[workflow_name]
-        effective_version = version_override or workflow_def.version
 
         async def execute_session_run(run_number: int) -> BenchmarkRun:
             workspace_path = session_storage.get_run_workspace(
@@ -347,10 +330,9 @@ class BenchmarkRunner:
         # Compute stats
         stats = self._compute_stats(run_results)
 
-        # Build baseline (use workflow_name directly, no version suffix)
+        # Build baseline
         baseline = BenchmarkBaseline(
             workflow_name=workflow_name,
-            workflow_version=effective_version,
             model=self.config.defaults.model,
             runs=run_results,
             stats=stats,
@@ -580,10 +562,25 @@ class BenchmarkRunner:
         except (WorkflowExecutionError, RepositoryError):
             raise
         except Exception as e:
+            error_str = str(e)
+
+            # Provide user-friendly message for SDK initialization timeout
+            if "Control request timeout: initialize" in error_str:
+                logger.error(
+                    "claude_code_connection_timeout",
+                    run_id=run_id,
+                    error=error_str,
+                )
+                raise WorkflowExecutionError(
+                    f"Failed to connect to Claude Code for run {run_id}. "
+                    "Ensure Claude Code is installed and accessible. "
+                    "In Docker, verify the container has network access."
+                ) from e
+
             logger.error(
                 "benchmark_run_unexpected_error",
                 run_id=run_id,
-                error=str(e),
+                error=error_str,
                 error_type=type(e).__name__,
             )
             raise WorkflowExecutionError(

@@ -45,7 +45,6 @@ dev = [
 [project.scripts]
 claude-evaluator = "claude_evaluator.cli:main"
 claude-eval = "claude_evaluator.cli:main"
-task-manager = "task_manager.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -86,7 +85,7 @@ ignore = [
 "src/claude_evaluator/scoring/checks/**/*.py" = ["ARG002"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["claude_evaluator", "task_manager"]
+known-first-party = ["claude_evaluator"]
 
 [tool.ruff.format]
 quote-style = "double"

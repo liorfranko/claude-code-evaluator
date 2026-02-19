@@ -181,14 +181,6 @@ For more information, see the documentation.
     )
 
     parser.add_argument(
-        "--benchmark-version",
-        type=str,
-        metavar="VERSION",
-        dest="benchmark_version",
-        help="Override workflow version at runtime (e.g., '1.1.0')",
-    )
-
-    parser.add_argument(
         "--results-dir",
         type=str,
         metavar="DIR",

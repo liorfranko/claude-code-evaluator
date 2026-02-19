@@ -20,7 +20,6 @@ def make_baseline(workflow_name: str, score: int = 80) -> BenchmarkBaseline:
     """Create a test baseline."""
     return BenchmarkBaseline(
         workflow_name=workflow_name,
-        workflow_version="1.0.0",
         model="claude-sonnet-4-20250514",
         runs=[
             BenchmarkRun(

@@ -85,7 +85,6 @@ class TestWorkflowDefinition:
         """Test creating a direct workflow definition."""
         workflow = WorkflowDefinition(type=WorkflowType.direct)
         assert workflow.type == WorkflowType.direct
-        assert workflow.version == "1.0.0"
         assert workflow.phases == []
 
     def test_plan_then_implement_workflow(self) -> None:
@@ -100,7 +99,6 @@ class TestWorkflowDefinition:
 
         workflow = WorkflowDefinition(
             type=WorkflowType.multi_command,
-            version="1.1.0",
             phases=[
                 Phase(
                     name="specify",
@@ -115,16 +113,7 @@ class TestWorkflowDefinition:
             ],
         )
         assert workflow.type == WorkflowType.multi_command
-        assert workflow.version == "1.1.0"
         assert len(workflow.phases) == 2
-
-    def test_custom_version(self) -> None:
-        """Test custom version string."""
-        workflow = WorkflowDefinition(
-            type=WorkflowType.direct,
-            version="2.0.0-beta",
-        )
-        assert workflow.version == "2.0.0-beta"
 
     def test_workflow_type_from_string(self) -> None:
         """Test workflow type accepts string values."""

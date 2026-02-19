@@ -48,7 +48,6 @@ def create_baseline(
 
     return BenchmarkBaseline(
         workflow_name=name,
-        workflow_version="1.0.0",
         model="test-model",
         runs=runs,
         stats=BaselineStats(
