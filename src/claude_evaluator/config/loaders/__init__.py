@@ -24,7 +24,7 @@ def __getattr__(name: str):
 
 __all__ = [
     "apply_defaults",
-    "load_benchmark",
+    "load_benchmark",  # pyright: ignore[reportUnsupportedDunderAll]
     "load_reviewer_configs",
     "load_suite",
 ]
