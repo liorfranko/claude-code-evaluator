@@ -260,7 +260,4 @@ Provide your analysis as a structured review with:
   - confidence (0-100): Confidence in this specific issue
 - **strengths**: List of positive findings demonstrating good documentation
 
-If no code files are provided or the implementation is clearly incomplete, note that
-documentation cannot be fully evaluated and assign a low confidence_score.
-
 Focus on documentation completeness and clarity, not on whether the code works correctly."""

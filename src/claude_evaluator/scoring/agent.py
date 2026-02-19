@@ -190,19 +190,20 @@ class EvaluatorAgent:
         if not evaluation.metrics or not evaluation.metrics.queries:
             return ""
 
-        queries = evaluation.metrics.queries
-        # Use the last query's response as it reflects the final state of the workflow
-        last_query = queries[-1]
-        response = last_query.response
-        if not response:
+        last_query = evaluation.metrics.queries[-1]
+        if not last_query.response:
             return ""
 
         phase = last_query.phase or "unknown"
-        truncated = response[:_CONTEXT_MAX_CHARS]
-        if len(response) > _CONTEXT_MAX_CHARS:
-            truncated += f"\n... (truncated, {len(response) - _CONTEXT_MAX_CHARS} chars omitted)"
+        response = last_query.response
 
-        return f"Workflow phase '{phase}' final output:\n{truncated}"
+        # Truncate response if needed
+        if len(response) > _CONTEXT_MAX_CHARS:
+            truncated = response[:_CONTEXT_MAX_CHARS]
+            chars_omitted = len(response) - _CONTEXT_MAX_CHARS
+            return f"Workflow phase '{phase}' final output:\n{truncated}\n... (truncated, {chars_omitted} chars omitted)"
+
+        return f"Workflow phase '{phase}' final output:\n{response}"
 
     def _extract_steps(self, evaluation: EvaluationReport) -> list[dict]:
         """Extract tool call steps from evaluation messages."""

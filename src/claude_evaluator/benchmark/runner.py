@@ -6,6 +6,7 @@ repository setup, workflow execution, scoring, and baseline storage.
 
 from __future__ import annotations
 
+import shutil
 import statistics as stats_lib
 import time
 from collections.abc import Awaitable, Callable
@@ -533,9 +534,18 @@ class BenchmarkRunner:
 
             report_path = await self._generate_report(evaluation, workspace)
 
+            # Move evaluation.json to run directory for easier access
+            run_eval_path = workspace.parent / "evaluation.json"
+            shutil.move(report_path, run_eval_path)
+            logger.debug(
+                "evaluation_moved_to_run_dir",
+                source=str(report_path),
+                dest=str(run_eval_path),
+            )
+
             criteria = self.config.evaluation.criteria or None
             score_report = await self._score_evaluation(
-                report_path, workspace, criteria
+                run_eval_path, workspace, criteria
             )
 
             dimension_scores = self._extract_dimension_scores(score_report)
